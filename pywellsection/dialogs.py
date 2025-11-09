@@ -150,3 +150,40 @@ class EditFormationTopDialog(QDialog):
             min_bound, max_bound = ref_depth, well_td
 
         return min_bound, max_bound
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QLabel,
+    QComboBox, QDialogButtonBox
+)
+
+class AddFormationTopDialog(QDialog):
+    """
+    Dialog to add a new formation top at a picked depth.
+    Shows the depth and a drop-down of stratigraphic candidates.
+    """
+    def __init__(self, parent, well_name: str, depth: float, candidates: list[str]):
+        super().__init__(parent)
+        self.setWindowTitle(f"Add formation top • {well_name}")
+        self.resize(380, 160)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Depth label
+        lbl_depth = QLabel(f"{depth:.3f}")
+        form.addRow("Depth:", lbl_depth)
+
+        # Drop-down with candidate units
+        self.combo = QComboBox(self)
+        self.combo.addItems(candidates)
+        form.addRow("Unit:", self.combo)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def selected_unit(self) -> str:
+        return self.combo.currentText()

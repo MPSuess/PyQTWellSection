@@ -15,11 +15,10 @@ from .multi_wells_panel import draw_multi_wells_panel_on_figure
 from .multi_wells_panel import add_tops_and_correlations
 from .sample_data import create_dummy_data
 from .dialogs import EditFormationTopDialog
+from .dialogs import AddFormationTopDialog
 
 
 import numpy as np
-
-
 
 
 class WellPanelWidget(QWidget):
@@ -37,7 +36,7 @@ class WellPanelWidget(QWidget):
 
         self.fig = Figure(figsize=(12, 6), dpi=100)
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setFixedSize(1200, 600)
+        self.canvas.setFixedSize(1200, 800)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidget(self.canvas)
@@ -280,23 +279,27 @@ class WellPanelWidget(QWidget):
         self._picked_depth = nearest_depth
         self._picked_formation = nearest_name
 
+        menu = QMenu(self)
+
         # distance threshold
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
         depth_range = abs(well_td - ref_depth) or 1.0
         max_pick_distance = depth_range * 0.02
         if min_dist > max_pick_distance:
-            return
+            act_add = menu.addAction(f"Add top at {click_depth:.2f} m…")
+            act_edit = None
+            act_delete = None
 
-        # highlight this top temporarily
-        self._clear_temp_highlight()
-        self._draw_temp_highlight(wi, nearest_name)
 
-        # NEW Added part
-        # --- context menu at mouse position ---
-        menu = QMenu(self)
-        act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
-        act_delete = menu.addAction(f"Delete top '{nearest_name}'…")
+        else:
+            # highlight this top temporarily
+            self._clear_temp_highlight()
+            self._draw_temp_highlight(wi, nearest_name)
+            act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
+            act_delete = menu.addAction(f"Delete top '{nearest_name}'…")
+            act_add = None
+
         # later: add more actions here (Delete, Rename, Change level, etc.)
 
         if hasattr(event, "guiEvent") and event.guiEvent is not None:
@@ -322,6 +325,10 @@ class WellPanelWidget(QWidget):
 
         if chosen == act_delete:
             self._delete_formation_top(well_index=wi, top_name=nearest_name)
+            return
+
+        if chosen == act_add:
+            self._add_formation_top_at_depth(well_index=wi, depth=float(click_depth))
             return
 
         # future: handle other actions here (e.g. if chosen == act_delete: ...)
@@ -777,6 +784,127 @@ class WellPanelWidget(QWidget):
         #     min_bound, max_bound = ref_depth, well_td
 
         return min_bound, max_bound
+
+    def _add_formation_top_at_depth(self, well_index: int, depth: float):
+        """
+        At a picked depth in one well, find all stratigraphic units that can be
+        inserted at that depth (without violating self.stratigraphy order),
+        let the user choose one, and insert it.
+        """
+        well = self.wells[well_index]
+        tops = well.setdefault("tops", {})
+
+        ref_depth = well["reference_depth"]
+        well_td = ref_depth + well["total_depth"]
+
+        # Basic sanity: depth must be within the well interval
+        if not (ref_depth <= depth <= well_td):
+            QMessageBox.information(
+                self, "Add top",
+                "Picked depth is outside the well interval."
+            )
+            return
+
+        strat = getattr(self, "stratigraphy", None)
+        if not strat:
+            QMessageBox.information(
+                self, "Add top",
+                "No stratigraphic column is defined."
+            )
+            return
+
+        # Build candidate list
+        candidates: list[str] = []
+
+        for name in strat:
+            # Skip units already present in this well
+            if name in tops:
+                continue
+
+            tops = well.get("tops", {})
+            idx_map = {key: i for i, key in enumerate(tops)}
+            idx = idx_map.get(name)
+            idx_l = list(idx_map)
+            shallower_depth = None
+            deeper_depth = None
+            ok = True
+
+            if idx is None:
+                shallower_depth = ref_depth
+                deeper_depth = well_td
+            else:
+                if idx == 0:
+                   shallower_depth = min_bound
+                   deeper_depth = tops[idx_l[idx + 1]]["depth"]
+                elif idx == len(idx_l) - 1:
+                    shallower_depth=tops[idx_l[idx - 1]]["depth"]
+                    deeper_depth = max_bound
+                else:
+                    shallower_depth = tops[idx_l[idx - 1]]["depth"]
+                    deeper_depth = tops[idx_l[idx + 1]]["depth"]
+
+                # Must be deeper than shallower neighbor (if it exists)
+            if shallower_depth is not None and depth <= shallower_depth:
+                ok = False
+            # Must be shallower than deeper neighbor (if it exists)
+            if deeper_depth is not None and depth >= deeper_depth:
+                ok = False
+
+            if ok:
+                candidates.append(name)
+
+
+            # # Find shallower neighbor in this well (in strat order)
+            # shallower_depth = None
+            # for j in range(idx - 1, -1, -1):
+            #     n2 = strat[j]
+            #     if n2 in tops:
+            #         val2 = tops[n2]
+            #         shallower_depth = float(val2["depth"] if isinstance(val2, dict) else val2)
+            #         break
+            #
+            # # Find deeper neighbor in this well (in strat order)
+            # deeper_depth = None
+            # for j in range(idx + 1, len(strat)):
+            #     n2 = strat[j]
+            #     if n2 in tops:
+            #         val2 = tops[n2]
+            #         deeper_depth = float(val2["depth"] if isinstance(val2, dict) else val2)
+            #         break
+
+
+
+        if not candidates:
+            QMessageBox.information(
+                self, "Add top",
+                "No stratigraphic units can be inserted at this depth\n"
+                "without violating the stratigraphic order."
+            )
+            return
+
+        # Let user choose which unit to insert
+        dlg = AddFormationTopDialog(
+            self,
+            well_name=well.get("name", f"Well {well_index + 1}"),
+            depth=depth,
+            candidates=candidates,
+        )
+
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        unit_name = dlg.selected_unit()
+        if not unit_name:
+            return
+
+        # Insert new top at the picked depth
+        # You can also choose to store dict with level/color if you like.
+        # For now just store a numeric depth; your existing code handles that.
+        tops[unit_name] = float(depth)
+
+        # Clear highlight and redraw panel (tops, fills, correlations, etc.)
+        self._clear_temp_highlight()
+        self.draw_panel()
 
 
 class MainWindow(QMainWindow):
