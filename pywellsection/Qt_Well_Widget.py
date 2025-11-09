@@ -11,10 +11,10 @@ from PyQt5.QtWidgets import (
     QScrollArea, QDialog, QMenu, QVBoxLayout, QMessageBox
 )
 
-from multi_wells_panel import draw_multi_wells_panel_on_figure
-from multi_wells_panel import add_tops_and_correlations
-from sample_data import create_dummy_data
-from dialogs import EditFormationTopDialog
+from .multi_wells_panel import draw_multi_wells_panel_on_figure
+from .multi_wells_panel import add_tops_and_correlations
+from .sample_data import create_dummy_data
+from .dialogs import EditFormationTopDialog
 
 
 import numpy as np
