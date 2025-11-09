@@ -2,10 +2,12 @@ import numpy as np
 
 def create_dummy_data_all():
     stratigraphy = {
+        "Upper Formation A": {"level": "sequence", "color": "#ff0000"},
         "Formation A": {"level": "formation", "color": "#ffcc00"},
         "Sequence 1": { "level": "sequence"},
         "Member A1": {"level": "member"},
         "Carboniferous": {"level": "formation", "color": "#000000"},
+        "Lower Formation A": {"level": "sequence", "color": "#0000ff"},
     }
 
     # Define depth intervals and facies

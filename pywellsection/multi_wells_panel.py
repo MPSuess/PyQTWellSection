@@ -112,10 +112,10 @@ def draw_multi_wells_panel_on_figure(
         total_cols,
         width_ratios=width_ratios,
         wspace=0.05,
-        left=0.06,
-        right=0.99,
+        left=0.1,
+        right=0.90,
         bottom=0.10,
-        top=0.86,
+        top=0.8,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -128,7 +128,7 @@ def draw_multi_wells_panel_on_figure(
     # One "main" axis per well (first track)
     well_main_axes = []
 
-    # ---- 1st pass: logs & axes (continuous + discrete) ----
+    ### ---- 1st pass: logs & axes (continuous + discrete) ----
     for wi, well in enumerate(wells):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
@@ -157,7 +157,7 @@ def draw_multi_wells_panel_on_figure(
             # Well title above middle track
             mid_track = n_tracks // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi+1}"), pad=18)
+                base_ax.set_title(well.get("name", f"Well {wi+1}"), pad=5)
 
             # ---- Continuous logs ----
             for j, log_cfg in enumerate(track.get("logs", [])):
@@ -249,11 +249,12 @@ def draw_multi_wells_panel_on_figure(
                             zorder=0.8,
                         )
 
-    # ---- draw & add depth range labels ----
+    ### ---- draw & add depth range labels ----
+
     fig.canvas.draw()
     add_depth_range_labels(fig, axes, wells, n_tracks)
 
-    # ---- tops + correlations (all the fancy stuff) ----
+    ### ---- tops + correlations (all the fancy stuff) ----
     if corr_artists is None:
         corr_artists = []
 
@@ -268,7 +269,7 @@ def draw_multi_wells_panel_on_figure(
         highlight_top=highlight_top,
     )
 
-    # Suptitle
+    ### Suptitle
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
 
