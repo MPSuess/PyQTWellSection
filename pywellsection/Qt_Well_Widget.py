@@ -231,6 +231,12 @@ class WellPanelWidget(QWidget):
             self._active_top_dialog.activateWindow()
 
     def _on_top_click(self, event):
+
+        # 🔒 Ignore clicks when toolbar is in zoom or pan mode
+        if hasattr(self, "toolbar") and getattr(self.toolbar, "mode", ""):
+            # mode is a non-empty string when zoom/pan is active, e.g. "zoom rect"
+            return
+
         if self._in_dialog_pick_mode:
             return
         if event.button != 1 or event.inaxes is None:
