@@ -98,6 +98,7 @@ class WellPanelWidget(QWidget):
 
     def update_panel(self,tracks, wells, stratigraphy):
         self.tracks = tracks
+        self.n_tracks = len(tracks)
         self.wells = wells
         self.stratigraphy = stratigraphy
         self.draw_panel()

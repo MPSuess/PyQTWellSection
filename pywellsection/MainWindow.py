@@ -61,26 +61,21 @@ class MainWindow(QMainWindow):
 
     def _project_file_open(self):
         """Load wells/tracks data from a JSON file (example)."""
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open well data",
-            "",
-            "Well data (*.json);;All files (*.*)"
-        )
+        path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
         if not path:
             return
-
         try:
+            wells, tracks, stratigraphy, _ = load_project_from_json(path)
+            self.panel.wells = wells
+            self.panel.tracks = tracks
+            self.panel.stratigraphy = stratigraphy
 
-            #path = Path(path)
-
-            self.wells, self.tracks, self.stratigraphy, meta_data = load_project_from_json(path)
-
-            self.panel.update_panel(self.wells, self.tracks, self.stratigraphy)
+            # ✅ Trigger full redraw
+            self.panel.update_panel(tracks, wells, stratigraphy)
             self.panel.draw_panel()
 
         except Exception as e:
-            QMessageBox.critical(self, "Open error", f"Failed to open file:\n{e}")
+            QMessageBox.critical(self, "Open Error", str(e))
 
     def _project_file_save(self):
         """Save wells/tracks data to a JSON file (example)."""
