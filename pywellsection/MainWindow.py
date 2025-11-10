@@ -14,8 +14,8 @@ from pathlib import Path
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Well Log / Picking Panel")
-        self.resize(1000, 800)
+        self.setWindowTitle("PyQTWellSection")
+        self.resize(1200, 1000)
 
         # ---- central widget ----
 
@@ -25,8 +25,6 @@ class MainWindow(QMainWindow):
         self.dock_panel.setWidget(self.panel)
         self.addDockWidget(Qt.TopDockWidgetArea, self.dock_panel)
         #self.setCentralWidget(self.panel)
-
-        # Create docks
 
         # ipython console
         self.console = QIPythonWidget(self)
@@ -48,6 +46,10 @@ class MainWindow(QMainWindow):
         logging.getLogger().setLevel("DEBUG")
         self.dock_logger = QDockWidget("Log", self)
         self.dock_logger.setWidget(self.textbox_logger.widget)
+
+        self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
+
+        self.resizeDocks([self.dock_panel, self.dock_console], [4, 1], Qt.Vertical)
 
         self.tabifyDockWidget(self.dock_console, self.dock_commands)
         self.tabifyDockWidget(self.dock_commands, self.dock_logger)
