@@ -214,5 +214,5 @@ def create_top_only_Data ():
 
 
 def create_dummy_data():
-    wells, tracks, stratigraphy = create_dummy_data_all()
+    wells, tracks, stratigraphy = create_dummy_data_0()
     return wells, tracks, stratigraphy
