@@ -293,9 +293,6 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
 
-
-
-
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 

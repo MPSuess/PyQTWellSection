@@ -39,6 +39,9 @@ def create_dummy_data_all():
 
     well1 = {
         "name": "Well A",
+        "x": 654321.0,
+        "y": 5234567.0,
+        "reference_type": "KB",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "logs": {
@@ -64,6 +67,9 @@ def create_dummy_data_all():
 
     well2 = {
         "name": "Well B",
+        "x": 654700.0,
+        "y": 5234600.0,
+        "reference_type": "RL",
         "reference_depth": 1010.0,  # different KB
         "total_depth": 1000.0,  # different TD -> 1010–2010 m
         "logs": {
@@ -81,6 +87,9 @@ def create_dummy_data_all():
 
     well3 = {
         "name": "Well A",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "RL",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "logs": {
@@ -138,12 +147,6 @@ def create_dummy_data_all():
         }
     },
     ]
-
-
-
-
-
-
     wells = [well1, well2, well3]
 
     return wells, tracks, stratigraphy
@@ -151,7 +154,8 @@ def create_dummy_data_all():
 def create_dummy_data_0():
     wells = []
     tracks = []
-    return wells, tracks
+    stratigraphy = []
+    return wells, tracks, stratigraphy
 
 def create_top_only_Data ():
 
