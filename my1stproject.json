@@ -1,0 +1,12 @@
+{
+  "wells": [
+    {
+      "name": "Well A",
+      "x": 654321.0,
+      "y": 5234567.0,
+      "reference_type": "KB",
+      "reference_depth": 950.0,
+      "total_depth": 800.0,
+      "logs": {
+        "GR": {
+          "depth": 
