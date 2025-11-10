@@ -920,23 +920,3 @@ class WellPanelWidget(QWidget):
         self._clear_temp_highlight()
         self.draw_panel()
 
-#
-# class MainWindow(QMainWindow):
-#     def __init__(self):
-#         super().__init__()
-#         self.setWindowTitle("Well Panel with Toolbar")
-#
-#         wells, tracks, stratigraphy = create_dummy_data()
-#
-#         self.panel = WellPanelWidget(wells,tracks, stratigraphy)
-#         self.setCentralWidget(self.panel)
-#
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     w = MainWindow()
-#     w.resize(1000, 700)
-#     w.show()
-#     sys.exit(app.exec_())
-#
-#
-#
