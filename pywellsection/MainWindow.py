@@ -1,11 +1,14 @@
 from PyQt5.QtWidgets import (
-    QMainWindow, QAction, QFileDialog, QMessageBox
+    QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget
 )
+from PyQt5.QtCore import Qt
 from pywellsection.Qt_Well_Widget import WellPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json
+from pywellsection.widgets import QTextEditLogger, QTextEditCommands
+from pywellsection.console import QIPythonWidget
 
-import json
+import logging
 from pathlib import Path
 
 class MainWindow(QMainWindow):
@@ -18,7 +21,40 @@ class MainWindow(QMainWindow):
 
         wells, tracks, stratigraphy = create_dummy_data()
         self.panel = WellPanelWidget(wells, tracks, stratigraphy)
-        self.setCentralWidget(self.panel)
+        self.dock_panel = QDockWidget("Well Panel", self)
+        self.dock_panel.setWidget(self.panel)
+        self.addDockWidget(Qt.TopDockWidgetArea, self.dock_panel)
+        #self.setCentralWidget(self.panel)
+
+        # Create docks
+
+        # ipython console
+        self.console = QIPythonWidget(self)
+        self.dock_console = QDockWidget("Console", self)
+        self.dock_console.setWidget(self.console)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_console)
+
+        # commands
+        self.textedit_commands = QTextEditCommands(self)
+        self.dock_commands = QDockWidget("Commands", self)
+        self.dock_commands.setWidget(self.textedit_commands)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_commands)
+
+        # log panel
+        self.textbox_logger = QTextEditLogger(self)
+        formatter = logging.Formatter("%(name)-20s - %(levelname)-8s - %(message)s")
+        self.textbox_logger.setFormatter(formatter)
+        logging.getLogger().addHandler(self.textbox_logger)
+        logging.getLogger().setLevel("DEBUG")
+        self.dock_logger = QDockWidget("Log", self)
+        self.dock_logger.setWidget(self.textbox_logger.widget)
+
+        self.tabifyDockWidget(self.dock_console, self.dock_commands)
+        self.tabifyDockWidget(self.dock_commands, self.dock_logger)
+        self.dock_console.raise_()
+
+
+
 
         # ---- build menu bar ----
         self._create_menubar()
