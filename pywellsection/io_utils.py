@@ -2,6 +2,8 @@
 import json
 import numpy as np
 from pathlib import Path
+import re
+import pandas as pd
 
 def load_project_from_json(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -143,3 +145,45 @@ def _to_json(self, obj):
 
     # fallback
     return self._to_json_scalar(obj)
+
+def parse_petrel_wellhead_file(path):
+    """Parse a Petrel Well Head file and return a DataFrame."""
+    with open(path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    # Find header block
+    begin = lines.index("BEGIN HEADER")
+    end = lines.index("END HEADER")
+    header_lines = lines[begin + 1:end]
+    headers = [h.strip() for h in header_lines]
+
+    # Data starts after END HEADER
+    data_lines = lines[end + 1:]
+
+    # Petrel data lines: quoted strings + numbers separated by spaces
+    # Split on spaces but preserve quoted substrings
+    pattern = re.compile(r'"[^"]*"|\S+')
+
+    records = []
+    for line in data_lines:
+        tokens = [t.strip('"') for t in pattern.findall(line)]
+        if len(tokens) != len(headers):
+            print(f"⚠️  Warning: skipping malformed line ({len(tokens)} vs {len(headers)}): {line}")
+            continue
+        records.append(tokens)
+
+    df = pd.DataFrame(records, columns=headers)
+
+    # Convert numeric fields (where possible)
+    numeric_cols = [
+        "Surface X", "Surface Y", "Well datum value", "TD (MD)",
+        "Bottom hole X", "Bottom hole Y"
+    ]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Replace Petrel nulls
+    df.replace({"NULL": None, "-999": None}, inplace=True)
+
+    return df
