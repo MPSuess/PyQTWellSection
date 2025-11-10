@@ -1,25 +1,21 @@
 #from sample_data import create_dummy_data
 #from Qt_Well_Widget import WellPanelWidget
+from PyQt5 import QtWidgets, QtCore
+
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow,
+    QApplication
 )
 import sys
 
-from pywellsection.Qt_Well_Widget import WellPanelWidget
-from pywellsection.sample_data import create_dummy_data
+
+from pywellsection.MainWindow import MainWindow
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Well Panel with Toolbar")
 
-        wells, tracks, stratigraphy = create_dummy_data()
-
-        self.panel = WellPanelWidget(wells,tracks, stratigraphy)
-        self.setCentralWidget(self.panel)
 
 if __name__ == "__main__":
+    if sys.platform == "darwin":
+        QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar, True)
     app = QApplication(sys.argv)
     w = MainWindow()
     w.resize(1250, 900)

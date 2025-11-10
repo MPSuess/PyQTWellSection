@@ -96,6 +96,13 @@ class WellPanelWidget(QWidget):
             #draw_multi_wells_panel_on_figure(self.fig,self.wells,self.tracks)
             self.canvas.draw()
 
+    def update_panel(self,tracks, wells, stratigraphy):
+        self.tracks = tracks
+        self.wells = wells
+        self.stratigraphy = stratigraphy
+        self.draw_panel()
+
+
     def enable_top_picking(self):
         """
         Connect a mouse-click handler so the user can pick & edit formation tops.
@@ -906,23 +913,23 @@ class WellPanelWidget(QWidget):
         self._clear_temp_highlight()
         self.draw_panel()
 
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Well Panel with Toolbar")
-
-        wells, tracks, stratigraphy = create_dummy_data()
-
-        self.panel = WellPanelWidget(wells,tracks, stratigraphy)
-        self.setCentralWidget(self.panel)
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = MainWindow()
-    w.resize(1000, 700)
-    w.show()
-    sys.exit(app.exec_())
-
-
-
+#
+# class MainWindow(QMainWindow):
+#     def __init__(self):
+#         super().__init__()
+#         self.setWindowTitle("Well Panel with Toolbar")
+#
+#         wells, tracks, stratigraphy = create_dummy_data()
+#
+#         self.panel = WellPanelWidget(wells,tracks, stratigraphy)
+#         self.setCentralWidget(self.panel)
+#
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     w = MainWindow()
+#     w.resize(1000, 700)
+#     w.show()
+#     sys.exit(app.exec_())
+#
+#
+#
