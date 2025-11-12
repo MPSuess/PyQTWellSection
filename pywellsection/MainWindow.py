@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from pywellsection.Qt_Well_Widget import WellPanelWidget
 from pywellsection.sample_data import create_dummy_data
-from pywellsection.io_utils import export_project_to_json, load_project_from_json
+from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
 
@@ -17,14 +17,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyQTWellSection")
         self.resize(1200, 1000)
 
-        # ---- central widget ----
-
+        # The Windows
+        ### central widget ----
         wells, tracks, stratigraphy = create_dummy_data()
         self.panel = WellPanelWidget(wells, tracks, stratigraphy)
         self.dock_panel = QDockWidget("Well Panel", self)
         self.dock_panel.setWidget(self.panel)
         self.addDockWidget(Qt.TopDockWidgetArea, self.dock_panel)
-        #self.setCentralWidget(self.panel)
+
 
         # ipython console
         self.console = QIPythonWidget(self)
@@ -70,15 +70,22 @@ class MainWindow(QMainWindow):
         # --- File menu ---
         file_menu = menubar.addMenu("&File")
 
-        act_open = QAction("Open...", self)
+        act_open = QAction("Open project...", self)
         act_open.setShortcut("Ctrl+O")
         act_open.triggered.connect(self._project_file_open)
         file_menu.addAction(act_open)
 
-        act_save = QAction("Save...", self)
+        act_save = QAction("Save project...", self)
         act_save.setShortcut("Ctrl+S")
         act_save.triggered.connect(self._project_file_save)
         file_menu.addAction(act_save)
+
+        file_menu.addSeparator()
+
+        # 👇 NEW: Import Petrel well heads
+        act_import_petrel = QAction("Import Petrel well heads...", self)
+        act_import_petrel.triggered.connect(self._file_import_petrel)
+        file_menu.addAction(act_import_petrel)
 
         file_menu.addSeparator()
 
@@ -87,7 +94,7 @@ class MainWindow(QMainWindow):
         act_exit.triggered.connect(self.close)
         file_menu.addAction(act_exit)
 
-        # --- optional Help menu ---
+        # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
         act_about = QAction("About...", self)
         act_about.triggered.connect(self._show_about)
@@ -160,3 +167,34 @@ class MainWindow(QMainWindow):
             "Well Panel Demo\n\n"
             "Includes well log visualization, top picking, and stratigraphic editing."
         )
+
+    def _file_import_petrel(self):
+        """Import wells from a Petrel well head file."""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Petrel well heads",
+            "",
+            "Petrel well head (*.txt *.dat *.whd *.asc);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        try:
+            wells = load_petrel_wellheads(path)
+            self.panel.wells = wells
+            self.panel.tracks = tracks = []
+            self.panel.stratigraphy = stratigraphy =[]
+
+            # ✅ Trigger full redraw
+            self.panel.update_panel(tracks, wells, stratigraphy)
+            #self.panel.draw_panel()
+
+
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Import error",
+                f"Failed to import Petrel well head file:\n{e}"
+            )
+
