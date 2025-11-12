@@ -1147,5 +1147,8 @@ class WellPanelWidget(QWidget):
 
         return wi, ti, ax, depth_plot, depth_true
 
-
+    def set_wells(self, wells):
+        self.wells = wells
+        self.flat_wells = None
+        self.draw_panel()
 
