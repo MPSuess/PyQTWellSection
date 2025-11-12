@@ -169,9 +169,6 @@ def draw_multi_wells_panel_on_figure(
 
         offset = offsets[wi]  # TRUE depth offset for this well
 
-        def _shift(d):
-            return d - offset  # plotting coord
-
         # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
             depth_formatter = FuncFormatter(lambda y, pos, off=offset: y + off)
@@ -232,7 +229,7 @@ def draw_multi_wells_panel_on_figure(
                 data = log_def["data"]
 
                 # plotting depth: flattened if offset != 0
-                depth_plot = _shift(depth)
+                depth_plot = [x - offset for x in depth]
 
                 twin_ax = base_ax.twiny()
                 color = log_cfg.get("color", "black")
@@ -289,14 +286,14 @@ def draw_multi_wells_panel_on_figure(
                     values = np.array(disc_def.get("values", []), dtype=object)
 
                     # same flattening as continuous logs
-                    tops_plot = _shift(tops)
-                    bottoms_plot = _shift(bottoms)
+                    tops_plot = [x - offset for x in tops]
+                    bottoms_plot = [x - offset for x in bottoms]
 
-                    if tops_plot.size > 0:
-                        order = np.argsort(tops_plot)
-                        tops_plot = tops_plot[order]
-                        bottoms_plot = bottoms_plot[order]
-                        values = values[order]
+ #                   if len(tops_plot) > 0:
+ #                       order = np.argsort(tops_plot)
+#                        tops_plot = tops_plot[order]
+#                        bottoms_plot = bottoms_plot[order]
+#                        values = values[order]
 
                     base_ax.set_xlim(0, 1)
                     base_ax.set_xticks([])
