@@ -29,8 +29,13 @@ class WellPanelWidget(QWidget):
         self.tracks = tracks
         self.n_tracks = len(tracks)
         self.stratigraphy = stratigraphy
+        self.logs = None
 
         self.highlight_top = None
+        self.visible_tops = None
+        self.visible_logs = None
+        self.visible_discrete_logs = None
+        self.visible_tracks = None
         #self._temp_highlight_top = None
 
         self.fig = Figure(figsize=(12, 6), dpi=100)
@@ -84,6 +89,10 @@ class WellPanelWidget(QWidget):
             self.fig.clear()
             self._corr_artists = []
             flatten_depths = self._flatten_depths
+            visible_tops = self.visible_tops
+            visible_logs = self.visible_logs
+            visible_discrete_logs = self.visible_discrete_logs
+
 
 
             self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
@@ -93,7 +102,11 @@ class WellPanelWidget(QWidget):
                 suptitle="Well Log Panel",
                 corr_artists=self._corr_artists,
                 highlight_top=self.highlight_top,
-                flatten_depths=flatten_depths
+                flatten_depths=flatten_depths,
+                visible_tops = visible_tops,
+                visible_logs = visible_logs,
+                visible_discrete_logs=visible_discrete_logs,
+                visible_tracks = self.visible_tracks,
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -107,7 +120,6 @@ class WellPanelWidget(QWidget):
         self.wells = wells
         self.stratigraphy = stratigraphy
         self.draw_panel()
-
 
     def enable_top_picking(self):
         """
@@ -329,127 +341,6 @@ class WellPanelWidget(QWidget):
         if chosen == act_flatten:
             self._flatten_on_formation_top(nearest_name)
             return
-
-    # Working on top_clic ...
-    # def _on_top_click(self, event):
-    #
-    #     # 🔒 Ignore clicks when toolbar is in zoom or pan mode
-    #     if hasattr(self, "toolbar") and getattr(self.toolbar, "mode", ""):
-    #         # mode is a non-empty string when zoom/pan is active, e.g. "zoom rect"
-    #         return
-    #
-    #     if self._in_dialog_pick_mode:
-    #         return
-    #     if event.button != 1 or event.inaxes is None:
-    #         return
-    #
-    #     ax = event.inaxes
-    #
-    #     # map twiny axis to base axis if not directly in axis_index
-    #     if ax not in self.axis_index:
-    #         ax_pos = ax.get_position()
-    #         best_ax = None
-    #         best_overlap = 0.0
-    #         for base_ax in self.axis_index.keys():
-    #             pos = base_ax.get_position()
-    #             x0 = max(ax_pos.x0, pos.x0)
-    #             x1 = min(ax_pos.x1, pos.x1)
-    #             y0 = max(ax_pos.y0, pos.y0)
-    #             y1 = min(ax_pos.y1, pos.y1)
-    #             overlap = max(0.0, x1 - x0) * max(0.0, y1 - y0)
-    #             if overlap > best_overlap:
-    #                 best_overlap = overlap
-    #                 best_ax = base_ax
-    #         if best_ax is None or best_overlap == 0.0:
-    #             return
-    #         ax = best_ax
-    #     self.ax = ax
-    #     wi, ti = self.axis_index[ax]
-    #     well = self.wells[wi]
-    #
-    #     self.well = well
-    #
-    #     if "tops" not in well or not well["tops"]:
-    #         return
-    #
-    #     click_depth = event.ydata
-    #     if click_depth is None:
-    #         return
-    #
-    #     # find nearest top
-    #     tops = well["tops"]
-    #     nearest_name = None
-    #     nearest_depth = None
-    #     min_dist = None
-    #     for name, val in tops.items():
-    #         depth = float(val["depth"]) if isinstance(val, dict) else float(val)
-    #         dist = abs(depth - click_depth)
-    #         if min_dist is None or dist < min_dist:
-    #             min_dist = dist
-    #             nearest_name = name
-    #             nearest_depth = depth
-    #     if nearest_name is None:
-    #         return
-    #
-    #     self._picked_depth = nearest_depth
-    #     self._picked_formation = nearest_name
-    #
-    #     menu = QMenu(self)
-    #
-    #     # distance threshold
-    #     ref_depth = well["reference_depth"]
-    #     well_td = ref_depth + well["total_depth"]
-    #     depth_range = abs(well_td - ref_depth) or 1.0
-    #     max_pick_distance = depth_range * 0.02
-    #     if min_dist > max_pick_distance:
-    #         act_add = menu.addAction(f"Add top at {click_depth:.2f} m…")
-    #         act_edit = None
-    #         act_delete = None
-    #
-    #
-    #     else:
-    #         # highlight this top temporarily
-    #         self._clear_temp_highlight()
-    #         self._draw_temp_highlight(wi, nearest_name)
-    #         act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
-    #         act_delete = menu.addAction(f"Delete top '{nearest_name}'…")
-    #         act_flatten = menu.addAction(f"Flatten on '{nearest_name}'…")
-    #         act_add = None
-    #
-    #     # later: add more actions here (Delete, Rename, Change level, etc.)
-    #
-    #     if hasattr(event, "guiEvent") and event.guiEvent is not None:
-    #         global_pos = event.guiEvent.globalPos()
-    #     else:
-    #         global_pos = QCursor.pos()
-    #
-    #     chosen = menu.exec_(global_pos)
-    #
-    #     if chosen is None:
-    #         # user cancelled menu; optionally clear highlight
-    #         # self._clear_temp_highlight()
-    #         return
-    #
-    #     if chosen == act_edit:
-    #         # delegate actual editing to helper
-    #         self._edit_formation_top(
-    #             well_index=wi,
-    #             top_name=nearest_name,
-    #             initial_depth=nearest_depth,
-    #         )
-    #         return
-    #
-    #     if chosen == act_delete:
-    #         self._delete_formation_top(well_index=wi, top_name=nearest_name)
-    #         return
-    #
-    #     if chosen == act_add:
-    #         self._add_formation_top_at_depth(well_index=wi, depth=float(click_depth))
-    #         return
-    #
-    #     if chosen == act_flatten:
-    #         self._flatten_on_formation_top(nearest_name)
-    #         return
 
     def _build_axis_index(self):
         """
@@ -1149,6 +1040,17 @@ class WellPanelWidget(QWidget):
 
     def set_wells(self, wells):
         self.wells = wells
-        self.flat_wells = None
+        self._flatten_depths = None
         self.draw_panel()
 
+    def set_visible_tops(self, visible_tops):
+        self.visible_tops = visible_tops
+        self.draw_panel()
+
+    def set_visible_logs(self, visible_logs):
+        self.visible_logs = visible_logs
+        self.draw_panel()
+
+    def set_visible_tracks(self, visible_tracks):
+        self.visible_tracks = visible_tracks
+        self.draw_panel()
