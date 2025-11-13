@@ -1,8 +1,10 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
-    QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget, QTableWidgetItem,)
+    QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
+    QTableWidgetItem,)
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
 
 from pywellsection.Qt_Well_Widget import WellPanelWidget
 from pywellsection.sample_data import create_dummy_data
@@ -24,6 +26,8 @@ class MainWindow(QMainWindow):
         wells, tracks, stratigraphy = create_dummy_data()
 
         self.all_wells = wells
+        self.all_stratigraphy = stratigraphy
+        self.all_tracks = tracks
 
         self.panel = WellPanelWidget(wells, tracks, stratigraphy)
         self.dock_panel = QDockWidget("Well Panel", self)
@@ -52,19 +56,44 @@ class MainWindow(QMainWindow):
         self.dock_logger = QDockWidget("Log", self)
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
-
-        self.well_dock = QDockWidget("Wells", self)
-        self.well_dock.setObjectName("WellDock")
-        #self.well_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-
-        self.well_tree = QTreeWidget(self.well_dock)
+        ### --- Define the Input Tree ###
+        self.well_tree = QTreeWidget(self)
         self.well_tree.setHeaderHidden(True)
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
 
+        # 👇 create the folder item once
+        self.well_root_item = QTreeWidgetItem(["Wells"])
+        # tristate so checking it checks/unchecks children
+        self.well_root_item.setFlags(
+            self.well_root_item.flags()
+            | Qt.ItemIsUserCheckable
+            | Qt.ItemIsTristate
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEnabled
+        )
+        self.well_root_item.setCheckState(0, Qt.Checked)
+        self.well_tree.addTopLevelItem(self.well_root_item)
+
+        self.well_tops_folder = QTreeWidgetItem(["Tops"])
+        # tristate so checking it checks/unchecks children
+        self.well_tops_folder.setFlags(
+            self.well_tops_folder.flags()
+            | Qt.ItemIsUserCheckable
+            | Qt.ItemIsTristate
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEnabled
+        )
+        self.well_tops_folder.setCheckState(0, Qt.Checked)
+        self.well_tree.addTopLevelItem(self.well_tops_folder)
+
+
+        ### Setup the Dock
+
+        self.well_dock = QDockWidget("Input Data", self)
+        self.well_dock.setObjectName("Input")
         self.well_dock.setWidget(self.well_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
 
-        self._populate_well_tree()
 
         self.splitDockWidget(self.well_dock, self.dock_panel, Qt.Horizontal)
         self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
@@ -76,8 +105,9 @@ class MainWindow(QMainWindow):
 
 
 
-
-
+        # --- intial build of the well tree
+        self._populate_well_tree()
+        self._populate_well_tops_tree()
         # ---- build menu bar ----
         self._create_menubar()
 
@@ -229,38 +259,107 @@ class MainWindow(QMainWindow):
         self.well_tree.setHeaderHidden(True)
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
 
-        self.well_dock.setWidget(self.well_tree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+        # 👇 create the folder item once
+        self.well_root_item = QTreeWidgetItem(["All wells"])
+        # tristate so checking it checks/unchecks children
+        self.well_root_item.setFlags(
+            self.well_root_item.flags()
+            | Qt.ItemIsUserCheckable
+            | Qt.ItemIsTristate
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEnabled
+        )
+        self.well_root_item.setCheckState(0, Qt.Checked)
+
+        self.well_tree.addTopLevelItem(self.well_root_item)
 
         self._populate_well_tree()  # initial fill
+
+        self.well_dock.setWidget(self.well_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
 
     def _populate_well_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
         # Remember current selection by name
         prev_selected = set()
-        root = self.well_tree.invisibleRootItem()
+        root = self.well_root_item
         for i in range(root.childCount()):
             it = root.child(i)
             if it.checkState(0) == Qt.Checked:
                 prev_selected.add(it.data(0, Qt.UserRole))
 
         self.well_tree.blockSignals(True)
-        self.well_tree.clear()
 
-        if not self.all_wells:
-            return
+        # remove all wells under the folder
+        root.takeChildren()
 
+        # add wells as children of "All wells"
         for w in self.all_wells:
             name = w.get("name") or "UNKNOWN"
             it = QTreeWidgetItem([name])
-            it.setFlags(it.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-            it.setData(0, Qt.UserRole, name)  # key by well name; use a unique id if you have one
+            it.setFlags(
+                it.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+            )
+            it.setData(0, Qt.UserRole, name)
+
             # default: keep previous selection; else checked
-            checked = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
-            it.setCheckState(0, checked)
-            self.well_tree.addTopLevelItem(it)
+            if not prev_selected:
+                state = Qt.Checked
+            else:
+                state = Qt.Checked if name in prev_selected else Qt.Unchecked
+            it.setCheckState(0, state)
+
+            root.addChild(it)
 
         self.well_tree.blockSignals(False)
+
+        # Apply current selection to panel
+        self._rebuild_panel_from_tree()
+
+    def _populate_well_tops_tree(self):
+        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+        # Remember current selection by name
+        prev_selected = set()
+        root = self.well_tops_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        self.well_tree.blockSignals(True)
+
+        # remove all wells under the folder
+        root.takeChildren()
+
+        # add wells as children of "All wells"
+
+        atemp = list (self.all_stratigraphy)
+
+        for w in self.all_stratigraphy:
+            name = w.get("name") or "UNKNOWN"
+            it = QTreeWidgetItem([name])
+            it.setFlags(
+                it.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+            )
+            it.setData(0, Qt.UserRole, name)
+
+            # default: keep previous selection; else checked
+            if not prev_selected:
+                state = Qt.Checked
+            else:
+                state = Qt.Checked if name in prev_selected else Qt.Unchecked
+            it.setCheckState(0, state)
+
+            root.addChild(it)
+
+        self.well_tree.blockSignals(False)
+
         # Apply current selection to panel
         self._rebuild_panel_from_tree()
 
@@ -271,7 +370,7 @@ class MainWindow(QMainWindow):
     def _rebuild_panel_from_tree(self):
         """Collect checked wells (by name) and send to panel."""
         checked_names = set()
-        root = self.well_tree.invisibleRootItem()
+        root = self.well_root_item
         for i in range(root.childCount()):
             it = root.child(i)
             if it.checkState(0) == Qt.Checked:
@@ -297,3 +396,4 @@ class MainWindow(QMainWindow):
             root.child(i).setCheckState(0, Qt.Unchecked)
         self.well_tree.blockSignals(False)
         self._rebuild_panel_from_tree()
+
