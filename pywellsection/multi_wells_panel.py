@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
-from matplotlib.ticker import FuncFormatter
 
 import numpy as np
 
@@ -72,6 +72,10 @@ def draw_multi_wells_panel_on_figure(
     corr_artists=None,
     highlight_top=None,
     flatten_depths=None,
+    visible_tops = None,
+    visible_logs = None,
+    visible_discrete_logs = None,
+    visible_tracks = None,
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -221,6 +225,10 @@ def draw_multi_wells_panel_on_figure(
             # ---- Continuous logs ----
             for j, log_cfg in enumerate(track.get("logs", [])):
                 log_name = log_cfg["log"]
+
+                if visible_logs is not None and log_name not in visible_logs:
+                    continue
+
                 log_def = well.get("logs", {}).get(log_name)
                 if log_def is None:
                     continue
@@ -330,6 +338,7 @@ def draw_multi_wells_panel_on_figure(
         corr_artists=corr_artists,
         highlight_top=highlight_top,
         flatten_depths=flatten_depths,
+        visible_tops=visible_tops,
     )
 
     if suptitle:
@@ -355,8 +364,7 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
 
-from matplotlib.lines import Line2D
-import matplotlib.patches as patches
+
 
 def add_tops_and_correlations(
     fig,
@@ -368,6 +376,7 @@ def add_tops_and_correlations(
     corr_artists=None,
     highlight_top=None,
     flatten_depths=None,
+    visible_tops=None,
 ):
     """
     Handle:
@@ -427,15 +436,20 @@ def add_tops_and_correlations(
         if not tops:
             continue
 
-        if len(flatten_depths) != 0:
-            flatten_depth = flatten_depths[wi]
-        else:
+        if flatten_depths is not None:
+            if len(flatten_depths) != 0:
+                flatten_depth = flatten_depths[wi]
+            else:
+                flatten_depth = 0.0
+        else :
             flatten_depth = 0.0
 
 
         # Normalize tops
         top_items = []
         for name, val in tops.items():
+            if visible_tops is not None and name not in visible_tops:
+                continue # hide this top if not in visible_tops
             if isinstance(val, dict):
                 depth = float(val["depth"])-flatten_depth
                 color = val.get("color", get_top_color(name))
