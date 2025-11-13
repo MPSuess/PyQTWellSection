@@ -39,6 +39,7 @@ def create_dummy_data_all():
 
     well1 = {
         "name": "Well A",
+        "UWI": "56032002322",
         "x": 654321.0,
         "y": 5234567.0,
         "reference_type": "KB",
@@ -67,6 +68,7 @@ def create_dummy_data_all():
 
     well2 = {
         "name": "Well B",
+        "UWI": "5603200223",
         "x": 654700.0,
         "y": 5234600.0,
         "reference_type": "RL",
@@ -93,6 +95,7 @@ def create_dummy_data_all():
 
     well3 = {
         "name": "Well C",
+        "UWI": "5603200224",
         "x": 658500.0,
         "y": 5236600.0,
         "reference_type": "RL",
@@ -223,6 +226,7 @@ def create_dummy_data_rand():
 
     well1 = {
         "name": "Well A",
+        "UWI": "5603200233",
         "x": 654321.0,
         "y": 5234567.0,
         "reference_type": "KB",
@@ -251,6 +255,7 @@ def create_dummy_data_rand():
 
     well2 = {
         "name": "Well B",
+        "UWI": "5603200231",
         "x": 654700.0,
         "y": 5234600.0,
         "reference_type": "RL",
@@ -277,10 +282,12 @@ def create_dummy_data_rand():
 
     well3 = {
         "name": "Well C",
+        "UWI": "5603200234",
         "x": 658500.0,
         "y": 5236600.0,
         "reference_type": "RL",
         "reference_depth": 0.0,
+
         "total_depth": 1500.0,  # interval is 950–1750 m
         "logs": {
             "GR": {"depth": np.linspace(1000, 1500, 500), "data": np.random.normal(50, 13, 500)},
@@ -388,6 +395,10 @@ def create_top_only_Data ():
 
     well1 = {
         "name": "Well A",
+        "UWI": "5603200234",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "RL",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "tops": {
@@ -399,6 +410,10 @@ def create_top_only_Data ():
 
     well2 = {
         "name": "Well B",
+        "UWI": "5603200231",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "KB",
         "reference_depth": 1010.0,  # different KB
         "total_depth": 1000.0,  # different TD -> 1010–2010 m
         "tops": {
@@ -411,6 +426,10 @@ def create_top_only_Data ():
 
     well3 = {
         "name": "Well A",
+        "UWI": "5603200234",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "GF",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "tops": {
@@ -434,6 +453,10 @@ def create_top_only_Data ():
 def create_dummy_data_wells_only():
     well1 = {
         "name": "Well A",
+        "UWI": "5603200234",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "RL",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "tops": {
@@ -445,6 +468,10 @@ def create_dummy_data_wells_only():
 
     well2 = {
         "name": "Well B",
+        "UWI": "5603200231",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "KB",
         "reference_depth": 1010.0,  # different KB
         "total_depth": 1000.0,  # different TD -> 1010–2010 m
         "tops": {
@@ -457,6 +484,10 @@ def create_dummy_data_wells_only():
 
     well3 = {
         "name": "Well A",
+        "UWI": "5603200234",
+        "x": 658500.0,
+        "y": 5236600.0,
+        "reference_type": "GF",
         "reference_depth": 950.0,  # KB / reference depth for this well
         "total_depth": 800.0,  # so interval is 950–1750 m
         "tops": {
