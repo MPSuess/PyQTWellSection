@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
 
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
+        self.all_logs = None
         self.all_tracks = tracks
 
         self.panel = WellPanelWidget(wells, tracks, stratigraphy)
@@ -86,6 +87,19 @@ class MainWindow(QMainWindow):
         self.well_tops_folder.setCheckState(0, Qt.Checked)
         self.well_tree.addTopLevelItem(self.well_tops_folder)
 
+        self.well_logs_folder = QTreeWidgetItem(["Logs"])
+        # tristate so checking it checks/unchecks children
+        self.well_logs_folder.setFlags(
+            self.well_logs_folder.flags()
+            | Qt.ItemIsUserCheckable
+            | Qt.ItemIsTristate
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEnabled
+        )
+        self.well_logs_folder.setCheckState(0, Qt.Checked)
+        #self.well_root_item.addChild(self.well_logs_folder)
+        self.well_tree.addTopLevelItem(self.well_logs_folder)
+
 
         ### Setup the Dock
 
@@ -108,6 +122,7 @@ class MainWindow(QMainWindow):
         # --- intial build of the well tree
         self._populate_well_tree()
         self._populate_well_tops_tree()
+        self._populate_well_log_tree()
         # ---- build menu bar ----
         self._create_menubar()
 
@@ -160,6 +175,15 @@ class MainWindow(QMainWindow):
         act_about.triggered.connect(self._show_about)
         help_menu.addAction(act_about)
 
+
+    def _show_about(self):
+        QMessageBox.information(
+            self,
+            "About",
+            "Well Panel Demo\n\n"
+            "Includes well log visualization, top picking, and stratigraphic editing."
+        )
+
     # ------------------------------------------------
     # FILE HANDLERS (placeholders for now)
     # ------------------------------------------------
@@ -173,11 +197,33 @@ class MainWindow(QMainWindow):
             wells, tracks, stratigraphy, _ = load_project_from_json(path)
             self.panel.wells = wells
             self.panel.tracks = tracks
-            self.panel.stratigraphy = stratigraphy
+            self.all_stratigraphy = []
+            self.all_tracks = tracks
+
             self.all_wells = wells
+
+            stratigraphy=self.all_stratigraphy
+
+            for well in wells:
+                tops = well.get("tops")
+                if tops:
+                    for top in tops:
+                        if top in stratigraphy:
+                            continue
+                        else:
+                            stratigraphy.append(top)
+                else:
+                    print("No tops found")
+
+            self.all_stratigraphy = stratigraphy
+
 
             # populate well tree
             self._populate_well_tree()
+            self._populate_well_tops_tree()
+            self._populate_well_log_tree()
+
+#            self._rebuild_visible_tops_from_tree()
 
             # ✅ Trigger full redraw
             self.panel.update_panel(tracks, wells, stratigraphy)
@@ -224,14 +270,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
 
-    def _show_about(self):
-        QMessageBox.information(
-            self,
-            "About",
-            "Well Panel Demo\n\n"
-            "Includes well log visualization, top picking, and stratigraphic editing."
-        )
-
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -246,6 +284,9 @@ class MainWindow(QMainWindow):
             self.all_wells = wells  # master list
             # Panel will show whatever is checked (defaults to all)
             self._populate_well_tree()
+            self._populate_well_tops_tree()
+            self._populate_well_log_tree()
+
         except Exception as e:
             QMessageBox.critical(self, "Import error", f"Failed to import:\n{e}")
 
@@ -336,10 +377,59 @@ class MainWindow(QMainWindow):
 
         # add wells as children of "All wells"
 
-        atemp = list (self.all_stratigraphy)
+        strat_list = list (self.all_stratigraphy)
 
-        for w in self.all_stratigraphy:
-            name = w.get("name") or "UNKNOWN"
+        for strat_name in strat_list:
+            strat_it = QTreeWidgetItem([strat_name])
+            strat_it.setFlags(
+                strat_it.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+            )
+            strat_it.setData(0, Qt.UserRole, strat_name)
+
+
+            # default: keep previous selection; else checked
+            if not prev_selected:
+                state = Qt.Checked
+            else:
+                state = Qt.Checked if name in prev_selected else Qt.Unchecked
+            strat_it.setCheckState(0, state)
+
+            root.addChild(strat_it)
+
+
+        self.well_tree.blockSignals(False)
+
+        # Apply current selection to panel
+        #self._rebuild_panel_from_tree()
+
+    def _populate_well_log_tree(self):
+        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+        # Remember current selection by name
+        prev_selected = set()
+        root = self.well_logs_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        self.well_tree.blockSignals(True)
+
+        # remove all wells under the folder
+        root.takeChildren()
+
+        # add wells as children of "All wells"
+
+        log_names = set()
+        for track in self.all_tracks:
+            for log_cgf in track.get("logs",[]):
+                name = log_cgf.get("log")
+                if name:
+                    log_names.add(name)
+
+        for name in sorted(log_names):
             it = QTreeWidgetItem([name])
             it.setFlags(
                 it.flags()
@@ -349,37 +439,28 @@ class MainWindow(QMainWindow):
             )
             it.setData(0, Qt.UserRole, name)
 
-            # default: keep previous selection; else checked
-            if not prev_selected:
-                state = Qt.Checked
-            else:
-                state = Qt.Checked if name in prev_selected else Qt.Unchecked
+            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
             it.setCheckState(0, state)
-
             root.addChild(it)
-
         self.well_tree.blockSignals(False)
-
-        # Apply current selection to panel
-        self._rebuild_panel_from_tree()
+        self._rebuild_visible_logs_from_tree()
 
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
-        self._rebuild_panel_from_tree()
 
-    def _rebuild_panel_from_tree(self):
-        """Collect checked wells (by name) and send to panel."""
-        checked_names = set()
-        root = self.well_root_item
-        for i in range(root.childCount()):
-            it = root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                checked_names.add(it.data(0, Qt.UserRole))
+        p = item.parent()
+        if item  is self.well_root_item or p is self.well_root_item:
+            self._rebuild_panel_from_tree()
+            return
 
-        # Map names → well dicts (keep original order)
-        selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
-        # If none selected, you can either show none or all; here: show none
-        self.panel.set_wells(selected)
+        if item  is self.well_tops_folder:
+            self._rebuild_visible_tops_from_tree()
+            return
+
+        # Logs
+        if item is self.well_logs_folder or p is self.well_tops_folder:
+            self._rebuild_visible_logs_from_tree()
+            return
 
     def _select_all_wells(self):
         self.well_tree.blockSignals(True)
@@ -396,4 +477,52 @@ class MainWindow(QMainWindow):
             root.child(i).setCheckState(0, Qt.Unchecked)
         self.well_tree.blockSignals(False)
         self._rebuild_panel_from_tree()
+
+    def _rebuild_panel_from_tree(self):
+        """Collect checked wells (by name) and send to panel."""
+        checked_names = set()
+        root = self.well_root_item
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                checked_names.add(it.data(0, Qt.UserRole))
+
+        # Map names → well dicts (keep original order)
+        selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
+        # If none selected, you can either show none or all; here: show none
+        self.panel.set_wells(selected)
+
+    def _rebuild_visible_tops_from_tree(self):
+        root = self.well_tops_folder
+        visible = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                nm = it.data(0, Qt.UserRole)
+                if nm:
+                    visible.add(nm)
+
+        self.panel.set_visible_tops(visible if visible else None)
+
+        self.panel.set_visible_tops(visible)
+
+    def _rebuild_visible_logs_from_tree(self):
+        """Collect checked logs and inform the panel."""
+        root = self.well_logs_folder
+        visible = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                nm = it.data(0, Qt.UserRole)
+                if nm:
+                    visible.add(nm)
+
+        # If everything is checked, you can pass None to mean "no filter"
+        if visible and len(visible) == root.childCount():
+            visible_set = None
+        else:
+            visible_set = visible if visible else set()
+
+        self.panel.set_visible_logs(visible_set)
+
 
