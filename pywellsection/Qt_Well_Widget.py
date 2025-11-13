@@ -212,7 +212,8 @@ class WellPanelWidget(QWidget):
 
         wi = self._active_pick_context["wi"]
 
-        if len(self._flatten_depths) > 0:
+        if self._flatten_depths is not None:
+        #if len(self._flatten_depths) > 0:
             flatten_depth = self._flatten_depths[wi]
         else:
             flatten_depth = 0
@@ -420,7 +421,8 @@ class WellPanelWidget(QWidget):
 
         wi_target = self._active_pick_context["wi"]
         depth = float(event.ydata)
-        if len(self._flatten_depths) > 0:
+        if self._flatten_depths is not None:
+        #if len(self._flatten_depths) > 0:
             flatten_depth = self._flatten_depths[wi_target]
         else:
             flatten_depth = 0
@@ -550,7 +552,8 @@ class WellPanelWidget(QWidget):
         if top_name not in tops:
             return
 
-        if len(self._flatten_depths) > 0:
+        #if len(self._flatten_depths) > 0:
+        if self._flatten_depths is not None:
             flatten_depth = self._flatten_depths[wi]
         else:
             flatten_depth = 0
@@ -939,8 +942,11 @@ class WellPanelWidget(QWidget):
 
         flatten_depths = []
 
-        strat_keys = self.stratigraphy.keys()
-        idx_map = list(strat_keys)
+        if type(self.stratigraphy) is list:
+            idx_map = self.stratigraphy
+        else:
+            strat_keys = self.stratigraphy.keys()
+            idx_map = list(strat_keys)
 
         idx_target = idx_map.index(top_name)
 
