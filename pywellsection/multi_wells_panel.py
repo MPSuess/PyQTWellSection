@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
+
 import numpy as np
+
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                             min_size=6, max_size=11):
@@ -60,8 +63,6 @@ def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                 ticklabel.set_fontsize(size * 0.9)
 
 
-
-
 def draw_multi_wells_panel_on_figure(
     fig,
     wells,
@@ -70,33 +71,72 @@ def draw_multi_wells_panel_on_figure(
     well_gap_factor=3.0,
     corr_artists=None,
     highlight_top=None,
+    flatten_depths=None,
+    visible_tops = None,
+    visible_logs = None,
+    visible_discrete_logs = None,
+    visible_tracks = None,
 ):
     """
     Draw multi-well, multi-track log panel with:
-      - independent depth axis per well
-      - continuous logs
-      - optional discrete log tracks (facies, lithology, etc.)
-      - tops with hierarchy (formation/member/sequence/...)
-      - colored top lines + interval fills per well
-      - colored & hatched fills + correlation lines in spacer between wells
-
-    Tops & correlations are handled in helper functions:
-      - add_depth_range_labels(...)
-      - add_tops_and_correlations(...)
+      - shared Y-scaling across wells
+      - depth window based on:
+          top_phys    = highest reference depth of all wells
+          bottom_phys = deepest well bottom (reference_depth + total_depth)
+      - when flattened, the displayed interval still contains *all* wells
+        by transforming [top_phys, bottom_phys] into each well's plotting
+        coordinates and taking the global min/max.
+      - optional flattening (per-well offsets)
+      - y-axis always labels TRUE depth (not relative depth)
     """
 
     fig.clf()
 
     n_wells = len(wells)
-    n_tracks = len(tracks)
+    if not tracks:
+        n_tracks = 1
+    else:
+        n_tracks = len(tracks)
 
-    # ---- Layout: tracks + spacer columns ----
+    if n_wells == 0:
+        return None, None
+
+    # ---- 1) Physical depth window (no offsets here) ----
+    ref_depths = [w["reference_depth"] for w in wells]
+    bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
+
+    # top_phys = highest reference depth, bottom_phys = deepest bottom
+    top_phys = max(ref_depths)
+    bottom_phys = max(bottoms)
+
+    if bottom_phys <= top_phys:
+        # safety fallback
+        top_phys = min(ref_depths)
+        bottom_phys = max(bottoms)
+
+    # ---- 2) Compute per-well offsets and global plotting range ----
+    # offset_i is in TRUE depth coordinates (e.g. formation top depth)
+    offsets = []
+    for wi in range(n_wells):
+        if flatten_depths is not None and wi < len(flatten_depths):
+            offsets.append(flatten_depths[wi])
+        else:
+            offsets.append(0.0)
+
+    top_plot_candidates = []
+    bottom_plot_candidates = []
+    for off in offsets:
+        top_plot_candidates.append(top_phys - off)
+        bottom_plot_candidates.append(bottom_phys - off)
+
+    # global plotting limits that include ALL wells after shifting
+    global_top_plot = min(top_plot_candidates)
+    global_bottom_plot = max(bottom_plot_candidates)
+
+    # ---- 3) Layout: tracks + spacer columns ----
     total_cols = n_wells * n_tracks + (n_wells - 1)
     width_ratios = []
     col_is_spacer = []
-
-    if n_wells == 0:
-        return
 
     for w in range(n_wells):
         for _ in range(n_tracks):
@@ -105,7 +145,6 @@ def draw_multi_wells_panel_on_figure(
         if w != n_wells - 1:
             width_ratios.append(well_gap_factor)
             col_is_spacer.append(True)
-
 
     gs = fig.add_gridspec(
         1,
@@ -120,68 +159,99 @@ def draw_multi_wells_panel_on_figure(
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
 
-    # Spacer axes off
+    # Turn off spacer axes
     for ax, is_spacer in zip(axes, col_is_spacer):
         if is_spacer:
             ax.axis("off")
 
-    # One "main" axis per well (first track)
     well_main_axes = []
 
-    ### ---- 1st pass: logs & axes (continuous + discrete) ----
+    # ---- 4) Draw wells ----
     for wi, well in enumerate(wells):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
+
+        offset = offsets[wi]  # TRUE depth offset for this well
+
+        # formatter to show TRUE depth: depth = plot_value + offset
+        if offset != 0.0:
+            depth_formatter = FuncFormatter(lambda y, pos, off=offset: y + off)
+        else:
+            depth_formatter = None
 
         first_track_idx = wi * (n_tracks + 1)
         main_ax = axes[first_track_idx]
         well_main_axes.append(main_ax)
 
+        # ---- Case: no tracks, just depth axis ----
+        if not tracks:
+            base_ax = main_ax
+            base_ax.set_ylim(global_top_plot, global_bottom_plot)
+            base_ax.invert_yaxis()
+            base_ax.grid(True, linestyle="--", alpha=0.3)
+            base_ax.set_ylabel("Depth (m)", labelpad=8)
+            base_ax.tick_params(axis="y", labelleft=True)
+            base_ax.xaxis.set_visible(False)
+            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5)
+
+            if depth_formatter is not None:
+                base_ax.yaxis.set_major_formatter(depth_formatter)
+            continue
+
+        # ---- Normal multi-track case ----
         for ti, track in enumerate(tracks):
             col_idx = wi * (n_tracks + 1) + ti
             base_ax = axes[col_idx]
 
-            base_ax.set_ylim(ref_depth, well_td)
+            # Shared plotting Y-range for all wells
+            base_ax.set_ylim(global_top_plot, global_bottom_plot)
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
-            # Depth labels only 1st track of each well
             if ti == 0:
                 base_ax.set_ylabel("Depth (m)", labelpad=8)
                 base_ax.tick_params(axis="y", labelleft=True)
+                if depth_formatter is not None:
+                    base_ax.yaxis.set_major_formatter(depth_formatter)
             else:
                 base_ax.tick_params(axis="y", labelleft=False)
 
             base_ax.xaxis.set_visible(False)
 
-            # Well title above middle track
             mid_track = n_tracks // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi+1}"), pad=5)
+                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5)
 
             # ---- Continuous logs ----
             for j, log_cfg in enumerate(track.get("logs", [])):
                 log_name = log_cfg["log"]
-                log_def = well["logs"].get(log_name)
+
+                if visible_logs is not None and log_name not in visible_logs:
+                    continue
+
+                log_def = well.get("logs", {}).get(log_name)
                 if log_def is None:
                     continue
 
                 depth = log_def["depth"]
                 data = log_def["data"]
 
+                # plotting depth: flattened if offset != 0
+                depth_plot = [x - offset for x in depth]
+
                 twin_ax = base_ax.twiny()
                 color = log_cfg.get("color", "black")
                 label = log_cfg.get("label", log_name)
 
-                twin_ax.plot(data, depth, color=color)
+                twin_ax.plot(data, depth_plot, color=color)
 
-                # Only top spine
+                # Only top spine visible
                 for spine_name, spine in twin_ax.spines.items():
                     spine.set_visible(spine_name == "top")
 
                 # Stack multiple logs upwards
-                offset = 1.0 + j * 0.08
-                twin_ax.spines["top"].set_position(("axes", offset))
+                offset_spine = 1.0 + j * 0.08
+                twin_ax.spines["top"].set_position(("axes", offset_spine))
 
                 xscale = log_cfg.get("xscale", "linear")
                 twin_ax.set_xscale("log" if xscale == "log" else "linear")
@@ -208,7 +278,7 @@ def draw_multi_wells_panel_on_figure(
 
                 twin_ax.grid(False)
 
-            # ---- DISCRETE TRACK (optional) ----
+            # ---- Discrete track ----
             disc_cfg = track.get("discrete")
             if disc_cfg is not None:
                 disc_name = disc_cfg["log"]
@@ -223,20 +293,22 @@ def draw_multi_wells_panel_on_figure(
                     bottoms = np.array(disc_def.get("bottom_depths", []), dtype=float)
                     values = np.array(disc_def.get("values", []), dtype=object)
 
-                    # Sort intervals by top depth
-                    if tops.size > 0:
-                        order = np.argsort(tops)
-                        tops = tops[order]
-                        bottoms = bottoms[order]
-                        values = values[order]
+                    # same flattening as continuous logs
+                    tops_plot = [x - offset for x in tops]
+                    bottoms_plot = [x - offset for x in bottoms]
+
+ #                   if len(tops_plot) > 0:
+ #                       order = np.argsort(tops_plot)
+#                        tops_plot = tops_plot[order]
+#                        bottoms_plot = bottoms_plot[order]
+#                        values = values[order]
 
                     base_ax.set_xlim(0, 1)
                     base_ax.set_xticks([])
                     base_ax.set_xlabel(disc_label, labelpad=2)
 
-                    for top_d, bot_d, val in zip(tops, bottoms, values):
+                    for top_d, bot_d, val in zip(tops_plot, bottoms_plot, values):
                         col = color_map.get(val, default_color)
-
                         base_ax.axhspan(
                             top_d,
                             bot_d,
@@ -249,12 +321,10 @@ def draw_multi_wells_panel_on_figure(
                             zorder=0.8,
                         )
 
-    ### ---- draw & add depth range labels ----
-
+    # ---- Final annotations ----
     fig.canvas.draw()
     add_depth_range_labels(fig, axes, wells, n_tracks)
 
-    ### ---- tops + correlations (all the fancy stuff) ----
     if corr_artists is None:
         corr_artists = []
 
@@ -267,9 +337,10 @@ def draw_multi_wells_panel_on_figure(
         correlations_only=False,
         corr_artists=corr_artists,
         highlight_top=highlight_top,
+        flatten_depths=flatten_depths,
+        visible_tops=visible_tops,
     )
 
-    ### Suptitle
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
 
@@ -293,8 +364,7 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
 
-from matplotlib.lines import Line2D
-import matplotlib.patches as patches
+
 
 def add_tops_and_correlations(
     fig,
@@ -305,6 +375,8 @@ def add_tops_and_correlations(
     correlations_only=False,
     corr_artists=None,
     highlight_top=None,
+    flatten_depths=None,
+    visible_tops=None,
 ):
     """
     Handle:
@@ -357,21 +429,33 @@ def add_tops_and_correlations(
 
     tops_by_name = {}
 
+
     # ---- pass 1: per-well tops & (optionally) within-well shading ----
     for wi, (well, main_ax) in enumerate(zip(wells, well_main_axes)):
         tops = well.get("tops", {})
         if not tops:
             continue
 
+        if flatten_depths is not None:
+            if len(flatten_depths) != 0:
+                flatten_depth = flatten_depths[wi]
+            else:
+                flatten_depth = 0.0
+        else :
+            flatten_depth = 0.0
+
+
         # Normalize tops
         top_items = []
         for name, val in tops.items():
+            if visible_tops is not None and name not in visible_tops:
+                continue # hide this top if not in visible_tops
             if isinstance(val, dict):
-                depth = float(val["depth"])
+                depth = float(val["depth"])-flatten_depth
                 color = val.get("color", get_top_color(name))
                 level = val.get("level", default_level)
             else:
-                depth = float(val)
+                depth = float(val)-flatten_depth
                 color = get_top_color(name)
                 level = default_level
             top_items.append((name, depth, color, level))
@@ -609,3 +693,5 @@ def add_tops_and_correlations(
             corr_artists.append(poly)
 
     return corr_artists
+
+
