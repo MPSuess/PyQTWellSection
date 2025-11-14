@@ -11,6 +11,7 @@ from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
+from pywellsection.trees import setup_well_widget_tree
 
 import logging
 from pathlib import Path
@@ -57,74 +58,73 @@ class MainWindow(QMainWindow):
         self.dock_logger = QDockWidget("Log", self)
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
-        ### --- Define the Input Tree ###
-        self.well_tree = QTreeWidget(self)
-        self.well_tree.setHeaderHidden(True)
-        self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
-
-        # 👇 create the folder item once
-        self.well_root_item = QTreeWidgetItem(["Wells"])
-        # tristate so checking it checks/unchecks children
-        self.well_root_item.setFlags(
-            self.well_root_item.flags()
-            | Qt.ItemIsUserCheckable
-            | Qt.ItemIsTristate
-            | Qt.ItemIsSelectable
-            | Qt.ItemIsEnabled
-        )
-        self.well_root_item.setCheckState(0, Qt.Checked)
-        self.well_tree.addTopLevelItem(self.well_root_item)
-
-        self.well_tops_folder = QTreeWidgetItem(["Tops"])
-        # tristate so checking it checks/unchecks children
-        self.well_tops_folder.setFlags(
-            self.well_tops_folder.flags()
-            | Qt.ItemIsUserCheckable
-            | Qt.ItemIsTristate
-            | Qt.ItemIsSelectable
-            | Qt.ItemIsEnabled
-        )
-        self.well_tops_folder.setCheckState(0, Qt.Checked)
-        self.well_tree.addTopLevelItem(self.well_tops_folder)
-
-        self.well_logs_folder = QTreeWidgetItem(["Logs"])
-        # tristate so checking it checks/unchecks children
-        self.well_logs_folder.setFlags(
-            self.well_logs_folder.flags()
-            | Qt.ItemIsUserCheckable
-            | Qt.ItemIsTristate
-            | Qt.ItemIsSelectable
-            | Qt.ItemIsEnabled
-        )
-        self.well_logs_folder.setCheckState(0, Qt.Checked)
-        #self.well_root_item.addChild(self.well_logs_folder)
-        self.well_tree.addTopLevelItem(self.well_logs_folder)
-
-
-        ### Setup the Dock
-
-        self.well_dock = QDockWidget("Input Data", self)
-        self.well_dock.setObjectName("Input")
-        self.well_dock.setWidget(self.well_tree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
-
-
-        self.splitDockWidget(self.well_dock, self.dock_panel, Qt.Horizontal)
-        self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
-        self.resizeDocks([self.dock_panel, self.dock_console], [4, 1], Qt.Vertical)
-
-        self.tabifyDockWidget(self.dock_console, self.dock_commands)
-        self.tabifyDockWidget(self.dock_commands, self.dock_logger)
-        self.dock_console.raise_()
-
-
-
-        # --- intial build of the well tree
-        self._populate_well_tree()
-        self._populate_well_tops_tree()
-        self._populate_well_log_tree()
+        setup_well_widget_tree(self)
         # ---- build menu bar ----
         self._create_menubar()
+
+    # def _setup_well_widget_tree(self):
+    #     ### --- Define the Input Tree ###
+    #     self.well_tree = QTreeWidget(self)
+    #     self.well_tree.setHeaderHidden(True)
+    #     self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
+    #
+    #     # 👇 create the folder item once
+    #     self.well_root_item = QTreeWidgetItem(["Wells"])
+    #     # tristate so checking it checks/unchecks children
+    #     self.well_root_item.setFlags(
+    #         self.well_root_item.flags()
+    #         | Qt.ItemIsUserCheckable
+    #         | Qt.ItemIsTristate
+    #         | Qt.ItemIsSelectable
+    #         | Qt.ItemIsEnabled
+    #     )
+    #     self.well_root_item.setCheckState(0, Qt.Checked)
+    #     self.well_tree.addTopLevelItem(self.well_root_item)
+    #
+    #     self.well_tops_folder = QTreeWidgetItem(["Tops"])
+    #     # tristate so checking it checks/unchecks children
+    #     self.well_tops_folder.setFlags(
+    #         self.well_tops_folder.flags()
+    #         | Qt.ItemIsUserCheckable
+    #         | Qt.ItemIsTristate
+    #         | Qt.ItemIsSelectable
+    #         | Qt.ItemIsEnabled
+    #     )
+    #     self.well_tops_folder.setCheckState(0, Qt.Checked)
+    #     self.well_tree.addTopLevelItem(self.well_tops_folder)
+    #
+    #     self.well_logs_folder = QTreeWidgetItem(["Logs"])
+    #     # tristate so checking it checks/unchecks children
+    #     self.well_logs_folder.setFlags(
+    #         self.well_logs_folder.flags()
+    #         | Qt.ItemIsUserCheckable
+    #         | Qt.ItemIsTristate
+    #         | Qt.ItemIsSelectable
+    #         | Qt.ItemIsEnabled
+    #     )
+    #     self.well_logs_folder.setCheckState(0, Qt.Checked)
+    #     # self.well_root_item.addChild(self.well_logs_folder)
+    #     self.well_tree.addTopLevelItem(self.well_logs_folder)
+    #
+    #     ### Setup the Dock
+    #
+    #     self.well_dock = QDockWidget("Input Data", self)
+    #     self.well_dock.setObjectName("Input")
+    #     self.well_dock.setWidget(self.well_tree)
+    #     self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+    #
+    #     self.splitDockWidget(self.well_dock, self.dock_panel, Qt.Horizontal)
+    #     self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
+    #     self.resizeDocks([self.dock_panel, self.dock_console], [4, 1], Qt.Vertical)
+    #
+    #     self.tabifyDockWidget(self.dock_console, self.dock_commands)
+    #     self.tabifyDockWidget(self.dock_commands, self.dock_logger)
+    #     self.dock_console.raise_()
+    #
+    #     # --- intial build of the well tree
+    #     self._populate_well_tree()
+    #     self._populate_well_tops_tree()
+    #     self._populate_well_log_tree()
 
     # ------------------------------------------------
     # MENU BAR SETUP
@@ -175,7 +175,6 @@ class MainWindow(QMainWindow):
         act_about.triggered.connect(self._show_about)
         help_menu.addAction(act_about)
 
-
     def _show_about(self):
         QMessageBox.information(
             self,
@@ -222,6 +221,7 @@ class MainWindow(QMainWindow):
             self._populate_well_tree()
             self._populate_well_tops_tree()
             self._populate_well_log_tree()
+            self._populate_well_track_tree()
 
 #            self._rebuild_visible_tops_from_tree()
 
@@ -286,6 +286,7 @@ class MainWindow(QMainWindow):
             self._populate_well_tree()
             self._populate_well_tops_tree()
             self._populate_well_log_tree()
+            self._populate_well_track_tree()
 
         except Exception as e:
             QMessageBox.critical(self, "Import error", f"Failed to import:\n{e}")
@@ -445,6 +446,63 @@ class MainWindow(QMainWindow):
         self.well_tree.blockSignals(False)
         self._rebuild_visible_logs_from_tree()
 
+    def _populate_well_track_tree(self):
+        """Rebuild tracks subtree from self.tracks, showing track→log assignment."""
+        if self.all_tracks is None:
+            return
+        else:
+            tracks = self.all_tracks
+
+        root = self.track_root_item
+
+        # remember previous checked tracks
+
+        prev_selected = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        self.well_tree.blockSignals(True)
+        root.takeChildren()
+
+        for track in self.all_tracks:
+            track_name = track.get("name") or "Track"
+            track_item = QTreeWidgetItem([track_name])
+            # make the track item checkable
+            track_item.setFlags(
+                track_item.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+            )
+            track_item.setData(0, Qt.UserRole, track_name)
+
+            state = (
+                Qt.Checked
+                if (not prev_selected or track_name in prev_selected)
+                else Qt.Unchecked
+            )
+            track_item.setCheckState(0, state)
+
+            # add logs as children (structural only)
+            for log_cfg in track.get("logs", []):
+                log_name = log_cfg.get("log")
+                if not log_name:
+                    continue
+                log_item = QTreeWidgetItem([log_name])
+                log_item.setFlags(
+                    log_item.flags()
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                track_item.addChild(log_item)
+
+            root.addChild(track_item)
+
+        self.well_tree.blockSignals(False)
+        self._rebuild_visible_tracks_from_tree()
+
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
@@ -460,6 +518,11 @@ class MainWindow(QMainWindow):
         # Logs
         if item is self.well_logs_folder or p is self.well_tops_folder:
             self._rebuild_visible_logs_from_tree()
+            return
+
+        # Tracks
+        if item is self.track_root_item or p is self.track_root_item:
+            self._rebuild_visible_tracks_from_tree()
             return
 
     def _select_all_wells(self):
@@ -525,4 +588,21 @@ class MainWindow(QMainWindow):
 
         self.panel.set_visible_logs(visible_set)
 
+    def _rebuild_visible_tracks_from_tree(self):
+        """Collect checked tracks and inform the panel."""
+        root = self.track_root_item
+        visible = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                nm = it.data(0, Qt.UserRole)
+                if nm:
+                    visible.add(nm)
 
+        # If all tracks are checked, we can pass None (= no filter)
+        if visible and len(visible) == root.childCount():
+            visible_set = None
+        else:
+            visible_set = visible if visible else None
+
+        self.panel.set_visible_tracks(visible_set)

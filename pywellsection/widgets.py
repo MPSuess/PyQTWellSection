@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QPlainTextEdit, QDockWidget
 from pandas import DataFrame
 
 LOG = logging.getLogger(__name__)
-LOG.setLevel("DEBUG")
+LOG.setLevel("INFO")
 
 class QTextEditLogger(QPlainTextEdit, logging.Handler):
     write_text_signal = pyqtSignal(str)
