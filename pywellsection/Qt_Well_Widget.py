@@ -27,6 +27,7 @@ class WellPanelWidget(QWidget):
         self.wells = wells
         self.well = None
         self.tracks = tracks
+        self.all_tracks = tracks
         self.n_tracks = len(tracks)
         self.stratigraphy = stratigraphy
         self.logs = None
@@ -35,7 +36,7 @@ class WellPanelWidget(QWidget):
         self.visible_tops = None
         self.visible_logs = None
         self.visible_discrete_logs = None
-        self.visible_tracks = None
+        self.visible_tracks = tracks
         #self._temp_highlight_top = None
 
         self.fig = Figure(figsize=(12, 6), dpi=100)
@@ -92,6 +93,7 @@ class WellPanelWidget(QWidget):
             visible_tops = self.visible_tops
             visible_logs = self.visible_logs
             visible_discrete_logs = self.visible_discrete_logs
+            visible_tracks = self.visible_tracks
 
 
 
@@ -106,7 +108,7 @@ class WellPanelWidget(QWidget):
                 visible_tops = visible_tops,
                 visible_logs = visible_logs,
                 visible_discrete_logs=visible_discrete_logs,
-                visible_tracks = self.visible_tracks,
+                visible_tracks = visible_tracks,
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -350,7 +352,18 @@ class WellPanelWidget(QWidget):
         """
         self.axis_index.clear()
         n_wells = len(self.wells)
-        n_tracks = len(self.tracks)
+        #n_tracks = len(self.tracks)
+
+        if self.visible_tracks is None:
+            filtered_tracks = self.tracks[:]
+        else:
+            filtered_tracks = [t for t in self.tracks if t.get("name") in self.visible_tracks]
+
+        if not filtered_tracks:
+            n_tracks = 1
+        else:
+            n_tracks = len(filtered_tracks)
+
 
         # layout is [W0T0, W0T1, ..., spacer, W1T0, W1T1, ..., spacer, ...]
         for wi in range(n_wells):
