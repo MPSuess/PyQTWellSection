@@ -311,6 +311,7 @@ def create_dummy_data_rand():
 
     tracks = [
         {
+            "name": "GR-CAL",
             "logs": [
                 {
                     "log": "GR",
@@ -331,6 +332,7 @@ def create_dummy_data_rand():
             ],
         },
         {
+            "name": "RT-RHOB",
             "logs": [
                 {
                     "log": "RT",
@@ -343,6 +345,7 @@ def create_dummy_data_rand():
             ],
         },
         {
+            "name": "RHOB-PHI",
             "logs": [
                 {
                     "log": "RHOB",
@@ -363,6 +366,7 @@ def create_dummy_data_rand():
             ],
         },
         {
+            "name": "Facies",
             "discrete": {
                 "log": "FACIES",
                 "label": "Facies",
@@ -504,5 +508,5 @@ def create_dummy_data_wells_only():
 
 
 def create_dummy_data():
-    wells, tracks, stratigraphy = create_dummy_data_0()
+    wells, tracks, stratigraphy = create_dummy_data_rand()
     return wells, tracks, stratigraphy

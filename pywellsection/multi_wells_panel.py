@@ -93,10 +93,17 @@ def draw_multi_wells_panel_on_figure(
     fig.clf()
 
     n_wells = len(wells)
-    if not tracks:
+
+    if visible_tracks is None:
+        filtered_tracks = tracks[:]
+    else:
+        filtered_tracks = [t for t in tracks if t.get("name") in visible_tracks]
+
+
+    if not filtered_tracks:
         n_tracks = 1
     else:
-        n_tracks = len(tracks)
+        n_tracks = len(filtered_tracks)
 
     if n_wells == 0:
         return None, None
@@ -184,7 +191,7 @@ def draw_multi_wells_panel_on_figure(
         well_main_axes.append(main_ax)
 
         # ---- Case: no tracks, just depth axis ----
-        if not tracks:
+        if not filtered_tracks:
             base_ax = main_ax
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
             base_ax.invert_yaxis()
@@ -199,9 +206,20 @@ def draw_multi_wells_panel_on_figure(
             continue
 
         # ---- Normal multi-track case ----
-        for ti, track in enumerate(tracks):
+        for ti, track in enumerate(filtered_tracks):
             col_idx = wi * (n_tracks + 1) + ti
             base_ax = axes[col_idx]
+
+            # track_name = track.get("name", f"Track {ti + 1}")
+            # track_hidden = (
+            #         visible_tracks is not None
+            #         and track_name not in visible_tracks
+            # )
+
+            # track_hidden = True # check if the track is hidden
+            # if visible_tracks is not None:
+            #     for val in visible_tracks:
+            #         if val['name'] == track_name: track_hidden = False
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
@@ -221,6 +239,11 @@ def draw_multi_wells_panel_on_figure(
             mid_track = n_tracks // 2
             if ti == mid_track:
                 base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5)
+
+            # If track is hidden: just leave the axis empty (depth axis still there).
+            #if track_hidden:
+                # no logs, no discrete fill
+            #    continue
 
             # ---- Continuous logs ----
             for j, log_cfg in enumerate(track.get("logs", [])):
@@ -339,6 +362,7 @@ def draw_multi_wells_panel_on_figure(
         highlight_top=highlight_top,
         flatten_depths=flatten_depths,
         visible_tops=visible_tops,
+        visible_tracks = visible_tracks,
     )
 
     if suptitle:
@@ -377,6 +401,7 @@ def add_tops_and_correlations(
     highlight_top=None,
     flatten_depths=None,
     visible_tops=None,
+    visible_tracks = None,
 ):
     """
     Handle:
