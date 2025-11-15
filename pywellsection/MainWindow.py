@@ -1,17 +1,23 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
-    QTableWidgetItem,)
+    QTableWidgetItem,QDialog)
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
+
+import numpy as np
+
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 
 from pywellsection.Qt_Well_Widget import WellPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
+from pywellsection.io_utils import load_las_as_logs
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
 from pywellsection.trees import setup_well_widget_tree
+from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
+from pywellsection.dialogs import AddLogToTrackDialog
 
 import logging
 from pathlib import Path
@@ -152,6 +158,10 @@ class MainWindow(QMainWindow):
         act_import_petrel.triggered.connect(self._file_import_petrel)
         file_menu.addAction(act_import_petrel)
 
+        act_import_las = QAction("Import LAS logs...", self)
+        act_import_las.triggered.connect(self._file_import_las)
+        file_menu.addAction(act_import_las)
+
         file_menu.addSeparator()
 
         act_exit = QAction("Exit", self)
@@ -168,6 +178,16 @@ class MainWindow(QMainWindow):
         act_sel_none = QAction("Select no wells", self)
         act_sel_none.triggered.connect(self._select_no_wells)
         view_menu.addAction(act_sel_none)
+
+        tools_menu = menubar.addMenu("&Tools")
+
+        act_add_log_to_track = QAction("Add log to track...", self)
+        act_add_log_to_track.triggered.connect(self._action_add_log_to_track)
+        tools_menu.addAction(act_add_log_to_track)
+
+        act_add_track = QAction("Add empty track...", self)
+        act_add_track.triggered.connect(self._action_add_empty_track)
+        tools_menu.addAction(act_add_track)
 
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
@@ -290,6 +310,82 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Import error", f"Failed to import:\n{e}")
+
+    def _file_import_las(self):
+        """Import LAS file and assign logs to an existing or new well."""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import LAS file",
+            "",
+            "LAS files (*.las);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        try:
+            las_well_info, logs = load_las_as_logs(path)
+        except Exception as e:
+            QMessageBox.critical(self, "LAS import error", f"Failed to read LAS:\n{e}")
+            return
+
+        # Dialog to choose target well or create new one
+        dlg = AssignLasToWellDialog(self, self.all_wells, las_well_info)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        mode, idx, new_name, new_uwi = dlg.result_assignment()
+
+        if mode == "existing":
+            # Attach logs to existing well
+            if idx < 0 or idx >= len(self.all_wells):
+                QMessageBox.critical(self, "LAS import", "Invalid well index selected.")
+                return
+
+            target_well = self.all_wells[idx]
+            if "logs" not in target_well:
+                target_well["logs"] = {}
+            # merge/override logs
+            for mnem, log_def in logs.items():
+                target_well["logs"][mnem] = log_def
+
+        else:
+            # Create new well from LAS info
+            wi = las_well_info.copy()
+            if new_name:
+                wi["name"] = new_name
+            if new_uwi:
+                wi["uwi"] = new_uwi
+
+            # ensure required keys
+            wi.setdefault("x", None)
+            wi.setdefault("y", None)
+            wi.setdefault("reference_type", "KB")
+            wi.setdefault("reference_depth", 0.0)
+            wi.setdefault("total_depth", max(
+                (float(np.nanmax(v["depth"])) for v in logs.values()),
+                default=0.0,
+            ))
+            wi.setdefault("tops", {})
+            wi["logs"] = logs
+
+            self.all_wells.append(wi)
+
+            if self.all_logs is None:
+                self.all_logs = logs
+            else:
+                for log in logs:
+                    if log not in self.all_logs:
+                        self.all_logs.append(log)
+
+        # Update panel + tree views
+        self.panel.set_wells(self.all_wells)
+
+        # refresh tree sections
+        self._populate_well_tree()
+        self._populate_well_log_tree()
+        self._populate_well_track_tree()
+
+        QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
 
     def _build_well_tree_dock(self):
         """Left dock: tree with checkboxes to toggle wells."""
@@ -424,11 +520,19 @@ class MainWindow(QMainWindow):
         # add wells as children of "All wells"
 
         log_names = set()
-        for track in self.all_tracks:
-            for log_cgf in track.get("logs",[]):
-                name = log_cgf.get("log")
-                if name:
-                    log_names.add(name)
+        # for track in self.all_tracks:
+        #     for log_cgf in track.get("logs",[]):
+        #         name = log_cgf.get("log")
+        #         if name:
+        #             log_names.add(name)
+
+        if self.all_logs is None:
+            return
+
+        for log in self.all_logs:
+            name = log
+            if name:
+                log_names.add(name)
 
         for name in sorted(log_names):
             it = QTreeWidgetItem([name])
@@ -606,3 +710,132 @@ class MainWindow(QMainWindow):
             visible_set = visible if visible else None
 
         self.panel.set_visible_tracks(visible_set)
+
+    def add_log_to_track(self, track_name: str, log_name: str,
+                         label: str = None, color: str = "black",
+                         xscale: str = "linear", direction: str = "normal",
+                         xlim=None):
+        """
+        Add a new log config to a track by name and refresh panel & trees.
+
+        - track_name: name of the track (track['name'])
+        - log_name:   log mnemonic as used in well['logs'][log_name]
+        - label:      label shown on top (defaults to log_name)
+        - color:      matplotlib color string
+        - xscale:     'linear' or 'log'
+        - direction:  'normal' or 'reverse' (reverse = flip x-axis)
+        - xlim:       optional (min, max) tuple for x-axis
+        """
+        if label is None:
+            label = log_name
+
+        # 1) find the track
+        track = None
+        for t in self.tracks:
+            if t.get("name") == track_name:
+                track = t
+                break
+
+        if track is None:
+            raise ValueError(f"Track '{track_name}' not found.")
+
+        # 2) ensure 'logs' list exists
+        if "logs" not in track or track["logs"] is None:
+            track["logs"] = []
+
+        # 3) build log config
+        log_cfg = {
+            "log": log_name,
+            "label": label,
+            "color": color,
+            "xscale": xscale,
+            "direction": direction,
+        }
+        if xlim is not None:
+            log_cfg["xlim"] = tuple(xlim)
+
+        # 4) append to track
+        track["logs"].append(log_cfg)
+
+        # 5) propagate to panel & tree widgets
+        self.panel.tracks = self.tracks  # keep panel in sync
+        self.panel.draw_panel()
+
+        # refresh log+track trees so the new log shows up
+        self._populate_well_log_tree()
+        self._populate_well_track_tree()
+
+    def _action_add_log_to_track(self):
+        """Show dialog to add a log to a track, then apply."""
+        dlg = AddLogToTrackDialog(self, self.tracks, self.all_wells)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        track_name, log_name, label, color = dlg.get_values()
+        try:
+            self.add_log_to_track(
+                track_name=track_name,
+                log_name=log_name,
+                label=label,
+                color=color,
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Add log to track", f"Failed:\n{e}")
+
+    def add_empty_track(self, track_name: str | None = None):
+        """
+        Add a new empty track (no logs, no discrete track) to the project and refresh UI.
+
+        If track_name is None, generate a unique name like 'Track 1', 'Track 2', ...
+        """
+        # Ensure we have a list of existing names
+        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+
+        if not track_name:
+            # Generate "Track N" that isn't used yet
+            base = "Track"
+            i = 1
+            while f"{base} {i}" in existing_names:
+                i += 1
+            track_name = f"{base} {i}"
+
+        # Build the empty track definition
+        new_track = {
+            "name": track_name,
+            "logs": [],  # no continuous logs yet
+            "discrete": None,  # no discrete track yet
+        }
+
+        # Append to tracks
+        if not hasattr(self, "tracks") or self.tracks is None:
+            self.tracks = []
+        self.tracks.append(new_track)
+        self.all_tracks.append(new_track)
+
+
+        # Keep panel in sync
+        self.panel.tracks = self.tracks
+        self.panel.draw_panel()
+
+        # Refresh tree sections that depend on tracks
+        self._populate_well_track_tree()
+        self._populate_well_log_tree()  # stays the same; just ensures consistency
+
+    def _action_add_empty_track(self):
+        # Suggest next unique name
+        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+        base = "Track"
+        i = 1
+        while f"{base} {i}" in existing_names:
+            i += 1
+        suggested = f"{base} {i}"
+
+        dlg = NewTrackDialog(self, suggested_name=suggested)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        name = dlg.track_name() or suggested
+        try:
+            self.add_empty_track(name)
+        except Exception as e:
+            QMessageBox.critical(self, "Add empty track", f"Failed to add track:\n{e}")
