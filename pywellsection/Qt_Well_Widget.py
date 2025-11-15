@@ -16,6 +16,7 @@ from .multi_wells_panel import add_tops_and_correlations
 from .sample_data import create_dummy_data
 from .dialogs import EditFormationTopDialog
 from .dialogs import AddFormationTopDialog
+from .dialogs import AddLogToTrackDialog
 
 
 import numpy as np
@@ -295,25 +296,32 @@ class WellPanelWidget(QWidget):
         self._picked_depth = nearest_depth
         self._picked_formation = nearest_name
 
-        # distance threshold based on TRUE depth range
+        # we now setup the menu
+        menu = QMenu(self)
+
+        act_edit = None
+        act_delete = None
+        act_flatten = None
+        act_add = None
+
+                # distance threshold based on TRUE depth range
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
         depth_range = abs(well_td - ref_depth) or 1.0
         max_pick_distance = depth_range * 0.02
         if min_dist > max_pick_distance:
-            return
+            act_add = menu.addAction(f"Add top '{depth_true:.2f} m'...'")
+        else:
 
-        # highlight top (your existing helper should already respect flattening
-        # via add_tops_and_correlations if you pass flatten_depths there)
-        self._clear_temp_highlight()
-        self._draw_temp_highlight(wi, nearest_name)
+            # highlight top (your existing helper should already respect flattening
+            # via add_tops_and_correlations if you pass flatten_depths there)
+            self._clear_temp_highlight()
+            self._draw_temp_highlight(wi, nearest_name)
 
-        # --- context menu ---
-        menu = QMenu(self)
-        act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
-        act_delete = menu.addAction(f"Delete top '{nearest_name}'")
-        act_add = menu.addAction(f"Add top at {depth_true:.2f} m…")
-        act_flatten = menu.addAction(f"Flatten on '{nearest_name}'")
+            # --- context menu ---
+            act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
+            act_delete = menu.addAction(f"Delete top '{nearest_name}'")
+            act_flatten = menu.addAction(f"Flatten on '{nearest_name}'")
 
         if hasattr(event, "guiEvent") and event.guiEvent is not None:
             global_pos = event.guiEvent.globalPos()
@@ -795,7 +803,7 @@ class WellPanelWidget(QWidget):
         well = self.wells[well_index]
         tops = well.setdefault("tops", {})
 
-        if len(self._flatten_depths) > 0:
+        if self._flatten_depths is not None:
             flatten_depth = self._flatten_depths[wi_target]
         else:
             flatten_depth = 0

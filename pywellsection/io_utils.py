@@ -1,8 +1,10 @@
 
 import json
-import numpy as np
 from pathlib import Path
 import re
+import lasio
+import numpy as np
+
 
 
 def load_project_from_json(path):
@@ -275,3 +277,80 @@ def load_petrel_wellheads(path):
 
     return wells
 
+def load_las_as_logs(path):
+    """
+    Read a LAS file and return:
+      - well_info: dict with basic info (name, uwi, x, y, etc.)
+      - logs: dict {mnemonic: {"depth": np.array, "data": np.array}}
+    """
+    las = lasio.read(path)
+
+    # ---- depth vector ----
+    # Prefer LAS index if it's depth, else look for DEPT/DEPTH
+    if las.index is not None:
+        depth = np.array(las.index, dtype=float)
+    else:
+        if "DEPT" in las.curves_dict:
+            depth = np.array(las["DEPT"].data, dtype=float)
+        elif "DEPTH" in las.curves_dict:
+            depth = np.array(las["DEPTH"].data, dtype=float)
+        else:
+            raise ValueError("No DEPT/DEPTH curve found in LAS file.")
+
+    # ---- basic well header info (best effort) ----
+    well_section = las.well
+
+    def wval(mnemonic, default=""):
+        if mnemonic in well_section:
+            v = well_section[mnemonic].value
+            return str(v).strip() if v is not None else default
+        return default
+
+    name = wval("WELL", "")
+    uwi = wval("UWI", "")
+    x = wval("X", "")
+    y = wval("Y", "")
+    kb = wval("KB", "")
+
+    try:
+        x = float(x) if x not in ("", "None") else None
+    except ValueError:
+        x = None
+    try:
+        y = float(y) if y not in ("", "None") else None
+    except ValueError:
+        y = None
+
+    # crude reference_depth and total_depth guess
+    depth_min = float(np.nanmin(depth))
+    depth_max = float(np.nanmax(depth))
+    total_depth = depth_max - depth_min if depth_max > depth_min else 0.0
+    reference_depth = depth_min
+
+    well_info = {
+        "name": name or uwi or "LAS_well",
+        "uwi": uwi,
+        "x": x,
+        "y": y,
+        "reference_type": kb or "KB",
+        "reference_depth": reference_depth,
+        "total_depth": total_depth,
+    }
+
+    # ---- collect logs (skip depth curves) ----
+    logs = {}
+    for curve in las.curves:
+        mnem = curve.mnemonic.strip()
+        umnem = mnem.upper()
+        if umnem in ("DEPT", "DEPTH"):
+            continue
+        data = np.array(curve.data, dtype=float)
+        logs[mnem] = {
+            "depth": depth.copy(),
+            "data": data,
+        }
+
+    if not logs:
+        raise ValueError("No log curves found in LAS file (besides depth).")
+
+    return well_info, logs
