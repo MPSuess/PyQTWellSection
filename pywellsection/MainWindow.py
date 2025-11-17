@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
-    QTableWidgetItem,QDialog)
+    QTableWidgetItem,QDialog, QInputDialog)
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
@@ -189,6 +189,10 @@ class MainWindow(QMainWindow):
         act_add_track.triggered.connect(self._action_add_empty_track)
         tools_menu.addAction(act_add_track)
 
+        act_delete_track = QAction("Delete track...", self)
+        act_delete_track.triggered.connect(self._action_delete_track)
+        tools_menu.addAction(act_delete_track)
+
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
         act_about = QAction("About...", self)
@@ -217,6 +221,7 @@ class MainWindow(QMainWindow):
             self.panel.wells = wells
             self.panel.tracks = tracks
             self.all_stratigraphy = []
+            self.all_logs = []
             self.all_tracks = tracks
 
             self.all_wells = wells
@@ -233,6 +238,19 @@ class MainWindow(QMainWindow):
                             stratigraphy.append(top)
                 else:
                     print("No tops found")
+
+            for well in wells:
+                logs = well.get("logs")
+                if logs:
+                    for log in logs:
+                        if not self.all_logs:
+                            self.all_logs = list(log)
+                        if log in self.all_logs:
+                            continue
+                        else:
+                            self.all_logs.append(log)
+                else:
+                    print("No logs found")
 
             self.all_stratigraphy = stratigraphy
 
@@ -375,7 +393,7 @@ class MainWindow(QMainWindow):
             else:
                 for log in logs:
                     if log not in self.all_logs:
-                        self.all_logs.append(log)
+                        self.all_logs[log] = logs[log]
 
         # Update panel + tree views
         self.panel.set_wells(self.all_wells)
@@ -731,7 +749,7 @@ class MainWindow(QMainWindow):
 
         # 1) find the track
         track = None
-        for t in self.tracks:
+        for t in self.all_tracks:
             if t.get("name") == track_name:
                 track = t
                 break
@@ -758,8 +776,10 @@ class MainWindow(QMainWindow):
         track["logs"].append(log_cfg)
 
         # 5) propagate to panel & tree widgets
-        self.panel.tracks = self.tracks  # keep panel in sync
-        self.panel.draw_panel()
+        #if self.panel.tracks is not None:
+        #    self.panel.tracks = self.panel.tracks
+        #    print(self.panel.tracks)# keep panel in sync
+        #self.panel.draw_panel()
 
         # refresh log+track trees so the new log shows up
         self._populate_well_log_tree()
@@ -767,7 +787,7 @@ class MainWindow(QMainWindow):
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
-        dlg = AddLogToTrackDialog(self, self.tracks, self.all_wells)
+        dlg = AddLogToTrackDialog(self, self.all_tracks, self.all_wells)
         if dlg.exec_() != QDialog.Accepted:
             return
 
@@ -789,7 +809,14 @@ class MainWindow(QMainWindow):
         If track_name is None, generate a unique name like 'Track 1', 'Track 2', ...
         """
         # Ensure we have a list of existing names
-        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            if self.tracks is None:
+                existing_names = set()
+            else:
+    #            existing_names = {t.get("name", "") for t in self.tracks}
+                existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+        else: existing_names = {t.get("name", "") for t in self.all_tracks}
 
         if not track_name:
             # Generate "Track N" that isn't used yet
@@ -807,15 +834,15 @@ class MainWindow(QMainWindow):
         }
 
         # Append to tracks
-        if not hasattr(self, "tracks") or self.tracks is None:
-            self.tracks = []
-        self.tracks.append(new_track)
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            self.all_tracks = []
         self.all_tracks.append(new_track)
+        #self.all_tracks.append(new_track)
 
 
         # Keep panel in sync
-        self.panel.tracks = self.tracks
-        self.panel.draw_panel()
+        #self.panel.tracks = self.tracks
+        #self.panel.draw_panel()
 
         # Refresh tree sections that depend on tracks
         self._populate_well_track_tree()
@@ -839,3 +866,67 @@ class MainWindow(QMainWindow):
             self.add_empty_track(name)
         except Exception as e:
             QMessageBox.critical(self, "Add empty track", f"Failed to add track:\n{e}")
+
+    def delete_track(self, track_name: str):
+        """
+        Delete a track (by its name) from the project and refresh UI.
+        Does NOT delete any log data from wells, only the track definition.
+        """
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            raise ValueError("No tracks defined in the project.")
+
+        # find track index
+        idx = None
+        for i, t in enumerate(self.all_tracks):
+            if t.get("name") == track_name:
+                idx = i
+                break
+
+        if idx is None:
+            raise ValueError(f"Track '{track_name}' not found.")
+
+        # remove from tracks list
+        del self.all_tracks[idx]
+
+        # keep panel in sync
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.all_tracks
+
+            # clean up visible_tracks if needed
+            vt = getattr(self.panel, "visible_tracks", None)
+            if vt is not None:
+                vt = set(vt)
+                if track_name in vt:
+                    vt.remove(track_name)
+                self.panel.visible_tracks = vt or None
+
+            self.panel.draw_panel()
+
+        # refresh tree sections
+        self._populate_well_track_tree()  # tracks folder
+        #self._populate_well_log_tree()  # logs folder still valid, but refresh for consistency
+
+
+    def _action_delete_track(self):
+        """Ask user which track to delete, then call delete_track."""
+        if not getattr(self, "all_tracks", None):
+            QMessageBox.information(self, "Delete track", "There are no tracks to delete.")
+            return
+
+        track_names = [t.get("name", f"Track {i + 1}") for i, t in enumerate(self.all_tracks)]
+
+        name, ok = QInputDialog.getItem(
+            self,
+            "Delete track",
+            "Select track to delete:",
+            track_names,
+            0,
+            False,
+        )
+        if not ok or not name:
+            return
+
+        try:
+            self.delete_track(name)
+        except Exception as e:
+            QMessageBox.critical(self, "Delete track", f"Failed to delete track:\n{e}")

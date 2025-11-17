@@ -236,9 +236,9 @@ class WellPanelWidget(QWidget):
 
         min, max = self._get_stratigraphic_bounds(formation_name)
 
-        if depth < min:
+        if depth < min+flatten_depth:
             depth = min
-        if depth > max:
+        if depth > max+flatten_depth:
             depth = max
 
         if depth is not None and self._active_top_dialog is not None:
@@ -317,6 +317,7 @@ class WellPanelWidget(QWidget):
             # via add_tops_and_correlations if you pass flatten_depths there)
             self._clear_temp_highlight()
             self._draw_temp_highlight(wi, nearest_name)
+            self.draw_panel()
 
             # --- context menu ---
             act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
@@ -451,6 +452,8 @@ class WellPanelWidget(QWidget):
         depth = depth - flatten_depth
 
 
+
+
         formation_name = self._active_pick_context["formation_name"]
 
         if formation_name is not None:
@@ -458,7 +461,7 @@ class WellPanelWidget(QWidget):
 
             if depth < min-flatten_depth:
                 depth = min-flatten_depth
-            if depth > max:
+            if depth > max-flatten_depth:
                 depth = max-flatten_depth
 
         print("move", event.ydata, min, max, depth)
@@ -468,9 +471,15 @@ class WellPanelWidget(QWidget):
 
         # draw a thin hatched band across ALL tracks of the selected well
         self._clear_pick_line()
-        first_track_idx = wi_target * (self.n_tracks + 1)
 
-        for ti in range(self.n_tracks):
+        if self.visible_tracks is None: # in this case all tracks are visible
+            self.visible_tracks = [t.get("name") for t in self.tracks]
+        n_tracks = len(self.visible_tracks)
+        first_track_idx = wi_target * (n_tracks + 1)
+
+
+
+        for ti in range(n_tracks):
             base_ax = self.axes[first_track_idx + ti]
 
             # choose a small thickness relative to the depth range
@@ -480,8 +489,11 @@ class WellPanelWidget(QWidget):
             band = base_ax.axhline(depth+flatten_depth, color="tab:red", lw=1.2, ls="--", zorder=10)
 
             self._pick_line_artists.append(band)
+            #if True: return
+            #self.draw_panel()
 
         self.canvas.draw_idle()
+        #self.draw_panel()
     ###----
     # def _handle_dialog_pick_click(self, event):
     #     """
