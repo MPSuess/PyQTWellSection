@@ -274,27 +274,27 @@ class WellPanelWidget(QWidget):
 
         well = self.wells[wi]
         if "tops" not in well or not well["tops"]:
-            return
+            tops = None
 
-        # --- find nearest top in TRUE depth space ---
-        tops = well["tops"]
+        else: # --- find nearest top in TRUE depth space ---
+            tops = well["tops"]
+
         nearest_name = None
         nearest_depth = None
-        min_dist = None
+        min_dist = 99999
 
-        for name, val in tops.items():
-            d = float(val["depth"] if isinstance(val, dict) else val)
-            dist = abs(d - depth_true)
-            if min_dist is None or dist < min_dist:
-                min_dist = dist
-                nearest_name = name
-                nearest_depth = d
+        if tops is not None:
+            for name, val in tops.items():
+                d = float(val["depth"] if isinstance(val, dict) else val)
+                dist = abs(d - depth_true)
+                if min_dist is None or dist < min_dist:
+                    min_dist = dist
+                    nearest_name = name
+                    nearest_depth = d
 
-        if nearest_name is None:
-            return
-
-        self._picked_depth = nearest_depth
-        self._picked_formation = nearest_name
+        if nearest_name is not None:
+            self._picked_depth = nearest_depth
+            self._picked_formation = nearest_name
 
         # we now setup the menu
         menu = QMenu(self)
@@ -309,7 +309,7 @@ class WellPanelWidget(QWidget):
         well_td = ref_depth + well["total_depth"]
         depth_range = abs(well_td - ref_depth) or 1.0
         max_pick_distance = depth_range * 0.02
-        if min_dist > max_pick_distance:
+        if min_dist > max_pick_distance or tops is None:
             act_add = menu.addAction(f"Add top '{depth_true:.2f} m'...'")
         else:
 
