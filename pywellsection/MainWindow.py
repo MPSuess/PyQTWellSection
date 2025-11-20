@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
-    QTableWidgetItem,QDialog)
+    QTableWidgetItem,QDialog, QInputDialog)
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
@@ -18,6 +18,7 @@ from pywellsection.console import QIPythonWidget
 from pywellsection.trees import setup_well_widget_tree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
+from pywellsection.dialogs import StratigraphyEditorDialog
 
 import logging
 from pathlib import Path
@@ -68,73 +69,6 @@ class MainWindow(QMainWindow):
         # ---- build menu bar ----
         self._create_menubar()
 
-    # def _setup_well_widget_tree(self):
-    #     ### --- Define the Input Tree ###
-    #     self.well_tree = QTreeWidget(self)
-    #     self.well_tree.setHeaderHidden(True)
-    #     self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
-    #
-    #     # 👇 create the folder item once
-    #     self.well_root_item = QTreeWidgetItem(["Wells"])
-    #     # tristate so checking it checks/unchecks children
-    #     self.well_root_item.setFlags(
-    #         self.well_root_item.flags()
-    #         | Qt.ItemIsUserCheckable
-    #         | Qt.ItemIsTristate
-    #         | Qt.ItemIsSelectable
-    #         | Qt.ItemIsEnabled
-    #     )
-    #     self.well_root_item.setCheckState(0, Qt.Checked)
-    #     self.well_tree.addTopLevelItem(self.well_root_item)
-    #
-    #     self.well_tops_folder = QTreeWidgetItem(["Tops"])
-    #     # tristate so checking it checks/unchecks children
-    #     self.well_tops_folder.setFlags(
-    #         self.well_tops_folder.flags()
-    #         | Qt.ItemIsUserCheckable
-    #         | Qt.ItemIsTristate
-    #         | Qt.ItemIsSelectable
-    #         | Qt.ItemIsEnabled
-    #     )
-    #     self.well_tops_folder.setCheckState(0, Qt.Checked)
-    #     self.well_tree.addTopLevelItem(self.well_tops_folder)
-    #
-    #     self.well_logs_folder = QTreeWidgetItem(["Logs"])
-    #     # tristate so checking it checks/unchecks children
-    #     self.well_logs_folder.setFlags(
-    #         self.well_logs_folder.flags()
-    #         | Qt.ItemIsUserCheckable
-    #         | Qt.ItemIsTristate
-    #         | Qt.ItemIsSelectable
-    #         | Qt.ItemIsEnabled
-    #     )
-    #     self.well_logs_folder.setCheckState(0, Qt.Checked)
-    #     # self.well_root_item.addChild(self.well_logs_folder)
-    #     self.well_tree.addTopLevelItem(self.well_logs_folder)
-    #
-    #     ### Setup the Dock
-    #
-    #     self.well_dock = QDockWidget("Input Data", self)
-    #     self.well_dock.setObjectName("Input")
-    #     self.well_dock.setWidget(self.well_tree)
-    #     self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
-    #
-    #     self.splitDockWidget(self.well_dock, self.dock_panel, Qt.Horizontal)
-    #     self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
-    #     self.resizeDocks([self.dock_panel, self.dock_console], [4, 1], Qt.Vertical)
-    #
-    #     self.tabifyDockWidget(self.dock_console, self.dock_commands)
-    #     self.tabifyDockWidget(self.dock_commands, self.dock_logger)
-    #     self.dock_console.raise_()
-    #
-    #     # --- intial build of the well tree
-    #     self._populate_well_tree()
-    #     self._populate_well_tops_tree()
-    #     self._populate_well_log_tree()
-
-    # ------------------------------------------------
-    # MENU BAR SETUP
-    # ------------------------------------------------
     def _create_menubar(self):
         menubar = self.menuBar()
 
@@ -189,6 +123,14 @@ class MainWindow(QMainWindow):
         act_add_track.triggered.connect(self._action_add_empty_track)
         tools_menu.addAction(act_add_track)
 
+        act_delete_track = QAction("Delete track...", self)
+        act_delete_track.triggered.connect(self._action_delete_track)
+        tools_menu.addAction(act_delete_track)
+
+        act_edit_strat = QAction("Edit stratigraphy...", self)
+        act_edit_strat.triggered.connect(self._action_edit_stratigraphy)
+        tools_menu.addAction(act_edit_strat)
+
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
         act_about = QAction("About...", self)
@@ -216,25 +158,33 @@ class MainWindow(QMainWindow):
             wells, tracks, stratigraphy, _ = load_project_from_json(path)
             self.panel.wells = wells
             self.panel.tracks = tracks
-            self.all_stratigraphy = []
+            #self.all_stratigraphy = None
+            self.all_logs = []
             self.all_tracks = tracks
 
             self.all_wells = wells
 
-            stratigraphy=self.all_stratigraphy
+            #stratigraphy=self.all_stratigraphy
+
+            if not self.all_stratigraphy:
+                self.all_stratigraphy = stratigraphy
+            else:
+                self.all_stratigraphy.update(stratigraphy)
 
             for well in wells:
-                tops = well.get("tops")
-                if tops:
-                    for top in tops:
-                        if top in stratigraphy:
+                logs = well.get("logs")
+                if logs:
+                    for log in logs:
+                        if not self.all_logs:
+                            self.all_logs = logs
+                        if log in self.all_logs:
                             continue
                         else:
-                            stratigraphy.append(top)
+                            self.all_logs.append(log)
                 else:
-                    print("No tops found")
+                    print("No logs found")
 
-            self.all_stratigraphy = stratigraphy
+            #self.all_stratigraphy = stratigraphy
 
 
             # populate well tree
@@ -243,7 +193,6 @@ class MainWindow(QMainWindow):
             self._populate_well_log_tree()
             self._populate_well_track_tree()
 
-#            self._rebuild_visible_tops_from_tree()
 
             # ✅ Trigger full redraw
             self.panel.update_panel(tracks, wells, stratigraphy)
@@ -371,11 +320,10 @@ class MainWindow(QMainWindow):
             self.all_wells.append(wi)
 
             if self.all_logs is None:
-                self.all_logs = logs
+                 self.all_logs = logs
             else:
-                for log in logs:
-                    if log not in self.all_logs:
-                        self.all_logs.append(log)
+                 self.all_logs = self.all_logs|logs # this operator merges the two dictionaries
+
 
         # Update panel + tree views
         self.panel.set_wells(self.all_wells)
@@ -417,8 +365,7 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
 
     def _populate_well_tree(self):
-        """Rebuild the tree from self.all_wells, preserving selections if possible."""
-        # Remember current selection by name
+        """Rebuild wells subtree from self.all_wells, with log leaves under each well."""
         prev_selected = set()
         root = self.well_root_item
         for i in range(root.childCount()):
@@ -427,34 +374,48 @@ class MainWindow(QMainWindow):
                 prev_selected.add(it.data(0, Qt.UserRole))
 
         self.well_tree.blockSignals(True)
-
-        # remove all wells under the folder
         root.takeChildren()
 
-        # add wells as children of "All wells"
         for w in self.all_wells:
-            name = w.get("name") or "UNKNOWN"
-            it = QTreeWidgetItem([name])
-            it.setFlags(
-                it.flags()
+            well_name = w.get("name") or "UNKNOWN"
+
+            # --- well item (checkable) ---
+            well_item = QTreeWidgetItem([well_name])
+            well_item.setFlags(
+                well_item.flags()
                 | Qt.ItemIsUserCheckable
                 | Qt.ItemIsSelectable
                 | Qt.ItemIsEnabled
             )
-            it.setData(0, Qt.UserRole, name)
+            well_item.setData(0, Qt.UserRole, well_name)
+            state = Qt.Checked if (not prev_selected or well_name in prev_selected) else Qt.Unchecked
+            well_item.setCheckState(0, state)
+            root.addChild(well_item)
 
-            # default: keep previous selection; else checked
-            if not prev_selected:
-                state = Qt.Checked
-            else:
-                state = Qt.Checked if name in prev_selected else Qt.Unchecked
-            it.setCheckState(0, state)
+            # --- log leaves (informational, not checkable) ---
+            logs_dict = w.get("logs", {}) or {}
+            if logs_dict:
+                # optionally add a small header item, or go straight to leaves
+                # header = QTreeWidgetItem(["Logs"])
+                # header.setFlags(header.flags() | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                # well_item.addChild(header)
+                # parent_for_logs = header
 
-            root.addChild(it)
+                parent_for_logs = well_item  # direct children of the well
+
+                for log_name in sorted(logs_dict.keys()):
+                    log_item = QTreeWidgetItem([log_name])
+                    # selectable but not user-checkable
+                    log_item.setFlags(
+                        log_item.flags()
+                        | Qt.ItemIsSelectable
+                        | Qt.ItemIsEnabled
+                    )
+                    # store mnemonic for possible future actions
+                    log_item.setData(0, Qt.UserRole, log_name)
+                    parent_for_logs.addChild(log_item)
 
         self.well_tree.blockSignals(False)
-
-        # Apply current selection to panel
         self._rebuild_panel_from_tree()
 
     def _populate_well_tops_tree(self):
@@ -491,7 +452,7 @@ class MainWindow(QMainWindow):
             if not prev_selected:
                 state = Qt.Checked
             else:
-                state = Qt.Checked if name in prev_selected else Qt.Unchecked
+                state = Qt.Checked if strat_name in prev_selected else Qt.Unchecked
             strat_it.setCheckState(0, state)
 
             root.addChild(strat_it)
@@ -731,7 +692,7 @@ class MainWindow(QMainWindow):
 
         # 1) find the track
         track = None
-        for t in self.tracks:
+        for t in self.all_tracks:
             if t.get("name") == track_name:
                 track = t
                 break
@@ -758,8 +719,10 @@ class MainWindow(QMainWindow):
         track["logs"].append(log_cfg)
 
         # 5) propagate to panel & tree widgets
-        self.panel.tracks = self.tracks  # keep panel in sync
-        self.panel.draw_panel()
+        #if self.panel.tracks is not None:
+        #    self.panel.tracks = self.panel.tracks
+        #    print(self.panel.tracks)# keep panel in sync
+        #self.panel.draw_panel()
 
         # refresh log+track trees so the new log shows up
         self._populate_well_log_tree()
@@ -767,7 +730,7 @@ class MainWindow(QMainWindow):
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
-        dlg = AddLogToTrackDialog(self, self.tracks, self.all_wells)
+        dlg = AddLogToTrackDialog(self, self.all_tracks, self.all_wells)
         if dlg.exec_() != QDialog.Accepted:
             return
 
@@ -789,7 +752,14 @@ class MainWindow(QMainWindow):
         If track_name is None, generate a unique name like 'Track 1', 'Track 2', ...
         """
         # Ensure we have a list of existing names
-        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            if self.tracks is None:
+                existing_names = set()
+            else:
+    #            existing_names = {t.get("name", "") for t in self.tracks}
+                existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+        else: existing_names = {t.get("name", "") for t in self.all_tracks}
 
         if not track_name:
             # Generate "Track N" that isn't used yet
@@ -807,15 +777,15 @@ class MainWindow(QMainWindow):
         }
 
         # Append to tracks
-        if not hasattr(self, "tracks") or self.tracks is None:
-            self.tracks = []
-        self.tracks.append(new_track)
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            self.all_tracks = []
         self.all_tracks.append(new_track)
+        #self.all_tracks.append(new_track)
 
 
         # Keep panel in sync
-        self.panel.tracks = self.tracks
-        self.panel.draw_panel()
+        #self.panel.tracks = self.tracks
+        #self.panel.draw_panel()
 
         # Refresh tree sections that depend on tracks
         self._populate_well_track_tree()
@@ -839,3 +809,100 @@ class MainWindow(QMainWindow):
             self.add_empty_track(name)
         except Exception as e:
             QMessageBox.critical(self, "Add empty track", f"Failed to add track:\n{e}")
+
+    def delete_track(self, track_name: str):
+        """
+        Delete a track (by its name) from the project and refresh UI.
+        Does NOT delete any log data from wells, only the track definition.
+        """
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            raise ValueError("No tracks defined in the project.")
+
+        # find track index
+        idx = None
+        for i, t in enumerate(self.all_tracks):
+            if t.get("name") == track_name:
+                idx = i
+                break
+
+        if idx is None:
+            raise ValueError(f"Track '{track_name}' not found.")
+
+        # remove from tracks list
+        del self.all_tracks[idx]
+
+        # keep panel in sync
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.all_tracks
+
+            # clean up visible_tracks if needed
+            vt = getattr(self.panel, "visible_tracks", None)
+            if vt is not None:
+                vt = set(vt)
+                if track_name in vt:
+                    vt.remove(track_name)
+                self.panel.visible_tracks = vt or None
+
+            self.panel.draw_panel()
+
+        # refresh tree sections
+        self._populate_well_track_tree()  # tracks folder
+        #self._populate_well_log_tree()  # logs folder still valid, but refresh for consistency
+
+    def _action_delete_track(self):
+        """Ask user which track to delete, then call delete_track."""
+        if not getattr(self, "all_tracks", None):
+            QMessageBox.information(self, "Delete track", "There are no tracks to delete.")
+            return
+
+        track_names = [t.get("name", f"Track {i + 1}") for i, t in enumerate(self.all_tracks)]
+
+        name, ok = QInputDialog.getItem(
+            self,
+            "Delete track",
+            "Select track to delete:",
+            track_names,
+            0,
+            False,
+        )
+        if not ok or not name:
+            return
+
+        try:
+            self.delete_track(name)
+        except Exception as e:
+            QMessageBox.critical(self, "Delete track", f"Failed to delete track:\n{e}")
+
+    def _action_edit_stratigraphy(self):
+        """Open table dialog to edit/add stratigraphy for the project."""
+        # Make sure we have a stratigraphy dict
+        strat = getattr(self, "all_stratigraphy", None)
+        if strat is None:
+            strat = {}
+
+        dlg = StratigraphyEditorDialog(self, strat)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_strat = dlg.result_stratigraphy()
+        if new_strat is None:
+            return
+
+        # 1) update project-level stratigraphy
+        self.stratigraphy = new_strat
+        self.all_stratigraphy = new_strat
+
+        # 2) push into panel
+        if hasattr(self, "panel"):
+            self.panel.stratigraphy = new_strat
+
+            # flattening uses strat key order:
+            # if you have any cached flatten state, you might want to reset:
+            if hasattr(self.panel, "_flatten_depths"):
+                self.panel._flatten_depths = None
+
+            self.panel.draw_panel()
+
+        # 3) refresh "Stratigraphic tops" folder in tree
+#        if hasattr(self, "_populate_top_tree"):
+        self._populate_well_tops_tree()

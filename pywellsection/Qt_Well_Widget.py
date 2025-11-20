@@ -70,6 +70,7 @@ class WellPanelWidget(QWidget):
         self._active_top_dialog = None
         self._active_pick_context = None  # {'wi': int, 'formation_name': str}
         self.ax = None
+        self.axes = None
 
         # temporary highlight of a selected top (optional)
         self._temp_highlight_artists = []
@@ -82,12 +83,31 @@ class WellPanelWidget(QWidget):
 
         self._flatten_top_name = None
         self._flatten_depths = []
+        self._current_depth_window = None  # (top_true, bottom_true) or None
 
         self.draw_panel()
         self.enable_top_picking()
 
     def draw_panel(self):
+
         if len(self.wells) != 0:
+            top_true = bottom_true = None
+            if hasattr(self, "axes") and self.axes:
+                # Take the first main axis as reference (row 0, track 0)
+                ref_ax = self.axes[0]
+                y0, y1 = ref_ax.get_ylim()
+                # y is in plotting coordinates (flattened); convert to true depth
+                offset0 = 0.0
+                if getattr(self, "_flatten_depths", None):
+                    # first well offset
+                    if len(self._flatten_depths) > 0:
+                        offset0 = float(self._flatten_depths[0])
+                # depth_true = depth_plot + offset
+                top_true = min(y0, y1) + offset0
+                bottom_true = max(y0, y1) + offset0
+                self._current_depth_window = (top_true, bottom_true)
+
+            # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
             self._corr_artists = []
             flatten_depths = self._flatten_depths
@@ -95,8 +115,6 @@ class WellPanelWidget(QWidget):
             visible_logs = self.visible_logs
             visible_discrete_logs = self.visible_discrete_logs
             visible_tracks = self.visible_tracks
-
-
 
             self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
                 self.fig,
@@ -110,6 +128,7 @@ class WellPanelWidget(QWidget):
                 visible_logs = visible_logs,
                 visible_discrete_logs=visible_discrete_logs,
                 visible_tracks = visible_tracks,
+                depth_window=self._current_depth_window,
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -236,9 +255,9 @@ class WellPanelWidget(QWidget):
 
         min, max = self._get_stratigraphic_bounds(formation_name)
 
-        if depth < min:
+        if depth < min+flatten_depth:
             depth = min
-        if depth > max:
+        if depth > max+flatten_depth:
             depth = max
 
         if depth is not None and self._active_top_dialog is not None:
@@ -262,6 +281,12 @@ class WellPanelWidget(QWidget):
             self._active_top_dialog.activateWindow()
 
     def _on_top_click(self, event):
+            # 1) if toolbar is in zoom or pan mode, do NOT pick
+        if hasattr(self, "toolbar") and getattr(self.toolbar, "mode", ""):
+            # toolbar.mode is '' when inactive, 'zoom rect' or 'pan/zoom' when active
+            return
+
+
         if self._in_dialog_pick_mode:
             return
         if event.button != 1:
@@ -274,27 +299,27 @@ class WellPanelWidget(QWidget):
 
         well = self.wells[wi]
         if "tops" not in well or not well["tops"]:
-            return
+            tops = None
 
-        # --- find nearest top in TRUE depth space ---
-        tops = well["tops"]
+        else: # --- find nearest top in TRUE depth space ---
+            tops = well["tops"]
+
         nearest_name = None
         nearest_depth = None
-        min_dist = None
+        min_dist = 99999
 
-        for name, val in tops.items():
-            d = float(val["depth"] if isinstance(val, dict) else val)
-            dist = abs(d - depth_true)
-            if min_dist is None or dist < min_dist:
-                min_dist = dist
-                nearest_name = name
-                nearest_depth = d
+        if tops is not None:
+            for name, val in tops.items():
+                d = float(val["depth"] if isinstance(val, dict) else val)
+                dist = abs(d - depth_true)
+                if min_dist is None or dist < min_dist:
+                    min_dist = dist
+                    nearest_name = name
+                    nearest_depth = d
 
-        if nearest_name is None:
-            return
-
-        self._picked_depth = nearest_depth
-        self._picked_formation = nearest_name
+        if nearest_name is not None:
+            self._picked_depth = nearest_depth
+            self._picked_formation = nearest_name
 
         # we now setup the menu
         menu = QMenu(self)
@@ -302,6 +327,7 @@ class WellPanelWidget(QWidget):
         act_edit = None
         act_delete = None
         act_flatten = None
+        act_unflatten = None
         act_add = None
 
                 # distance threshold based on TRUE depth range
@@ -309,7 +335,7 @@ class WellPanelWidget(QWidget):
         well_td = ref_depth + well["total_depth"]
         depth_range = abs(well_td - ref_depth) or 1.0
         max_pick_distance = depth_range * 0.02
-        if min_dist > max_pick_distance:
+        if min_dist > max_pick_distance or tops is None:
             act_add = menu.addAction(f"Add top '{depth_true:.2f} m'...'")
         else:
 
@@ -317,11 +343,13 @@ class WellPanelWidget(QWidget):
             # via add_tops_and_correlations if you pass flatten_depths there)
             self._clear_temp_highlight()
             self._draw_temp_highlight(wi, nearest_name)
+            self.draw_panel()
 
             # --- context menu ---
             act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
             act_delete = menu.addAction(f"Delete top '{nearest_name}'")
             act_flatten = menu.addAction(f"Flatten on '{nearest_name}'")
+            act_unflatten = menu.addAction(f"Unflatten section'")
 
         if hasattr(event, "guiEvent") and event.guiEvent is not None:
             global_pos = event.guiEvent.globalPos()
@@ -351,6 +379,10 @@ class WellPanelWidget(QWidget):
 
         if chosen == act_flatten:
             self._flatten_on_formation_top(nearest_name)
+            return
+
+        if act_unflatten is not None and chosen == act_unflatten:
+            self._reset_flatten()
             return
 
     def _build_axis_index(self):
@@ -451,6 +483,8 @@ class WellPanelWidget(QWidget):
         depth = depth - flatten_depth
 
 
+
+
         formation_name = self._active_pick_context["formation_name"]
 
         if formation_name is not None:
@@ -458,7 +492,7 @@ class WellPanelWidget(QWidget):
 
             if depth < min-flatten_depth:
                 depth = min-flatten_depth
-            if depth > max:
+            if depth > max-flatten_depth:
                 depth = max-flatten_depth
 
         print("move", event.ydata, min, max, depth)
@@ -468,9 +502,15 @@ class WellPanelWidget(QWidget):
 
         # draw a thin hatched band across ALL tracks of the selected well
         self._clear_pick_line()
-        first_track_idx = wi_target * (self.n_tracks + 1)
 
-        for ti in range(self.n_tracks):
+        if self.visible_tracks is None: # in this case all tracks are visible
+            self.visible_tracks = [t.get("name") for t in self.tracks]
+        n_tracks = len(self.visible_tracks)
+        first_track_idx = wi_target * (n_tracks + 1)
+
+
+
+        for ti in range(n_tracks):
             base_ax = self.axes[first_track_idx + ti]
 
             # choose a small thickness relative to the depth range
@@ -480,8 +520,11 @@ class WellPanelWidget(QWidget):
             band = base_ax.axhline(depth+flatten_depth, color="tab:red", lw=1.2, ls="--", zorder=10)
 
             self._pick_line_artists.append(band)
+            #if True: return
+            #self.draw_panel()
 
         self.canvas.draw_idle()
+        #self.draw_panel()
     ###----
     # def _handle_dialog_pick_click(self, event):
     #     """
@@ -1018,6 +1061,7 @@ class WellPanelWidget(QWidget):
         # Store state and redraw
         self._flatten_top_name = top_name
         self._flatten_depths = flatten_depths
+        self._current_depth_window = None
         self.draw_panel()
 
     def _get_flatten_offset_for_well(self, wi: int) -> float:
@@ -1080,4 +1124,13 @@ class WellPanelWidget(QWidget):
 
     def set_visible_tracks(self, visible_tracks):
         self.visible_tracks = visible_tracks
+        self.draw_panel()
+
+    def _reset_flatten(self):
+        """
+        Turn off flattening and redraw in true depth.
+        """
+        self._flatten_top_name = None
+        self._flatten_depths = None
+        #self._current_depth_window = None  # optional: reset zoom as well
         self.draw_panel()
