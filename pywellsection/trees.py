@@ -13,6 +13,8 @@ def setup_well_widget_tree(self):
     self.well_tree = QTreeWidget(self)
     self.well_tree.setHeaderHidden(True)
     self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
+    self.well_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.well_tree.customContextMenuRequested.connect(_on_tree_context_menu)
 
     LOG.info("Setting up well tree")
 
@@ -89,3 +91,7 @@ def setup_well_widget_tree(self):
     self._populate_well_log_tree()
     self._populate_well_track_tree()
 
+
+
+def _on_tree_context_menu(self, pos):
+    return

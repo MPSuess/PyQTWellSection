@@ -76,6 +76,7 @@ def draw_multi_wells_panel_on_figure(
     visible_logs = None,
     visible_discrete_logs = None,
     visible_tracks = None,
+    depth_window = None,
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -116,10 +117,16 @@ def draw_multi_wells_panel_on_figure(
     top_phys = max(ref_depths)
     bottom_phys = max(bottoms)
 
-    if bottom_phys <= top_phys:
-        # safety fallback
-        top_phys = min(ref_depths)
-        bottom_phys = max(bottoms)
+    if depth_window is not None:
+        top_phys, bottom_phys = depth_window
+        # safety
+        if bottom_phys <= top_phys:
+            top_phys, bottom_phys = min(ref_depths), max(bottoms)
+
+    # if bottom_phys <= top_phys:
+    #     # safety fallback
+    #     top_phys = min(ref_depths)
+    #     bottom_phys = max(bottoms)
 
     # ---- 2) Compute per-well offsets and global plotting range ----
     # offset_i is in TRUE depth coordinates (e.g. formation top depth)
