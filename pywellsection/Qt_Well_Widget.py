@@ -23,7 +23,7 @@ import numpy as np
 
 
 class WellPanelWidget(QWidget):
-    def __init__(self, wells, tracks, stratigraphy, parent=None):
+    def __init__(self, wells, tracks, stratigraphy, panel_settings, parent=None):
         super().__init__(parent)
         self.wells = wells
         self.well = None
@@ -32,6 +32,10 @@ class WellPanelWidget(QWidget):
         self.n_tracks = len(tracks)
         self.stratigraphy = stratigraphy
         self.logs = None
+
+        self.well_gap_factor = panel_settings["well_gap_factor"]
+        self.track_gap_factor = panel_settings["track_gap_factor"]
+        self.track_width = panel_settings["track_width"]
 
         self.highlight_top = None
         self.visible_tops = None
@@ -42,7 +46,7 @@ class WellPanelWidget(QWidget):
 
         self.fig = Figure(figsize=(12, 6), dpi=100)
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setFixedSize(1200, 800)
+        self.canvas.setFixedSize(400, 800)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidget(self.canvas)
@@ -116,10 +120,29 @@ class WellPanelWidget(QWidget):
             visible_discrete_logs = self.visible_discrete_logs
             visible_tracks = self.visible_tracks
 
+            n_wells = len(self.wells)
+
+            if visible_tracks is None:
+                filtered_tracks = self.tracks[:]
+            else:
+                filtered_tracks = [t for t in self.tracks if t.get("name") in visible_tracks]
+
+            if not filtered_tracks:
+                n_tracks = 1
+            else:
+                n_tracks = len(filtered_tracks)
+
+            total_cols = n_wells * n_tracks + (n_wells - 1)
+
+            self.canvas.setFixedSize(total_cols*100, 800)
+
             self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
                 self.fig,
                 self.wells,
                 self.tracks,
+                well_gap_factor=self.well_gap_factor,
+                track_gap_factor=self.track_gap_factor,
+                track_width=self.track_width,
                 suptitle="Well Log Panel",
                 corr_artists=self._corr_artists,
                 highlight_top=self.highlight_top,
@@ -1134,3 +1157,8 @@ class WellPanelWidget(QWidget):
         self._flatten_depths = None
         #self._current_depth_window = None  # optional: reset zoom as well
         self.draw_panel()
+        
+    def set_panel_settings(self, settings):
+        self.well_gap_factor = settings["well_gap_factor"]
+        self.track_gap_factor = settings["track_gap_factor"]
+        self.track_width = settings["track_width"]        

@@ -69,6 +69,8 @@ def draw_multi_wells_panel_on_figure(
     tracks,
     suptitle=None,
     well_gap_factor=3.0,
+    track_gap_factor=0.5,
+    track_width = 1.0,
     corr_artists=None,
     highlight_top=None,
     flatten_depths=None,
@@ -154,7 +156,7 @@ def draw_multi_wells_panel_on_figure(
 
     for w in range(n_wells):
         for _ in range(n_tracks):
-            width_ratios.append(1.0)
+            width_ratios.append(track_width)
             col_is_spacer.append(False)
         if w != n_wells - 1:
             width_ratios.append(well_gap_factor)

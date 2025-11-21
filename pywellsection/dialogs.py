@@ -513,3 +513,121 @@ class StratigraphyEditorDialog(QDialog):
     def result_stratigraphy(self):
         """Return OrderedDict of new stratigraphy or None if dialog cancelled."""
         return self._accepted_strat
+    
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox,
+    QDialogButtonBox
+)
+
+class LayoutSettingsDialog(QDialog):
+    def __init__(self, parent, well_gap_factor: float, track_width: float):
+        super().__init__(parent)
+        self.setWindowTitle("Layout settings")
+        self.resize(300, 150)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.spin_gap = QDoubleSpinBox(self)
+        self.spin_gap.setRange(0.1, 20.0)
+        self.spin_gap.setDecimals(2)
+        self.spin_gap.setSingleStep(0.1)
+        self.spin_gap.setValue(float(well_gap_factor))
+        form.addRow("Gap between wells:", self.spin_gap)
+
+        self.spin_track = QDoubleSpinBox(self)
+        self.spin_track.setRange(0.1, 10.0)
+        self.spin_track.setDecimals(2)
+        self.spin_track.setSingleStep(0.1)
+        self.spin_track.setValue(float(track_width))
+        form.addRow("Track width:", self.spin_track)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def values(self):
+        return float(self.spin_gap.value()), float(self.spin_track.value())
+    
+    
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
+    QDialogButtonBox
+)
+
+class LogDisplaySettingsDialog(QDialog):
+    """
+    Dialog to edit display settings for a log mnemonic:
+      - color
+      - xscale: linear/log
+      - direction: normal/reverse
+      - xlim: min/max or blank for auto
+    """
+    def __init__(self, parent, log_name: str,
+                 color: str, xscale: str, direction: str, xlim):
+        super().__init__(parent)
+        self.setWindowTitle(f"Display settings – {log_name}")
+        self.resize(320, 200)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.ed_color = QLineEdit(color or "", self)
+        form.addRow("Color:", self.ed_color)
+
+        self.cmb_xscale = QComboBox(self)
+        self.cmb_xscale.addItems(["linear", "log"])
+        idx = self.cmb_xscale.findText(xscale or "linear")
+        if idx < 0:
+            idx = 0
+        self.cmb_xscale.setCurrentIndex(idx)
+        form.addRow("X scale:", self.cmb_xscale)
+
+        self.cmb_dir = QComboBox(self)
+        self.cmb_dir.addItems(["normal", "reverse"])
+        idx = self.cmb_dir.findText(direction or "normal")
+        if idx < 0:
+            idx = 0
+        self.cmb_dir.setCurrentIndex(idx)
+        form.addRow("Direction:", self.cmb_dir)
+
+        # xlim: two line edits, blank = auto
+        xmin_txt = ""
+        xmax_txt = ""
+        if xlim is not None and len(xlim) == 2:
+            try:
+                xmin_txt = str(xlim[0])
+                xmax_txt = str(xlim[1])
+            except Exception:
+                pass
+
+        self.ed_xmin = QLineEdit(xmin_txt, self)
+        self.ed_xmax = QLineEdit(xmax_txt, self)
+        form.addRow("X min (blank = auto):", self.ed_xmin)
+        form.addRow("X max (blank = auto):", self.ed_xmax)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def values(self):
+        color = self.ed_color.text().strip() or None
+        xscale = self.cmb_xscale.currentText()
+        direction = self.cmb_dir.currentText()
+
+        xmin_txt = self.ed_xmin.text().strip()
+        xmax_txt = self.ed_xmax.text().strip()
+
+        if xmin_txt and xmax_txt:
+            try:
+                xlim = (float(xmin_txt), float(xmax_txt))
+            except ValueError:
+                xlim = None
+        else:
+            xlim = None
+
+        return color, xscale, direction, xlim
