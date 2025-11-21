@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
-    QTableWidgetItem,QDialog, QInputDialog)
+    QTableWidgetItem,QDialog, QInputDialog, QMenu)
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPoint
 
 import numpy as np
 
@@ -19,6 +19,8 @@ from pywellsection.trees import setup_well_widget_tree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
+from pywellsection.dialogs import LayoutSettingsDialog
+from pywellsection.dialogs import LogDisplaySettingsDialog
 
 import logging
 from pathlib import Path
@@ -38,7 +40,15 @@ class MainWindow(QMainWindow):
         self.all_logs = None
         self.all_tracks = tracks
 
-        self.panel = WellPanelWidget(wells, tracks, stratigraphy)
+        self.well_gap_factor = 3.0
+        self.track_gap_factor = 1.0
+        self.track_width = 1.0
+
+
+        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+                               "track_width": self.track_width}
+
+        self.panel = WellPanelWidget(wells, tracks, stratigraphy, self.panel_settings)
         self.dock_panel = QDockWidget("Well Panel", self)
         self.dock_panel.setWidget(self.panel)
         self.addDockWidget(Qt.TopDockWidgetArea, self.dock_panel)
@@ -113,6 +123,10 @@ class MainWindow(QMainWindow):
         act_sel_none.triggered.connect(self._select_no_wells)
         view_menu.addAction(act_sel_none)
 
+        act_layout = QAction("Layout settings...", self)
+        act_layout.triggered.connect(self._action_layout_settings)
+        view_menu.addAction(act_layout)
+
         tools_menu = menubar.addMenu("&Tools")
 
         act_add_log_to_track = QAction("Add log to track...", self)
@@ -136,6 +150,8 @@ class MainWindow(QMainWindow):
         act_about = QAction("About...", self)
         act_about.triggered.connect(self._show_about)
         help_menu.addAction(act_about)
+
+            # (keep any existing View items like “Select all wells” etc.)
 
     def _show_about(self):
         QMessageBox.information(
@@ -176,11 +192,12 @@ class MainWindow(QMainWindow):
                 if logs:
                     for log in logs:
                         if not self.all_logs:
-                            self.all_logs = logs
+                            self.all_logs = logs.keys()
                         if log in self.all_logs:
                             continue
                         else:
-                            self.all_logs.append(log)
+                            print("appending log:" , log)
+                            self.all_logs = self.all_logs|{log}
                 else:
                     print("No logs found")
 
@@ -345,7 +362,7 @@ class MainWindow(QMainWindow):
         self.well_tree.setHeaderHidden(True)
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
 
-        # 👇 create the folder item once
+         # 👇 create the folder item once
         self.well_root_item = QTreeWidgetItem(["All wells"])
         # tristate so checking it checks/unchecks children
         self.well_root_item.setFlags(
@@ -358,6 +375,11 @@ class MainWindow(QMainWindow):
         self.well_root_item.setCheckState(0, Qt.Checked)
 
         self.well_tree.addTopLevelItem(self.well_root_item)
+
+        # Context menu
+        #self.well_tree.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.well_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        #self.well_tree.customContextMenuRequested.connect(self.test_connect)
 
         self._populate_well_tree()  # initial fill
 
@@ -906,3 +928,139 @@ class MainWindow(QMainWindow):
         # 3) refresh "Stratigraphic tops" folder in tree
 #        if hasattr(self, "_populate_top_tree"):
         self._populate_well_tops_tree()
+
+    def _action_layout_settings(self):
+        """Open dialog to adjust distance between wells and track width."""
+        if not hasattr(self, "panel"):
+            return
+
+        dlg = LayoutSettingsDialog(
+            self,
+            well_gap_factor=self.panel.well_gap_factor,
+            track_width=self.panel.track_width,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        gap, tw = dlg.values()
+        self.set_layout_params(gap, tw)
+
+    def set_layout_params(self, well_gap_factor: float, track_width: float):
+        """Update panel layout (gap between wells and track width) and redraw."""
+        self.well_gap_factor = max(0.1, float(well_gap_factor))
+        self.track_width = max(0.1, float(track_width))
+        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+                               "track_width": self.track_width}
+        self.panel.set_panel_settings(self.panel_settings)
+        self.panel.draw_panel()
+
+    
+    def test_connect(self, pos):
+        return True
+
+    def _on_tree_context_menu(self, pos):
+        """
+        Show a context menu for logs in the tree:
+          - logs under the 'Logs' folder
+          - logs under each track in the 'Tracks' folder
+        """
+        item = self.well_tree.itemAt(pos)
+        if item is None:
+            return
+
+        global_pos = self.well_tree.viewport().mapToGlobal(pos)
+        parent = item.parent()
+
+        # --- case 1: logs under "Logs" folder ---
+        if parent is self.well_logs_folder:
+            log_name = item.data(0, Qt.UserRole) or item.text(0)
+            if not log_name:
+                return
+
+            menu = QMenu(self)
+            act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_log_display_settings(log_name)
+            return
+
+        # --- case 2: log leaves under "Tracks" folder ---
+        # tracks folder: track_root_item
+        if parent is not None and parent.parent() is self.track_root_item:
+            # parent is the track item, 'item' is the log name
+            log_name = item.text(0)
+            if not log_name:
+                return
+
+            menu = QMenu(self)
+            act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_log_display_settings(log_name)
+            return
+
+        # other nodes (wells, tops folders, etc.) → no context menu for logs
+
+    from PyQt5.QtWidgets import QMessageBox
+
+    def _edit_log_display_settings(self, log_name: str):
+        """
+        Open dialog to edit display settings for log 'log_name' and apply
+        to all track configs that use this log.
+        """
+        # 1) Find existing settings from the first matching track/log
+        base_cfg = None
+        for track in self.all_tracks:
+            for log_cfg in track.get("logs", []):
+                if log_cfg.get("log") == log_name:
+                    base_cfg = log_cfg
+                    break
+            if base_cfg is not None:
+                break
+
+        if base_cfg is None:
+            QMessageBox.information(
+                self,
+                "Log display",
+                f"No track display settings found for log '{log_name}'."
+            )
+            return
+
+        color = base_cfg.get("color", "black")
+        xscale = base_cfg.get("xscale", "linear")
+        direction = base_cfg.get("direction", "normal")
+        xlim = base_cfg.get("xlim", None)
+
+        # 2) Open dialog
+        dlg = LogDisplaySettingsDialog(self, log_name, color, xscale, direction, xlim)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_color, new_xscale, new_direction, new_xlim = dlg.values()
+
+        # 3) Apply updated settings to ALL track configs with this log
+        for track in self.all_tracks:
+            for log_cfg in track.get("logs", []):
+                if log_cfg.get("log") != log_name:
+                    continue
+                if new_color is not None:
+                    log_cfg["color"] = new_color
+                else:
+                    log_cfg.pop("color", None)
+
+                log_cfg["xscale"] = new_xscale or "linear"
+                log_cfg["direction"] = new_direction or "normal"
+
+                if new_xlim is not None:
+                    log_cfg["xlim"] = new_xlim
+                else:
+                    log_cfg.pop("xlim", None)  # auto scale
+
+        # 4) Sync with panel and redraw
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.all_tracks
+            self.panel.draw_panel()
+
+        # 5) (Optional) refresh track/log trees for consistency
+        #self._populate_well_track_tree()
+        #self._populate_log_tree()
