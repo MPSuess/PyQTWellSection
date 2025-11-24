@@ -208,7 +208,7 @@ def draw_multi_wells_panel_on_figure(
             base_ax.set_ylabel("Depth (m)", labelpad=8)
             base_ax.tick_params(axis="y", labelleft=True)
             base_ax.xaxis.set_visible(False)
-            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5)
+            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
 
             if depth_formatter is not None:
                 base_ax.yaxis.set_major_formatter(depth_formatter)
@@ -247,7 +247,7 @@ def draw_multi_wells_panel_on_figure(
 
             mid_track = n_tracks // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5)
+                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
 
             # If track is hidden: just leave the axis empty (depth axis still there).
             #if track_hidden:
