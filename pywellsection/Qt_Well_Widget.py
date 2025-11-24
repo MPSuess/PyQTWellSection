@@ -813,6 +813,8 @@ class WellPanelWidget(QWidget):
 
         if idx is None:
             return min_bound, max_bound
+        elif len(idx_l)==1:
+            return min_bound, max_bound
         else:
             if idx==0:
                 if type(tops[idx_l[idx]])==float:
