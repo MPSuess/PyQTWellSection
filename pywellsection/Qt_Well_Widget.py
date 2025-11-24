@@ -815,14 +815,20 @@ class WellPanelWidget(QWidget):
             return min_bound, max_bound
         else:
             if idx==0:
-                return min_bound,tops[idx_l[idx+1]]["depth"]
+                if type(tops[idx_l[idx]])==float:
+                    return min_bound, tops[idx_l[idx+1]]
+                else:
+                    return min_bound,tops[idx_l[idx+1]]["depth"]
             elif idx==len(idx_l)-1:
-                print()
-                return tops[idx_l[idx-1]]["depth"],max_bound
+                if type(tops[idx_l[idx]])==float:
+                    return tops[idx_l[idx-1]], max_bound
+                else:
+                    return tops[idx_l[idx-1]]["depth"],max_bound
             else:
-                return tops[idx_l[idx-1]]["depth"],tops[idx_l[idx+1]]["depth"]
-
-
+                if type(tops[idx_l[idx]])==float:
+                    return tops[idx_l[idx-1]], tops[idx_l[idx+1]]
+                else:
+                    return tops[idx_l[idx-1]]["depth"],tops[idx_l[idx+1]]["depth"]
 
         # #idx = strat.index(top_name)
         #
