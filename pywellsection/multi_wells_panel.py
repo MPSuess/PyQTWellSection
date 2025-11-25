@@ -1,9 +1,24 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FormatStrFormatter
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 
 import numpy as np
+
+import logging
+from pathlib import Path
+
+logging.getLogger("ipykernel").setLevel("CRITICAL")
+logging.getLogger("traitlets").setLevel("CRITICAL")
+logging.getLogger("root").setLevel("CRITICAL")
+logging.getLogger("parso").setLevel("CRITICAL")
+logging.getLogger("parso.cache").setLevel("CRITICAL")
+logging.getLogger("matplotlib.font_manager").setLevel("CRITICAL")
+logging.getLogger("matplotlib.ticker").setLevel("CRITICAL")
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel("DEBUG")
 
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
@@ -112,6 +127,7 @@ def draw_multi_wells_panel_on_figure(
         return None, None
 
     # ---- 1) Physical depth window (no offsets here) ----
+
     ref_depths = [w["reference_depth"] for w in wells]
     bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
 
@@ -120,15 +136,18 @@ def draw_multi_wells_panel_on_figure(
     bottom_phys = max(bottoms)
 
     if depth_window is not None:
+        print ("depth_window", depth_window)
+    #
+    if depth_window is not None:
         top_phys, bottom_phys = depth_window
         # safety
         if bottom_phys <= top_phys:
-            top_phys, bottom_phys = min(ref_depths), max(bottoms)
-
-    # if bottom_phys <= top_phys:
-    #     # safety fallback
-    #     top_phys = min(ref_depths)
-    #     bottom_phys = max(bottoms)
+            top_phys, bottom_phys = max(ref_depths), max(bottoms)
+    #
+    print(f"top_phys={top_phys:.0f} bottom_phys={bottom_phys:.0f}")
+    #
+    #top_phys = 1000
+    #bottom_phys = 2500
 
     # ---- 2) Compute per-well offsets and global plotting range ----
     # offset_i is in TRUE depth coordinates (e.g. formation top depth)
@@ -139,15 +158,21 @@ def draw_multi_wells_panel_on_figure(
         else:
             offsets.append(0.0)
 
+    LOG.debug(f"offsets={offsets}")
+
     top_plot_candidates = []
     bottom_plot_candidates = []
     for off in offsets:
         top_plot_candidates.append(top_phys - off)
         bottom_plot_candidates.append(bottom_phys - off)
 
+
+
     # global plotting limits that include ALL wells after shifting
     global_top_plot = min(top_plot_candidates)
     global_bottom_plot = max(bottom_plot_candidates)
+
+    LOG.debug(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
 
     # ---- 3) Layout: tracks + spacer columns ----
     total_cols = n_wells * n_tracks + (n_wells - 1)
@@ -189,11 +214,15 @@ def draw_multi_wells_panel_on_figure(
 
         offset = offsets[wi]  # TRUE depth offset for this well
 
+        LOG.debug(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
+
         # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
             depth_formatter = FuncFormatter(lambda y, pos, off=offset: y + off)
         else:
             depth_formatter = None
+
+        LOG.debug(f"depth_formatter={depth_formatter}")
 
         first_track_idx = wi * (n_tracks + 1)
         main_ax = axes[first_track_idx]
@@ -219,16 +248,7 @@ def draw_multi_wells_panel_on_figure(
             col_idx = wi * (n_tracks + 1) + ti
             base_ax = axes[col_idx]
 
-            # track_name = track.get("name", f"Track {ti + 1}")
-            # track_hidden = (
-            #         visible_tracks is not None
-            #         and track_name not in visible_tracks
-            # )
-
-            # track_hidden = True # check if the track is hidden
-            # if visible_tracks is not None:
-            #     for val in visible_tracks:
-            #         if val['name'] == track_name: track_hidden = False
+            LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)

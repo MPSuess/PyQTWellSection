@@ -21,15 +21,28 @@ from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
 from pywellsection.dialogs import LayoutSettingsDialog
 from pywellsection.dialogs import LogDisplaySettingsDialog
+from pywellsection.dialogs import AllTopsTableDialog
+from pywellsection.dialogs import NewWellDialog
 
 import logging
 from pathlib import Path
+
+logging.getLogger("ipykernel").setLevel("CRITICAL")
+logging.getLogger("traitlets").setLevel("CRITICAL")
+logging.getLogger("root").setLevel("CRITICAL")
+logging.getLogger("parso").setLevel("CRITICAL")
+logging.getLogger("parso.cache").setLevel("CRITICAL")
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel("DEBUG")
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyQTWellSection")
         self.resize(1200, 1000)
+        self.redraw_requested = False
 
         # The Windows
         ### central widget ----
@@ -145,6 +158,11 @@ class MainWindow(QMainWindow):
         act_edit_strat.triggered.connect(self._action_edit_stratigraphy)
         tools_menu.addAction(act_edit_strat)
 
+        act_edit_all_tops = QAction("Edit all tops in table...", self)
+        act_edit_all_tops.triggered.connect(self._action_edit_all_tops)
+        tools_menu.addAction(act_edit_all_tops)
+
+
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
         act_about = QAction("About...", self)
@@ -203,7 +221,7 @@ class MainWindow(QMainWindow):
 
             #self.all_stratigraphy = stratigraphy
 
-
+            self.redraw_requested = False
             # populate well tree
             self._populate_well_tree()
             self._populate_well_tops_tree()
@@ -213,6 +231,7 @@ class MainWindow(QMainWindow):
 
             # ✅ Trigger full redraw
             self.panel.update_panel(tracks, wells, stratigraphy)
+            self.redraw_requested = True
             self.panel.draw_panel()
 
         except Exception as e:
@@ -945,6 +964,123 @@ class MainWindow(QMainWindow):
         gap, tw = dlg.values()
         self.set_layout_params(gap, tw)
 
+    def _action_edit_all_tops(self):
+        """Open table dialog to edit/add/delete tops of all wells."""
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Edit tops", "No wells in project.")
+            return
+
+        strat = getattr(self, "stratigraphy", None)
+
+        dlg = AllTopsTableDialog(self, self.all_wells, stratigraphy=strat)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        result = dlg.result_changes()
+        if not result:
+            return
+
+        updates = result["updates"]  # (well_name, top_name) -> depth
+        additions = result["additions"]  # (well_name, top_name) -> depth
+        deletions = result["deletions"]  # set of (well_name, top_name)
+
+        # Map well_name -> well dict (assuming names are unique)
+        wells_by_name = {}
+        for w in self.all_wells:
+            nm = w.get("name")
+            if nm:
+                wells_by_name[nm] = w
+
+        # --- apply deletions ---
+        for (well_name, top_name) in deletions:
+            well = wells_by_name.get(well_name)
+            if not well:
+                continue
+            tops = well.get("tops", {})
+            if top_name in tops:
+                del tops[top_name]
+
+        # --- apply updates (depth changes for existing tops) ---
+        for (well_name, top_name), depth in updates.items():
+            well = wells_by_name.get(well_name)
+            if not well:
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Well '{well_name}' not found in project. Skipping update for top '{top_name}'."
+                )
+                continue
+
+            tops = well.setdefault("tops", {})
+            old_val = tops.get(top_name)
+            if isinstance(old_val, dict):
+                new_val = dict(old_val)
+                new_val["depth"] = depth
+                tops[top_name] = new_val
+            else:
+                tops[top_name] = depth
+
+        # --- apply additions (new tops) ---
+        for (well_name, top_name), depth in additions.items():
+            well = wells_by_name.get(well_name)
+            if not well:
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Well '{well_name}' not found in project. Cannot add top '{top_name}'."
+                )
+                continue
+
+            tops = well.setdefault("tops", {})
+            if top_name in tops:
+                # Should not happen if dialog prevented duplicates, but guard anyway
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Top '{top_name}' already exists in well '{well_name}'. Skipping addition."
+                )
+                continue
+
+            # store as simple depth; if you use richer top dicts, adapt this
+            tops[top_name] = depth
+
+        # --- redraw panel with updated tops ---
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.draw_panel()
+
+        # --- refresh tops tree ---
+        if hasattr(self, "_populate_top_tree"):
+            self._populate_top_tree()
+
+    def _action_add_new_well(self):
+        """Open dialog to add a new well to the project."""
+        existing_names = [w.get("name", "") for w in getattr(self, "all_wells", [])]
+
+        dlg = NewWellDialog(self, existing_names=existing_names)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_well = dlg.result_well()
+        if new_well is None:
+            return
+
+        # Append to project well list
+        if not hasattr(self, "all_wells") or self.all_wells is None:
+            self.all_wells = []
+        self.all_wells.append(new_well)
+
+        # Update panel wells (keep tracks & stratigraphy)
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            # you might want to reset flattening or keep it; here we keep zoom/flatten
+            self.panel.draw_panel()
+
+        # Refresh wells tree (and maybe other trees)
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+
     def set_layout_params(self, well_gap_factor: float, track_width: float):
         """Update panel layout (gap between wells and track width) and redraw."""
         self.well_gap_factor = max(0.1, float(well_gap_factor))
@@ -970,6 +1106,17 @@ class MainWindow(QMainWindow):
 
         global_pos = self.well_tree.viewport().mapToGlobal(pos)
         parent = item.parent()
+
+        # --- Wells folder or well items: show "Add new well..." ---
+        if item is self.well_root_item or parent is self.well_root_item:
+            menu = QMenu(self)
+
+            act_add_well = menu.addAction("Add new well...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_well:
+                self._action_add_new_well()
+            return
 
         # --- case 1: logs under "Logs" folder ---
         if parent is self.well_logs_folder:

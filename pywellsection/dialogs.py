@@ -631,3 +631,499 @@ class LogDisplaySettingsDialog(QDialog):
             xlim = None
 
         return color, xscale, direction, xlim
+
+from collections import OrderedDict
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QTableWidget, QTableWidgetItem, QLineEdit,
+    QDialogButtonBox, QLabel, QMessageBox, QPushButton, QComboBox
+)
+from PyQt5.QtCore import Qt
+
+
+class AllTopsTableDialog(QDialog):
+    """
+    Edit/add/delete formation tops of all wells in a single table.
+
+    Columns: Well, Top, Level, Depth
+    - Existing rows: Well, Top via comboboxes (disabled), Depth editable.
+    - New rows: Well, Top via comboboxes (enabled), Depth editable.
+      Top choices come from stratigraphy + any extra tops found in wells.
+    Filter box: filters by substring in Well/Top/Level columns.
+    """
+
+    COL_WELL = 0
+    COL_TOP = 1
+    COL_LEVEL = 2
+    COL_DEPTH = 3
+
+    def __init__(self, parent, wells, stratigraphy=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit all formation tops")
+        self.resize(800, 500)
+
+        self._wells = wells
+        self._strat = stratigraphy or {}
+
+        # existing (well_name, top_name) pairs from incoming data
+        self._existing_pairs = set()
+        for wi, well in enumerate(self._wells):
+            well_name = well.get("name", f"Well {wi+1}")
+            tops = well.get("tops", {}) or {}
+            for top_name in tops.keys():
+                self._existing_pairs.add((well_name, top_name))
+
+        # sets for easy combo population
+        self._well_names = sorted({
+            w.get("name", f"Well {i+1}") for i, w in enumerate(self._wells)
+        })
+
+        # all top names: first strat order, then any extra from wells
+        strat_names = list(self._strat.keys())
+        extra_names = set()
+        for well in self._wells:
+            for tname in (well.get("tops", {}) or {}).keys():
+                if tname not in strat_names:
+                    extra_names.add(tname)
+        self._top_names = strat_names + sorted(extra_names)
+
+        # records deletions of existing tops
+        self._deleted_pairs = set()
+
+        # result structure on accept
+        self._result = None  # {"updates": {...}, "additions": {...}, "deletions": set(...)}
+
+        # ---------- layout ----------
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit depths of formation tops for all wells.\n"
+            "Use the filter to search by well name or top name.\n"
+            "You can also add new tops (choose Well + Top + Depth) or delete rows.",
+            self
+        ))
+
+        # filter box
+        flayout = QFormLayout()
+        self.ed_filter = QLineEdit(self)
+        self.ed_filter.setPlaceholderText("Filter by well / top / level...")
+        self.ed_filter.textChanged.connect(self._apply_filter)
+        flayout.addRow("Filter:", self.ed_filter)
+        layout.addLayout(flayout)
+
+        # table
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Well", "Top", "Level", "Depth"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        # add/delete row buttons
+        row_btn_layout = QHBoxLayout()
+        self.btn_add_row = QPushButton("Add row", self)
+        self.btn_del_row = QPushButton("Delete selected row(s)", self)
+        row_btn_layout.addWidget(self.btn_add_row)
+        row_btn_layout.addWidget(self.btn_del_row)
+        row_btn_layout.addStretch(1)
+        layout.addLayout(row_btn_layout)
+
+        self.btn_add_row.clicked.connect(self._add_row)
+        self.btn_del_row.clicked.connect(self._delete_selected_rows)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # fill data
+        self._populate_table()
+
+    # ---------------- combobox helpers ----------------
+
+    def _create_well_combo(self, selected_name: str = "", enabled: bool = True) -> QComboBox:
+        cb = QComboBox(self.table)
+        cb.addItems(self._well_names)
+        if selected_name and selected_name in self._well_names:
+            cb.setCurrentText(selected_name)
+        if not enabled:
+            cb.setEnabled(False)
+        return cb
+
+    def _create_top_combo(self, selected_name: str = "", enabled: bool = True) -> QComboBox:
+        cb = QComboBox(self.table)
+        cb.addItems(self._top_names)
+        if selected_name and selected_name in self._top_names:
+            cb.setCurrentText(selected_name)
+        if not enabled:
+            cb.setEnabled(False)
+        # when top changes, update Level column if we have stratigraphy
+        cb.currentTextChanged.connect(self._update_level_for_row_from_top)
+        return cb
+
+    def _update_level_for_row_from_top(self, top_name: str):
+        """
+        When top combo changes on any row, update the Level column using stratigraphy.
+        """
+        if not self._strat:
+            return
+
+        # find which combobox emitted the signal
+        cb = self.sender()
+        if cb is None:
+            return
+
+        # locate row of this combobox
+        for row in range(self.table.rowCount()):
+            if self.table.cellWidget(row, self.COL_TOP) is cb:
+                level = ""
+                meta = self._strat.get(top_name, {}) or {}
+                level = meta.get("level", "")
+                it_level = self.table.item(row, self.COL_LEVEL)
+                if it_level is None:
+                    it_level = QTableWidgetItem(level)
+                    it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
+                    self.table.setItem(row, self.COL_LEVEL, it_level)
+                else:
+                    it_level.setText(level)
+                break
+
+    # ---------------- populate / helpers ----------------
+
+    def _populate_table(self):
+        """
+        Fill table with rows for every (well, top).
+        Order: by stratigraphy (if provided), then any remaining tops.
+        """
+        rows = []
+
+        for wi, well in enumerate(self._wells):
+            well_name = well.get("name", f"Well {wi+1}")
+            tops = well.get("tops", {}) or {}
+            if not tops:
+                continue
+
+            ordered_names = list(self._strat.keys()) if self._strat else []
+            used = set()
+
+            # first by strat column order
+            for name in ordered_names:
+                if name in tops:
+                    rows.append((well_name, name))
+                    used.add(name)
+
+            # add any remaining tops not in stratigraphy
+            for name in tops.keys():
+                if name not in used:
+                    rows.append((well_name, name))
+
+        self.table.setRowCount(len(rows))
+
+        for row, (well_name, top_name) in enumerate(rows):
+            # find depth
+            depth = 0.0
+            for well in self._wells:
+                if well.get("name", "") == well_name:
+                    tops = well.get("tops", {}) or {}
+                    val = tops.get(top_name)
+                    if isinstance(val, dict):
+                        depth = float(val.get("depth", 0.0))
+                    else:
+                        depth = float(val)
+                    break
+
+            level = ""
+            if self._strat:
+                meta = self._strat.get(top_name, {}) or {}
+                level = meta.get("level", "")
+
+            # Well combobox (existing row, disabled)
+            cb_well = self._create_well_combo(well_name, enabled=False)
+            self.table.setCellWidget(row, self.COL_WELL, cb_well)
+
+            # Top combobox (existing row, disabled)
+            cb_top = self._create_top_combo(top_name, enabled=False)
+            self.table.setCellWidget(row, self.COL_TOP, cb_top)
+
+            # Level (read-only)
+            it_level = QTableWidgetItem(level)
+            it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(row, self.COL_LEVEL, it_level)
+
+            # Depth (editable)
+            it_depth = QTableWidgetItem(f"{depth:.3f}")
+            it_depth.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_DEPTH, it_depth)
+
+    def _add_row(self):
+        """
+        Add a new row: Well & Top via combos (enabled), Depth editable.
+        """
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        cb_well = self._create_well_combo("", enabled=True)
+        self.table.setCellWidget(row, self.COL_WELL, cb_well)
+
+        cb_top = self._create_top_combo("", enabled=True)
+        self.table.setCellWidget(row, self.COL_TOP, cb_top)
+
+        # Level auto-filled when top changes (handled by signal)
+        it_level = QTableWidgetItem("")
+        it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
+        self.table.setItem(row, self.COL_LEVEL, it_level)
+
+        it_depth = QTableWidgetItem("")
+        it_depth.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.table.setItem(row, self.COL_DEPTH, it_depth)
+
+    def _delete_selected_rows(self):
+        """
+        Delete selected rows. If a row corresponds to an existing (well,top),
+        record it in _deleted_pairs so caller can remove that top from wells.
+        """
+        sel_rows = sorted(
+            {idx.row() for idx in self.table.selectedIndexes()},
+            reverse=True
+        )
+        for row in sel_rows:
+            cb_well = self.table.cellWidget(row, self.COL_WELL)
+            cb_top = self.table.cellWidget(row, self.COL_TOP)
+
+            well_name = cb_well.currentText().strip() if cb_well else ""
+            top_name = cb_top.currentText().strip() if cb_top else ""
+
+            pair = (well_name, top_name)
+            if pair in self._existing_pairs:
+                self._deleted_pairs.add(pair)
+
+            self.table.removeRow(row)
+
+    def _apply_filter(self, text: str):
+        """Hide rows that don't match the filter text."""
+        txt = text.strip().lower()
+        n_rows = self.table.rowCount()
+        if not txt:
+            for row in range(n_rows):
+                self.table.setRowHidden(row, False)
+            return
+
+        for row in range(n_rows):
+            show = False
+
+            # Well & Top from combobox
+            cb_well = self.table.cellWidget(row, self.COL_WELL)
+            cb_top = self.table.cellWidget(row, self.COL_TOP)
+            well_txt = cb_well.currentText().lower() if cb_well else ""
+            top_txt = cb_top.currentText().lower() if cb_top else ""
+
+            if txt in well_txt or txt in top_txt:
+                show = True
+            else:
+                # Level from item
+                item = self.table.item(row, self.COL_LEVEL)
+                if item and txt in item.text().lower():
+                    show = True
+
+            self.table.setRowHidden(row, not show)
+
+    def _on_accept(self):
+        """
+        Validate depths and build:
+          - updates:   (well_name, top_name) -> depth
+          - additions: (well_name, top_name) -> depth
+          - deletions: set of (well_name, top_name)
+        """
+        updates = {}
+        additions = {}
+        seen_pairs = set()
+
+        n_rows = self.table.rowCount()
+
+        for row in range(n_rows):
+            cb_well = self.table.cellWidget(row, self.COL_WELL)
+            cb_top = self.table.cellWidget(row, self.COL_TOP)
+            item_depth = self.table.item(row, self.COL_DEPTH)
+
+            well_name = cb_well.currentText().strip() if cb_well else ""
+            top_name = cb_top.currentText().strip() if cb_top else ""
+            depth_txt = item_depth.text().strip() if item_depth else ""
+
+            # skip completely empty rows (shouldn't really happen with combos, but just in case)
+            if not well_name and not top_name and not depth_txt:
+                continue
+
+            if not well_name or not top_name or not depth_txt:
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Row {row+1} is incomplete. Please select Well, Top, and Depth or delete the row."
+                )
+                return
+
+            # depth numeric?
+            try:
+                depth = float(depth_txt)
+            except ValueError:
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Invalid depth '{depth_txt}' in row {row+1}. Please enter a number."
+                )
+                return
+
+            pair = (well_name, top_name)
+            if pair in seen_pairs:
+                QMessageBox.warning(
+                    self,
+                    "Edit tops",
+                    f"Duplicate (Well, Top) pair '{well_name}', '{top_name}' in the table.\n"
+                    "Each top may only appear once."
+                )
+                return
+            seen_pairs.add(pair)
+
+            if pair in self._existing_pairs:
+                updates[pair] = depth
+            else:
+                additions[pair] = depth
+
+        self._result = {
+            "updates": updates,
+            "additions": additions,
+            "deletions": set(self._deleted_pairs),
+        }
+        self.accept()
+
+    def result_changes(self):
+        """
+        Return dict:
+          {
+            "updates":   { (well_name, top_name): depth, ... },
+            "additions": { (well_name, top_name): depth, ... },
+            "deletions": set( (well_name, top_name), ... ),
+          }
+        or None if dialog was cancelled.
+        """
+        return self._result
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
+    QDoubleSpinBox, QDialogButtonBox, QLabel, QMessageBox
+)
+from PyQt5.QtCore import Qt
+
+
+class NewWellDialog(QDialog):
+    """
+    Dialog to create a new well with basic settings.
+    Produces a dict you can append to self.all_wells.
+    """
+
+    def __init__(self, parent, existing_names=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add new well")
+        self.resize(400, 300)
+
+        self._existing_names = set(existing_names or [])
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Enter well header information.\n"
+            "Name should be unique in the project.", self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Name
+        self.ed_name = QLineEdit(self)
+        form.addRow("Name:", self.ed_name)
+
+        # UWI
+        self.ed_uwi = QLineEdit(self)
+        form.addRow("UWI:", self.ed_uwi)
+
+        # X, Y
+        self.spin_x = QDoubleSpinBox(self)
+        self.spin_x.setRange(-1e9, 1e9)
+        self.spin_x.setDecimals(3)
+        self.spin_x.setSpecialValueText("NaN")
+        self.spin_x.setValue(0.0)
+        form.addRow("Surface X (m):", self.spin_x)
+
+        self.spin_y = QDoubleSpinBox(self)
+        self.spin_y.setRange(-1e9, 1e9)
+        self.spin_y.setDecimals(3)
+        self.spin_y.setSpecialValueText("NaN")
+        self.spin_y.setValue(0.0)
+        form.addRow("Surface Y (m):", self.spin_y)
+
+        # Reference type (KB, RL, RT, DF, etc.)
+        self.cmb_ref_type = QComboBox(self)
+        self.cmb_ref_type.addItems(["KB", "RL", "RT", "DF"])
+        form.addRow("Reference type:", self.cmb_ref_type)
+
+        # Reference depth (e.g. KB elevation)
+        self.spin_ref_depth = QDoubleSpinBox(self)
+        self.spin_ref_depth.setRange(-1e5, 1e5)
+        self.spin_ref_depth.setDecimals(3)
+        self.spin_ref_depth.setValue(0.0)
+        form.addRow("Reference depth (m):", self.spin_ref_depth)
+
+        # Total depth (MD measured from reference)
+        self.spin_td = QDoubleSpinBox(self)
+        self.spin_td.setRange(0.0, 1e5)
+        self.spin_td.setDecimals(3)
+        self.spin_td.setValue(1000.0)
+        form.addRow("Total depth (m):", self.spin_td)
+
+        # Buttons
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._result = None
+
+    def _on_accept(self):
+        name = self.ed_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "New well", "Please enter a well name.")
+            return
+        if name in self._existing_names:
+            QMessageBox.warning(
+                self, "New well",
+                f"A well named '{name}' already exists in the project. "
+                "Please choose another name."
+            )
+            return
+
+        uwi = self.ed_uwi.text().strip()
+        x = float(self.spin_x.value())
+        y = float(self.spin_y.value())
+        ref_type = self.cmb_ref_type.currentText()
+        ref_depth = float(self.spin_ref_depth.value())
+        total_depth = float(self.spin_td.value())
+
+        new_well = {
+            "name": name,
+            "uwi": uwi,
+            "x": x,
+            "y": y,
+            "reference_type": ref_type,
+            "reference_depth": ref_depth,
+            "total_depth": total_depth,
+            "tops": {},
+            "logs": {},
+            "discrete_logs": {},
+        }
+
+        self._result = new_well
+        self.accept()
+
+    def result_well(self):
+        """Return well dict or None if cancelled."""
+        return self._result
