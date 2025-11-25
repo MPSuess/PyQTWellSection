@@ -90,5 +90,6 @@ def setup_well_widget_tree(self):
     self._populate_well_tops_tree()
     self._populate_well_log_tree()
     self._populate_well_track_tree()
+    self.redraw_requested = True
 
 
