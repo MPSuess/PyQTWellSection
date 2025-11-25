@@ -218,7 +218,7 @@ def draw_multi_wells_panel_on_figure(
 
         # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
-            depth_formatter = FuncFormatter(lambda y, pos, off=offset: y + off)
+            depth_formatter = FuncFormatter(lambda y, pos, off=offset: f"{(y + off):.2f}")
         else:
             depth_formatter = None
 
@@ -260,8 +260,10 @@ def draw_multi_wells_panel_on_figure(
                 base_ax.tick_params(axis="y", labelleft=True)
                 if depth_formatter is not None:
                     base_ax.yaxis.set_major_formatter(depth_formatter)
+
+
             else:
-                base_ax.tick_params(axis="y", labelleft=False)
+                base_ax.tick_params(axis="y", labelleft=False )
 
             base_ax.xaxis.set_visible(False)
 

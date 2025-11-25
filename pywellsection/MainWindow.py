@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
 
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width}
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested}
 
         self.panel = WellPanelWidget(wells, tracks, stratigraphy, self.panel_settings)
         self.dock_panel = QDockWidget("Well Panel", self)
@@ -89,6 +89,15 @@ class MainWindow(QMainWindow):
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
         setup_well_widget_tree(self)
+
+        self.redraw_requested=True
+
+        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested}
+
+        self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
+        self.panel.draw_panel()
+
         # ---- build menu bar ----
         self._create_menubar()
 
@@ -222,6 +231,9 @@ class MainWindow(QMainWindow):
             #self.all_stratigraphy = stratigraphy
 
             self.redraw_requested = False
+            self.panel_settings["redraw_requested"] = False
+            self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
+
             # populate well tree
             self._populate_well_tree()
             self._populate_well_tops_tree()
@@ -230,8 +242,9 @@ class MainWindow(QMainWindow):
 
 
             # ✅ Trigger full redraw
-            self.panel.update_panel(tracks, wells, stratigraphy)
             self.redraw_requested = True
+            self.panel_settings["redraw_requested"] = True
+            self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
             self.panel.draw_panel()
 
         except Exception as e:

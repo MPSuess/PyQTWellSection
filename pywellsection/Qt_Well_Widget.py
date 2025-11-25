@@ -44,9 +44,12 @@ class WellPanelWidget(QWidget):
         self.stratigraphy = stratigraphy
         self.logs = None
 
+        self.panel_settings = panel_settings
+
         self.well_gap_factor = panel_settings["well_gap_factor"]
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
+        self.redraw_requested = panel_settings["redraw_requested"]
 
         self.highlight_top = None
         self.visible_tops = None
@@ -105,6 +108,11 @@ class WellPanelWidget(QWidget):
         self.offset0 = 0
 
     def draw_panel(self):
+
+        redraw_requested = self.panel_settings["redraw_requested"]
+
+        if not redraw_requested:
+            return
 
 
         if len(self.wells) != 0:
@@ -175,11 +183,12 @@ class WellPanelWidget(QWidget):
             #draw_multi_wells_panel_on_figure(self.fig,self.wells,self.tracks)
             self.canvas.draw()
 
-    def update_panel(self,tracks, wells, stratigraphy):
+    def update_panel(self,tracks, wells, stratigraphy, panel_settings):
         self.tracks = tracks
         self.n_tracks = len(tracks)
         self.wells = wells
         self.stratigraphy = stratigraphy
+        self.panel_settings = panel_settings
         self.draw_panel()
 
     def enable_top_picking(self):
@@ -736,11 +745,8 @@ class WellPanelWidget(QWidget):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
 
-
         min_bound = ref_depth
         max_bound = well_td
-
-
 
         # store context for 'pick on plot'
         self._active_pick_context = {
@@ -855,40 +861,6 @@ class WellPanelWidget(QWidget):
                     return tops[idx_l[idx-1]], tops[idx_l[idx+1]]
                 else:
                     return tops[idx_l[idx-1]]["depth"],tops[idx_l[idx+1]]["depth"]
-
-        # #idx = strat.index(top_name)
-        #
-        # # Find shallower neighbor (earlier in strat list that exists in this well)
-        # shallower_depth = None
-        # for j in range(idx - 1, -1, -1):
-        #     name_j = list(idx_map)[j]
-        #     if name_j in tops:
-        #         val = tops[name_j]
-        #         shallower_depth = float(val["depth"] if isinstance(val, dict) else val)
-        #         break
-        #
-        # # Find deeper neighbor (later in strat list that exists in this well)
-        # deeper_depth = None
-        # for j in range(idx, len(strat)):
-        #     name_j = list(idx_map)[j]
-        #     if name_j in tops:
-        #         val = tops[name_j+1]
-        #         deeper_depth = float(val["depth"] if isinstance(val, dict) else val)
-        #         break
-        #
-        # eps = 1e-3  # small margin to avoid exact crossing
-        #
-        # # If we have a shallower neighbor, this sets the upper bound (shallower depth)
-        # if shallower_depth is not None:
-        #     min_bound = max(min_bound, shallower_depth + eps)
-        #
-        # # If we have a deeper neighbor, this sets the lower bound (deeper depth)
-        # if deeper_depth is not None:
-        #     max_bound = min(max_bound, deeper_depth - eps)
-        #
-        # # Ensure min_bound < max_bound (if strat is strange, just fall back)
-        # if not (min_bound < max_bound):
-        #     min_bound, max_bound = ref_depth, well_td
 
         return min_bound, max_bound
 
