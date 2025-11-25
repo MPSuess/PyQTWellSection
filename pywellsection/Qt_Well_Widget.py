@@ -18,6 +18,17 @@ from .dialogs import EditFormationTopDialog
 from .dialogs import AddFormationTopDialog
 from .dialogs import AddLogToTrackDialog
 
+import logging
+from pathlib import Path
+
+logging.getLogger("ipykernel").setLevel("CRITICAL")
+logging.getLogger("traitlets").setLevel("CRITICAL")
+logging.getLogger("root").setLevel("CRITICAL")
+logging.getLogger("parso").setLevel("CRITICAL")
+logging.getLogger("parso.cache").setLevel("CRITICAL")
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel("DEBUG")
 
 import numpy as np
 
@@ -91,8 +102,10 @@ class WellPanelWidget(QWidget):
 
         self.draw_panel()
         self.enable_top_picking()
+        self.offset0 = 0
 
     def draw_panel(self):
+
 
         if len(self.wells) != 0:
             top_true = bottom_true = None
@@ -100,6 +113,8 @@ class WellPanelWidget(QWidget):
                 # Take the first main axis as reference (row 0, track 0)
                 ref_ax = self.axes[0]
                 y0, y1 = ref_ax.get_ylim()
+                print(f"y0={y0} y1={y1}")
+                print(f"current depth window: {self._current_depth_window}")
                 # y is in plotting coordinates (flattened); convert to true depth
                 offset0 = 0.0
                 if getattr(self, "_flatten_depths", None):
@@ -109,6 +124,7 @@ class WellPanelWidget(QWidget):
                 # depth_true = depth_plot + offset
                 top_true = min(y0, y1) + offset0
                 bottom_true = max(y0, y1) + offset0
+
                 self._current_depth_window = (top_true, bottom_true)
 
             # 2) Redraw everything (this will clear fig and rebuild axe
@@ -278,10 +294,12 @@ class WellPanelWidget(QWidget):
 
         min, max = self._get_stratigraphic_bounds(formation_name)
 
-        if depth < min+flatten_depth:
-            depth = min
-        if depth > max+flatten_depth:
-            depth = max
+        LOG.debug(f"min={min} max={max} depth={depth} flatten_depth={flatten_depth}")
+
+        # if depth < min+flatten_depth:
+        #     depth = min
+        # if depth > max+flatten_depth:
+        #     depth = max
 
         if depth is not None and self._active_top_dialog is not None:
             self._active_top_dialog.set_depth(depth)
@@ -503,24 +521,24 @@ class WellPanelWidget(QWidget):
         else:
             flatten_depth = 0
 
+        print(f"depth={depth} flatten_depth={flatten_depth}")
+
         depth = depth - flatten_depth
 
-
-
+        print (f"recalculated depth={depth}")
 
         formation_name = self._active_pick_context["formation_name"]
 
         if formation_name is not None:
             min,max = self._get_stratigraphic_bounds(formation_name)
 
-            if depth < min-flatten_depth:
-                depth = min-flatten_depth
-            if depth > max-flatten_depth:
-                depth = max-flatten_depth
-
-        print("move", event.ydata, min, max, depth)
+            # if depth < min-flatten_depth:
+            #     depth = min-flatten_depth
+            # if depth > max-flatten_depth:
+            #     depth = max-flatten_depth
 
 
+        print("move", event.ydata, min, max, depth, flatten_depth)
 
 
         # draw a thin hatched band across ALL tracks of the selected well
@@ -718,8 +736,11 @@ class WellPanelWidget(QWidget):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
 
+
         min_bound = ref_depth
         max_bound = well_td
+
+
 
         # store context for 'pick on plot'
         self._active_pick_context = {
@@ -727,6 +748,9 @@ class WellPanelWidget(QWidget):
             "formation_name": top_name,
             "last_depth": initial_depth,
         }
+
+        if top_name is not None:
+            min_bound,max_bound= self._get_stratigraphic_bounds(top_name)
 
         dlg = EditFormationTopDialog(
             self,
