@@ -6,6 +6,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QPoint
 
 import numpy as np
+import csv
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 
@@ -95,7 +96,7 @@ class MainWindow(QMainWindow):
 
         setup_well_widget_tree(self)
 
-        self.redraw_requested=False
+        self.redraw_requested=True
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested}
@@ -124,14 +125,20 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
+        import_menu = file_menu.addMenu("&Import")
+
+        act_import_tops = QAction("Import tops from CSV...", self)
+        act_import_tops.triggered.connect(self._action_import_tops_csv)
+        import_menu.addAction(act_import_tops)
+
         # 👇 NEW: Import Petrel well heads
         act_import_petrel = QAction("Import Petrel well heads...", self)
         act_import_petrel.triggered.connect(self._file_import_petrel)
-        file_menu.addAction(act_import_petrel)
+        import_menu.addAction(act_import_petrel)
 
         act_import_las = QAction("Import LAS logs...", self)
         act_import_las.triggered.connect(self._file_import_las)
-        file_menu.addAction(act_import_las)
+        import_menu.addAction(act_import_las)
 
         file_menu.addSeparator()
 
@@ -197,6 +204,8 @@ class MainWindow(QMainWindow):
     # FILE HANDLERS (placeholders for now)
     # ------------------------------------------------
 
+
+
     def _project_file_open(self):
         """Load wells/tracks data from a JSON file (example)."""
         path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
@@ -228,8 +237,8 @@ class MainWindow(QMainWindow):
 
                 # keep existing fields
                 level = meta.get("level", "")
-                color = meta.get("color", "")
-                hatch = meta.get("hatch", "")
+                color = meta.get("color", "#000fff")
+                hatch = meta.get("hatch", "-")
                 role = meta.get("role", "stratigraphy")  # 👈 default if missing
 
                 stratigraphy[name] = {
@@ -1258,3 +1267,183 @@ class MainWindow(QMainWindow):
         # 5) (Optional) refresh track/log trees for consistency
         #self._populate_well_track_tree()
         #self._populate_log_tree()
+
+
+
+
+    def _load_tops_from_csv(self, path: str):
+        """
+        Load formation / fault tops from a CSV file with columns:
+            Well_name, MD, Horizon, Name, Type
+
+        and merge them into:
+            - self.all_wells[*]["tops"]
+            - self.stratigraphy (adds role if needed)
+
+        Rules:
+          - well must exist in self.all_wells (matched by well['name'])
+          - top name is taken from:
+              * if Type == 'Fault':  Name or Horizon
+              * else:                Horizon or Name
+          - role:
+              * if Type == 'Fault'  -> 'fault'
+              * else                -> 'stratigraphy'
+          - depth is MD (float)
+        """
+        # ---- read CSV ----
+        try:
+            with open(path, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter=";")
+                rows = list(reader)
+        except Exception as e:
+            QMessageBox.critical(self, "Load tops CSV", f"Failed to read file:\n{e}")
+            return
+
+        if not rows:
+            QMessageBox.information(self, "Load tops CSV", "No data rows found in CSV.")
+            return
+
+        # ---- index wells by name ----
+        if not hasattr(self, "all_wells") or not self.all_wells:
+            QMessageBox.warning(
+                self,
+                "Load tops CSV",
+                "No wells in project. Please create/import wells before loading tops."
+            )
+            return
+
+        wells_by_name = {}
+        for w in self.all_wells:
+            nm = w.get("name")
+            if nm:
+                wells_by_name[nm] = w
+
+        # ---- ensure we have a stratigraphy dict ----
+        strat = getattr(self, "stratigraphy", None)
+        if strat is None or not isinstance(strat, dict):
+            strat = OrderedDict()
+        else:
+            # preserve existing order
+            strat = OrderedDict(strat)
+
+        unknown_wells = set()
+        skipped_rows = 0
+        added_tops = 0
+        updated_tops = 0
+
+        for row in rows:
+            well_name = (row.get("Well_name") or "").strip()
+            md_str = (row.get("MD") or "").strip()
+            horizon = (row.get("Horizon") or "").strip()
+            name_col = (row.get("Name") or "").strip()
+            type_col = (row.get("Type") or "").strip()
+
+            if not well_name or not md_str:
+                skipped_rows += 1
+                continue
+
+            # parse depth
+            try:
+                depth = float(md_str.replace(",", "."))  # comma or dot decimals
+            except ValueError:
+                skipped_rows += 1
+                continue
+
+            # find well
+            well = wells_by_name.get(well_name)
+            if well is None:
+                unknown_wells.add(well_name)
+                skipped_rows += 1
+                continue
+
+            # determine top name + role
+            # For Faults -> name comes from Name or Horizon
+            # For others -> name from Horizon or Name
+            ttype = type_col.strip()
+            if ttype == "Fault":
+                top_name = name_col or horizon
+                role = "fault"
+            else:
+                top_name = horizon or name_col
+                role = "stratigraphy"
+
+            if not top_name:
+                # can't use an unnamed row
+                skipped_rows += 1
+                continue
+
+            # ---- update stratigraphy meta ----
+            meta = strat.get(top_name, {})
+            if not isinstance(meta, dict):
+                meta = {}
+
+            # keep existing fields, just ensure role exists / updated
+            meta.setdefault("level", "")  # you can refine this later
+            meta.setdefault("color", "#000000")
+            meta.setdefault("hatch", "-")
+            # if no role defined yet, set it; if already set, we do NOT overwrite
+            meta.setdefault("role", role)
+
+            strat[top_name] = meta
+
+            # ---- update well tops ----
+            tops = well.setdefault("tops", {})
+            old_val = tops.get(top_name)
+
+            if isinstance(old_val, dict):
+                old_val["depth"] = depth
+                tops[top_name] = old_val
+                updated_tops += 1
+            elif old_val is not None:
+                # old was a bare number
+                tops[top_name] = {"depth": depth}
+                updated_tops += 1
+            else:
+                tops[top_name] = {"depth": depth}
+                added_tops += 1
+
+        # store stratigraphy back
+        self.stratigraphy = strat
+
+        # ---- update panel ----
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.stratigraphy = self.stratigraphy
+            # keep zoom/flatten; if you want to reset, uncomment:
+            # self.panel._current_depth_window = None
+            # self.panel._flatten_depths = None
+            self.panel.draw_panel()
+
+        # ---- refresh trees ----
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_top_tree"):
+            self._populate_top_tree()
+
+        # ---- summary message ----
+        msg = [
+            f"Added tops:   {added_tops}",
+            f"Updated tops: {updated_tops}",
+            f"Skipped rows: {skipped_rows}",
+        ]
+        if unknown_wells:
+            msg.append(
+                "\nUnknown wells encountered (not in project):\n  "
+                + ", ".join(sorted(unknown_wells))
+            )
+
+        QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
+
+
+
+    def _action_import_tops_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import tops from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)",
+        )
+        if not path:
+            return
+
+        self._load_tops_from_csv(path)
