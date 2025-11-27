@@ -140,7 +140,7 @@ def draw_multi_wells_panel_on_figure(
         print ("depth_window", depth_window)
     #
     if depth_window is not None:
-        top_phys, bottom_phys = depth_window
+        #top_phys, bottom_phys = depth_window
         # safety
         if bottom_phys <= top_phys:
             top_phys, bottom_phys = min(ref_depths), max(bottoms)
@@ -175,8 +175,8 @@ def draw_multi_wells_panel_on_figure(
     global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
     #global_top_plot = 0
     #global_bottom_plot = 3000
-    global_top_plot = top_phys
-    global_bottom_plot = bottom_phys
+    #global_top_plot = top_phys
+    #global_bottom_plot = bottom_phys
 
     print(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
 
