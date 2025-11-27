@@ -129,11 +129,18 @@ class WellPanelWidget(QWidget):
                     # first well offset
                     if len(self._flatten_depths) > 0:
                         offset0 = float(self._flatten_depths[0])
+                #if offset0 != self.offset0: # change the offset
                 # depth_true = depth_plot + offset
                 top_true = min(y0, y1) + offset0
                 bottom_true = max(y0, y1) + offset0
+                self.offset0 = offset0
+                #else:
+                 #   top_true = min(y0,y1)
+                 #   bottom_true = max(y0,y1)
 
                 self._current_depth_window = (top_true, bottom_true)
+                print(f"top_true={top_true} bottom_true={bottom_true}")
+                print(f"updated current depth window: {self._current_depth_window}")
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
@@ -176,6 +183,7 @@ class WellPanelWidget(QWidget):
                 visible_discrete_logs=visible_discrete_logs,
                 visible_tracks = visible_tracks,
                 depth_window=self._current_depth_window,
+                stratigraphy=self.stratigraphy,
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -202,7 +210,7 @@ class WellPanelWidget(QWidget):
 
         #--- Helpers
 
-    def _dialog_accepted(self):
+    def edit_top_dialog_accepted(self):
         """OK clicked on dialog: update top and redraw."""
         if self._active_top_dialog is None:
             print ("no more top dialog?")
@@ -232,7 +240,7 @@ class WellPanelWidget(QWidget):
         self._clear_pick_line()
         self.draw_panel()
 
-    def _dialog_rejected(self):
+    def edit_top_dialog_rejected(self):
         """Cancel clicked: just clean up."""
         self._active_top_dialog = None
         self._active_pick_context = None
@@ -393,7 +401,7 @@ class WellPanelWidget(QWidget):
             # via add_tops_and_correlations if you pass flatten_depths there)
             self._clear_temp_highlight()
             self._draw_temp_highlight(wi, nearest_name)
-            self.draw_panel()
+            #self.draw_panel()
 
             # --- context menu ---
             act_edit = menu.addAction(f"Edit top '{nearest_name}'…")
@@ -770,8 +778,8 @@ class WellPanelWidget(QWidget):
         dlg.btn_pick.clicked.connect(self._arm_pick_for_dialog)
 
         # # wire up actions
-        dlg.accepted.connect(self._dialog_accepted)
-        dlg.rejected.connect(self._dialog_rejected)
+        dlg.accepted.connect(self.edit_top_dialog_accepted)
+        dlg.rejected.connect(self.edit_top_dialog_rejected)
         #
         print ("Starting Dialog")
         dlg.show()
@@ -874,7 +882,7 @@ class WellPanelWidget(QWidget):
         tops = well.setdefault("tops", {})
 
         if self._flatten_depths is not None:
-            flatten_depth = self._flatten_depths[wi_target]
+            flatten_depth = self._flatten_depths[well_index]
         else:
             flatten_depth = 0
 
@@ -1088,7 +1096,7 @@ class WellPanelWidget(QWidget):
         # Store state and redraw
         self._flatten_top_name = top_name
         self._flatten_depths = flatten_depths
-        self._current_depth_window = None
+        #self._current_depth_window = None
         self.draw_panel()
 
     def _get_flatten_offset_for_well(self, wi: int) -> float:

@@ -24,8 +24,13 @@ from pywellsection.dialogs import LogDisplaySettingsDialog
 from pywellsection.dialogs import AllTopsTableDialog
 from pywellsection.dialogs import NewWellDialog
 
-import logging
 from pathlib import Path
+from collections import OrderedDict
+
+
+import logging
+
+
 
 logging.getLogger("ipykernel").setLevel("CRITICAL")
 logging.getLogger("traitlets").setLevel("CRITICAL")
@@ -90,7 +95,7 @@ class MainWindow(QMainWindow):
 
         setup_well_widget_tree(self)
 
-        self.redraw_requested=True
+        self.redraw_requested=False
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested}
@@ -198,14 +203,43 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            wells, tracks, stratigraphy, _ = load_project_from_json(path)
+            wells, tracks, raw_strat, _ = load_project_from_json(path)
             self.panel.wells = wells
             self.panel.tracks = tracks
             #self.all_stratigraphy = None
             self.all_logs = []
             self.all_tracks = tracks
-
             self.all_wells = wells
+
+            # ---- normalize stratigraphy ----
+            # Ensure it's an ordered mapping of name -> dict(meta)
+            if isinstance(raw_strat, dict):
+                strat_items = raw_strat.items()
+            elif isinstance(raw_strat, list):
+                # in case older format is a list of (name, meta) pairs
+                strat_items = raw_strat
+            else:
+                strat_items = []
+
+            stratigraphy = OrderedDict()
+            for name, meta in strat_items:
+                if meta is None or not isinstance(meta, dict):
+                    meta = {}
+
+                # keep existing fields
+                level = meta.get("level", "")
+                color = meta.get("color", "")
+                hatch = meta.get("hatch", "")
+                role = meta.get("role", "stratigraphy")  # 👈 default if missing
+
+                stratigraphy[name] = {
+                    "level": level,
+                    "color": color,
+                    "hatch": hatch,
+                    "role": role,
+                }
+
+#            self.stratigraphy = stratigraphy
 
             #stratigraphy=self.all_stratigraphy
 
