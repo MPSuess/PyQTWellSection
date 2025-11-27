@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 import sys
 
+import pyexpat
 
 from pywellsection.MainWindow import MainWindow
 
