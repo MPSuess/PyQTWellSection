@@ -164,6 +164,7 @@ def draw_multi_wells_panel_on_figure(
     top_plot_candidates = []
     bottom_plot_candidates = []
     for off in offsets:
+
         top_plot_candidates.append(top_phys - off)
         bottom_plot_candidates.append(bottom_phys - off)
 
@@ -174,8 +175,8 @@ def draw_multi_wells_panel_on_figure(
     global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
     #global_top_plot = 0
     #global_bottom_plot = 3000
-    #global_top_plot = top_phys - 500
-    #global_bottom_plot = bottom_phys + 500
+    global_top_plot = top_phys
+    global_bottom_plot = bottom_phys
 
     print(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
 
@@ -257,6 +258,7 @@ def draw_multi_wells_panel_on_figure(
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
+            print(global_top_plot, global_bottom_plot)
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
