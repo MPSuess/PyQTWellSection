@@ -135,8 +135,8 @@ class WellPanelWidget(QWidget):
                 bottom_true = max(y0, y1) + offset0
                 self.offset0 = offset0
                 #else:
-                 #   top_true = min(y0,y1)
-                 #   bottom_true = max(y0,y1)
+                #top_true = min(y0,y1)
+                #bottom_true = max(y0,y1)
 
                 self._current_depth_window = (top_true, bottom_true)
                 print(f"top_true={top_true} bottom_true={bottom_true}")
