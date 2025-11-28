@@ -94,6 +94,7 @@ def draw_multi_wells_panel_on_figure(
     visible_discrete_logs = None,
     visible_tracks = None,
     depth_window = None,
+    stratigraphy = None,
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -139,10 +140,10 @@ def draw_multi_wells_panel_on_figure(
         print ("depth_window", depth_window)
     #
     if depth_window is not None:
-        top_phys, bottom_phys = depth_window
+        #top_phys, bottom_phys = depth_window
         # safety
         if bottom_phys <= top_phys:
-            top_phys, bottom_phys = max(ref_depths), max(bottoms)
+            top_phys, bottom_phys = min(ref_depths), max(bottoms)
     #
     print(f"top_phys={top_phys:.0f} bottom_phys={bottom_phys:.0f}")
     #
@@ -163,16 +164,21 @@ def draw_multi_wells_panel_on_figure(
     top_plot_candidates = []
     bottom_plot_candidates = []
     for off in offsets:
+
         top_plot_candidates.append(top_phys - off)
         bottom_plot_candidates.append(bottom_phys - off)
 
 
 
     # global plotting limits that include ALL wells after shifting
-    global_top_plot = min(top_plot_candidates)
-    global_bottom_plot = max(bottom_plot_candidates)
+    global_top_plot = min(top_plot_candidates) + offsets[0]
+    global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
+    #global_top_plot = 0
+    #global_bottom_plot = 3000
+    #global_top_plot = top_phys
+    #global_bottom_plot = bottom_phys
 
-    LOG.debug(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
+    print(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
 
     # ---- 3) Layout: tracks + spacer columns ----
     total_cols = n_wells * n_tracks + (n_wells - 1)
@@ -214,7 +220,7 @@ def draw_multi_wells_panel_on_figure(
 
         offset = offsets[wi]  # TRUE depth offset for this well
 
-        LOG.debug(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
+        print(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
 
         # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
@@ -252,6 +258,7 @@ def draw_multi_wells_panel_on_figure(
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
+            print(global_top_plot, global_bottom_plot)
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
@@ -394,6 +401,7 @@ def draw_multi_wells_panel_on_figure(
         flatten_depths=flatten_depths,
         visible_tops=visible_tops,
         visible_tracks = visible_tracks,
+        stratigraphy = stratigraphy
     )
 
     if suptitle:
@@ -433,6 +441,7 @@ def add_tops_and_correlations(
     flatten_depths=None,
     visible_tops=None,
     visible_tracks = None,
+    stratigraphy = None,
 ):
     """
     Handle:
@@ -510,10 +519,13 @@ def add_tops_and_correlations(
                 depth = float(val["depth"])-flatten_depth
                 color = val.get("color", get_top_color(name))
                 level = val.get("level", default_level)
+                role = val.get("role", "stratigraphy")
+                hatch = val.get("hatch", "")
             else:
                 depth = float(val)-flatten_depth
                 color = get_top_color(name)
                 level = default_level
+                role = "stratigraphy"
             top_items.append((name, depth, color, level))
 
         # sort shallow -> deep
@@ -537,6 +549,7 @@ def add_tops_and_correlations(
                 col_idx = first_track_idx + ti
                 base_ax = axes[col_idx]
                 for name in top_names:
+
                     info = top_meta[name]
 
                     style = info["style"]
@@ -547,15 +560,28 @@ def add_tops_and_correlations(
 
                     linewidth = style["line_width"] * (1.0 if not is_highlighted else 1.8)
 
-                    base_ax.axhline(
-                        info["depth"],
-                        xmin=0.0,
-                        xmax=1.0,
-                        color=info["color"],
-                        linestyle=info["style"]["line_style"],
-                        linewidth=linewidth,
-                        zorder=1.2 if not is_highlighted else 1.8,
-                    )
+                    if stratigraphy[name]['role'] == 'stratigraphy':
+                        base_ax.axhline(
+                            info["depth"],
+                            xmin=0.0,
+                            xmax=1.0,
+                            color=info["color"],
+                            linestyle=info["style"]["line_style"],
+                            linewidth=linewidth,
+                            zorder=1.2 if not is_highlighted else 1.8,
+                        )
+                    elif stratigraphy[name]['role'] == 'fault':
+                        base_ax.axhline(
+                            info["depth"],
+                            xmin=0.0,
+                            xmax=1.0,
+                            color=stratigraphy[name]["color"],
+                            #linestyle = '-',
+                            linestyle=stratigraphy[name]["hatch"],
+                            linewidth=linewidth,
+                            zorder=1.2 if not is_highlighted else 1.8,
+                        )
+
 
             # fill BETWEEN tops in this well using upper top's style
             if len(top_depths) >= 2:
@@ -566,18 +592,19 @@ def add_tops_and_correlations(
                     info = top_meta[name_upper]
                     color = info["color"]
                     style = info["style"]
-                    for ti in range(n_tracks):
-                        col_idx = first_track_idx + ti
-                        base_ax = axes[col_idx]
-                        base_ax.axhspan(
-                            d1,
-                            d2,
-                            facecolor=color,
-                            alpha=style["alpha"],
-                            hatch=style["hatch"],
-                            edgecolor="none",
-                            zorder=0.2,
-                        )
+                    if stratigraphy[name_upper]['role']=='stratigraphy':
+                        for ti in range(n_tracks):
+                            col_idx = first_track_idx + ti
+                            base_ax = axes[col_idx]
+                            base_ax.axhspan(
+                                d1,
+                                d2,
+                                facecolor=color,
+                                alpha=style["alpha"],
+                                hatch=style["hatch"],
+                                edgecolor="none",
+                                zorder=0.2,
+                            )
 
             # hatched interval just below deepest formation top
             formation_depths = [
