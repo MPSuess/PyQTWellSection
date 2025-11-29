@@ -196,8 +196,16 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "About",
-            "Well Panel Demo\n\n"
-            "Includes well log visualization, top picking, and stratigraphic editing."
+            (
+                "Well Section & Log Panel Viewer\n"
+                "Author: M. Peter Süss\n\n"
+                "This software provides tools for visualizing and editing well correlations, "
+                "well tops, logs, and related geological data.\n\n"
+                "\n\n"
+                "Licensed under the European Union Public Licence (EUPL) v1.2.\n"
+                "See: https://joinup.ec.europa.eu/collection/eupl/eupl-text-12\n\n"
+                "© M. Peter Süss"
+            )
         )
 
     # ------------------------------------------------
@@ -1174,6 +1182,18 @@ class MainWindow(QMainWindow):
                 self._action_add_new_well()
             return
 
+        if item is self.track_root_item:
+            menu = QMenu(self)
+
+            act_add_track = menu.addAction("Add new track...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_track:
+                self._action_add_empty_track()
+            return
+
+
+
         # --- case 1: logs under "Logs" folder ---
         if parent is self.well_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
@@ -1189,17 +1209,23 @@ class MainWindow(QMainWindow):
 
         # --- case 2: log leaves under "Tracks" folder ---
         # tracks folder: track_root_item
-        if parent is not None and parent.parent() is self.track_root_item:
+        if parent is self.track_root_item:
             # parent is the track item, 'item' is the log name
-            log_name = item.text(0)
-            if not log_name:
+            track_name = item.text(0)
+            if not track_name:
                 return
 
             menu = QMenu(self)
-            act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+            act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
+            act_add_log = menu.addAction(f"Add new log to track ...")
+            act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
-                self._edit_log_display_settings(log_name)
+                self._edit_log_display_settings(track_name)
+            elif chosen == act_add_log:
+                self._action_add_log_to_track()
+            elif chosen == act_delete_track:
+                self._action_delete_track()
             return
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
