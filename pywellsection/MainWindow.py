@@ -31,7 +31,9 @@ from collections import OrderedDict
 
 import logging
 
-
+# This file is part of the `pywellsection` project and licensed under
+# EUPL 1.2
+# M. Peter Süss 2025
 
 logging.getLogger("ipykernel").setLevel("CRITICAL")
 logging.getLogger("traitlets").setLevel("CRITICAL")
