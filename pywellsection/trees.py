@@ -32,7 +32,7 @@ def setup_well_widget_tree(self):
     self.well_root_item.setCheckState(0, Qt.Checked)
     self.well_tree.addTopLevelItem(self.well_root_item)
 
-    self.well_tops_folder = QTreeWidgetItem(["Tops"])
+    self.well_tops_folder = QTreeWidgetItem(["Well Tops"])
     # tristate so checking it checks/unchecks children
     self.well_tops_folder.setFlags(
         self.well_tops_folder.flags()
@@ -41,8 +41,17 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
+
     self.well_tops_folder.setCheckState(0, Qt.Checked)
     self.well_tree.addTopLevelItem(self.well_tops_folder)
+
+    stratigraphy_root = QTreeWidgetItem([well_name])
+    stratigraphy_root.setFlags(
+        stratigraphy_root.flags()
+        | Qt.ItemIsUserCheckable
+        | Qt.ItemIsSelectable
+        | Qt.ItemIsEnabled
+    )
 
     self.well_logs_folder = QTreeWidgetItem(["Logs"])
     # tristate so checking it checks/unchecks children
