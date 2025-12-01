@@ -4,8 +4,9 @@ from pathlib import Path
 import re
 import lasio
 import numpy as np
-
-
+import csv
+from PyQt5.QtWidgets import QMessageBox
+from collections import defaultdict
 
 def load_project_from_json(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -354,3 +355,232 @@ def load_las_as_logs(path):
         raise ValueError("No log curves found in LAS file (besides depth).")
 
     return well_info, logs
+
+def export_discrete_logs_to_csv(self, path: str):
+    """
+    Export all discrete well logs (new format) to a CSV file.
+
+    Input format per discrete log:
+        {
+            "depth":  [...],
+            "values": [...],   # -999 = no value below that depth
+        }
+
+    Output columns:
+        Well, Log, TopDepth, BottomDepth, Value
+    """
+    if not getattr(self, "all_wells", None):
+        QMessageBox.information(self, "Export discrete logs", "No wells in project.")
+        return
+
+    rows = []
+    MISSING = -999
+
+    for well in self.all_wells:
+        well_name = well.get("name", "UNKNOWN_WELL")
+        disc_logs = well.get("discrete_logs", {}) or {}
+        ref_depth = well.get("reference_depth", 0.0)
+        well_td   = ref_depth + float(well.get("total_depth", 0.0))
+
+        for log_name, disc_def in disc_logs.items():
+            depths = np.array(disc_def.get("depth", []), dtype=float)
+            values = np.array(disc_def.get("values", []), dtype=object)
+
+            if depths.size == 0 or values.size == 0:
+                continue
+
+            # sort
+            order = np.argsort(depths)
+            depths = depths[order]
+            values = values[order]
+
+            # intervals between depth[i] and depth[i+1]
+            for i in range(len(depths) - 1):
+                top_d = float(depths[i])
+                bot_d = float(depths[i + 1])
+                val   = values[i]
+
+                if val == MISSING:
+                    continue
+
+                rows.append({
+                    "Well": well_name,
+                    "Log": log_name,
+                    "TopDepth": top_d,
+                    "BottomDepth": bot_d,
+                    "Value": val,
+                })
+
+            # last sample → extend to TD if not missing
+            last_val = values[-1]
+            if last_val != MISSING:
+                top_d = float(depths[-1])
+                bot_d = float(well_td)
+                rows.append({
+                    "Well": well_name,
+                    "Log": log_name,
+                    "TopDepth": top_d,
+                    "BottomDepth": bot_d,
+                    "Value": last_val,
+                })
+
+    if not rows:
+        QMessageBox.information(
+            self,
+            "Export discrete logs",
+            "No discrete logs found in the project."
+        )
+        return
+
+    try:
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["Well", "Log", "TopDepth", "BottomDepth", "Value"]
+            )
+            writer.writeheader()
+            for r in rows:
+                writer.writerow(r)
+    except Exception as e:
+        QMessageBox.critical(
+            self,
+            "Export discrete logs",
+            f"Failed to write CSV file:\n{e}"
+        )
+        return
+
+    QMessageBox.information(
+        self,
+        "Export discrete logs",
+        f"Exported {len(rows)} intervals to:\n{path}"
+    )
+
+def import_discrete_logs_from_csv(self, path: str):
+    """
+    Import discrete well logs from a CSV file in interval format:
+
+        Well,Log,TopDepth,BottomDepth,Value
+
+    and convert to internal format per (well, log):
+
+        discrete_logs[log_name] = {
+            "depth":  [top1, top2, ...],
+            "values": [val1, val2, ...]   # string values; use '-999' as missing
+        }
+
+    Notes:
+      - Requires wells with matching names already in self.all_wells.
+      - For each (well, log), the imported data replaces any existing discrete log.
+      - 'Value' is stored as string as-is; if you want a special missing code,
+        use e.g. '-999' or an empty field in the CSV.
+    """
+    if not getattr(self, "all_wells", None):
+        QMessageBox.information(self, "Import discrete logs", "No wells in project.")
+        return
+
+    # ---- read CSV ----
+    try:
+        with open(path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+    except Exception as e:
+        QMessageBox.critical(self, "Import discrete logs", f"Failed to read file:\n{e}")
+        return
+
+    if not rows:
+        QMessageBox.information(self, "Import discrete logs", "No data rows found in CSV.")
+        return
+
+    # ---- group rows by (well_name, log_name) ----
+    grouped = defaultdict(list)
+    skipped = 0
+    for r in rows:
+        well_name = (r.get("Well") or "").strip()
+        log_name  = (r.get("Log") or "").strip()
+        top_s     = (r.get("TopDepth") or "").strip()
+        val_raw   = r.get("Value", "")
+
+        if not well_name or not log_name or not top_s:
+            skipped += 1
+            continue
+
+        try:
+            top_d = float(top_s.replace(",", "."))
+        except ValueError:
+            skipped += 1
+            continue
+
+        # Store value as string (we don’t force numeric)
+        val = str(val_raw).strip()
+
+        grouped[(well_name, log_name)].append((top_d, val))
+
+    if not grouped:
+        QMessageBox.information(
+            self,
+            "Import discrete logs",
+            "No valid (Well, Log, TopDepth) rows found in CSV."
+        )
+        return
+
+    # ---- map wells by name ----
+    wells_by_name = {}
+    for w in self.all_wells:
+        nm = w.get("name")
+        if nm:
+            wells_by_name[nm] = w
+
+    unknown_wells = set()
+    imported_pairs = 0
+
+    for (well_name, log_name), samples in grouped.items():
+        well = wells_by_name.get(well_name)
+        if well is None:
+            unknown_wells.add(well_name)
+            continue
+
+        if not samples:
+            continue
+
+        # sort by depth
+        samples.sort(key=lambda t: t[0])
+        depths = [d for (d, v) in samples]
+        values = [v for (d, v) in samples]
+
+        disc_logs = well.setdefault("discrete_logs", {})
+        disc_logs[log_name] = {
+            "depth": depths,
+            "values": values,
+        }
+        imported_pairs += 1
+
+    # ---- update panel ----
+    if hasattr(self, "panel"):
+        self.panel.wells = self.all_wells
+        # you can keep current zoom/flatten, or reset if you like:
+        # self.panel._current_depth_window = None
+        # self.panel._flatten_depths = None
+        self.panel.draw_panel()
+
+    # ---- refresh trees ----
+    if hasattr(self, "_populate_log_tree"):
+        self._populate_log_tree()
+    if hasattr(self, "_populate_well_tree"):
+        self._populate_well_tree()
+
+    # ---- summary message ----
+    msg_lines = [
+        f"Imported discrete logs for {imported_pairs} (well, log) pairs.",
+        f"Skipped rows: {skipped}",
+    ]
+    if unknown_wells:
+        msg_lines.append(
+            "\nUnknown wells (not found in project):\n  " +
+            ", ".join(sorted(unknown_wells))
+        )
+
+    QMessageBox.information(
+        self,
+        "Import discrete logs",
+        "\n".join(msg_lines)
+    )

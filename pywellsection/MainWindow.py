@@ -13,7 +13,9 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from pywellsection.Qt_Well_Widget import WellPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
-from pywellsection.io_utils import load_las_as_logs
+from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
+
+
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
 from pywellsection.trees import setup_well_widget_tree
@@ -24,6 +26,9 @@ from pywellsection.dialogs import LayoutSettingsDialog
 from pywellsection.dialogs import LogDisplaySettingsDialog
 from pywellsection.dialogs import AllTopsTableDialog
 from pywellsection.dialogs import NewWellDialog
+from pywellsection.dialogs import AllWellsSettingsDialog
+from pywellsection.dialogs import SingleWellSettingsDialog
+from pywellsection.dialogs import NewDiscreteTrackDialog
 
 from pathlib import Path
 from collections import OrderedDict
@@ -141,6 +146,15 @@ class MainWindow(QMainWindow):
         act_import_las = QAction("Import LAS logs...", self)
         act_import_las.triggered.connect(self._file_import_las)
         import_menu.addAction(act_import_las)
+
+        act_import_discrete = QAction("Discrete logs from CSV…", self)
+        act_import_discrete.triggered.connect(self._action_import_discrete_logs_csv)
+        import_menu.addAction(act_import_discrete)
+
+        export_menu = file_menu.addMenu("&Export")
+        act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
+        act_export_discrete_logs.triggered.connect(self._action_export_discrete_logs_csv)
+        export_menu.addAction(act_export_discrete_logs)
 
         file_menu.addSeparator()
 
@@ -280,6 +294,18 @@ class MainWindow(QMainWindow):
                             self.all_logs = self.all_logs|{log}
                 else:
                     print("No logs found")
+
+            for well in wells:
+                disc_logs = well.get("discrete_logs", {})
+                for log_name, d in list(disc_logs.items()):
+                    if "top_depths" in d and "bottom_depths" in d:
+                        tops = np.array(d["top_depths"], dtype=float)
+                        values = np.array(d["values"], dtype=object)
+                        # convert to depth/value representation (top sample)
+                        disc_logs[log_name] = {
+                            "depth": tops.tolist(),
+                            "values": values.tolist(),
+                        }
 
             #self.all_stratigraphy = stratigraphy
 
@@ -973,25 +999,6 @@ class MainWindow(QMainWindow):
         self._populate_well_track_tree()
         self._populate_well_log_tree()  # stays the same; just ensures consistency
 
-    def _action_add_empty_track(self):
-        # Suggest next unique name
-        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
-        base = "Track"
-        i = 1
-        while f"{base} {i}" in existing_names:
-            i += 1
-        suggested = f"{base} {i}"
-
-        dlg = NewTrackDialog(self, suggested_name=suggested)
-        if dlg.exec_() != QDialog.Accepted:
-            return
-
-        name = dlg.track_name() or suggested
-        try:
-            self.add_empty_track(name)
-        except Exception as e:
-            QMessageBox.critical(self, "Add empty track", f"Failed to add track:\n{e}")
-
     def delete_track(self, track_name: str):
         """
         Delete a track (by its name) from the project and refresh UI.
@@ -1030,6 +1037,25 @@ class MainWindow(QMainWindow):
         # refresh tree sections
         self._populate_well_track_tree()  # tracks folder
         #self._populate_well_log_tree()  # logs folder still valid, but refresh for consistency
+
+    def _action_add_empty_track(self):
+        # Suggest next unique name
+        existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
+        base = "Track"
+        i = 1
+        while f"{base} {i}" in existing_names:
+            i += 1
+        suggested = f"{base} {i}"
+
+        dlg = NewTrackDialog(self, suggested_name=suggested)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        name = dlg.track_name() or suggested
+        try:
+            self.add_empty_track(name)
+        except Exception as e:
+            QMessageBox.critical(self, "Add empty track", f"Failed to add track:\n{e}")
 
     def _action_delete_track(self):
         """Ask user which track to delete, then call delete_track."""
@@ -1221,6 +1247,202 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
+    def _action_add_discrete_track(self):
+        """Create a new discrete track and append it to the project."""
+        if not hasattr(self, "tracks") or self.tracks is None:
+            self.tracks = []
+
+        # collect all discrete log names currently present in wells
+        available_disc_logs = set()
+        if getattr(self, "all_wells", None):
+            for w in self.all_wells:
+                dlogs = w.get("discrete_logs", {}) or {}
+                for lname in dlogs.keys():
+                    available_disc_logs.add(lname)
+
+        existing_track_names = [t.get("name", "") for t in self.tracks]
+
+        dlg = NewDiscreteTrackDialog(
+            self,
+            available_discrete_logs=available_disc_logs,
+            existing_track_names=existing_track_names,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_track = dlg.result_track()
+        if not new_track:
+            return
+
+        # append track
+        self.tracks.append(new_track)
+
+        # push to panel
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.tracks
+            self.panel.draw_panel()
+
+        # refresh track tree
+        if hasattr(self, "_populate_track_tree"):
+            self._populate_track_tree()
+
+
+    def _action_edit_all_wells(self):
+        """Open dialog to edit all well header settings."""
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Well settings", "No wells in project.")
+            return
+
+        dlg = AllWellsSettingsDialog(self, self.all_wells)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        headers = dlg.result_headers()
+        if not headers:
+            return
+
+        # Apply back to self.all_wells, preserving tops/logs/discrete_logs
+        for i, hdr in enumerate(headers):
+            if i >= len(self.all_wells):
+                break
+            w = self.all_wells[i]
+            w["name"] = hdr["name"]
+            w["uwi"] = hdr["uwi"]
+            w["x"] = hdr["x"]
+            w["y"] = hdr["y"]
+            w["reference_type"] = hdr["reference_type"]
+            w["reference_depth"] = hdr["reference_depth"]
+            w["total_depth"] = hdr["total_depth"]
+
+        # push into panel
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            # optional: keep current zoom; if you want to reset, uncomment:
+            # self.panel._current_depth_window = None
+            # self.panel._flatten_depths = None
+            self.panel.draw_panel()
+
+        # refresh tree views that show wells
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _action_edit_single_well_by_index(self, well_index: int):
+        """Open dialog to edit a single well's settings."""
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Well settings", "No wells in project.")
+            return
+
+        if well_index < 0 or well_index >= len(self.all_wells):
+            QMessageBox.warning(self, "Well settings", "Invalid well index.")
+            return
+
+        well = self.all_wells[well_index]
+        existing_names = [w.get("name", "") for w in self.all_wells]
+
+        dlg = SingleWellSettingsDialog(self, well, existing_names=existing_names)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        hdr = dlg.result_header()
+        if not hdr:
+            return
+
+        # apply header changes
+        well["name"] = hdr["name"]
+        well["uwi"] = hdr["uwi"]
+        well["x"] = hdr["x"]
+        well["y"] = hdr["y"]
+        well["reference_type"] = hdr["reference_type"]
+        well["reference_depth"] = hdr["reference_depth"]
+        well["total_depth"] = hdr["total_depth"]
+
+        # update panel
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            # optional: keep zoom/flatten; if you want to reset, uncomment:
+            # self.panel._current_depth_window = None
+            # self.panel._flatten_depths = None
+            self.panel.draw_panel()
+
+        # refresh trees (names may have changed)
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_top_tree"):
+            self._populate_top_tree() or parent is self.well_root_item
+
+    def _action_edit_single_well_by_name(self, well_name: str):
+        """Edit a single well, identified by its name from the tree item."""
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Well settings", "No wells in project.")
+            return
+
+        # find index by name
+        well_index = None
+        for i, w in enumerate(self.all_wells):
+            if w.get("name") == well_name:
+                well_index = i
+                break
+
+        if well_index is None:
+            QMessageBox.warning(
+                self,
+                "Well settings",
+                f"Well '{well_name}' not found in project."
+            )
+            return
+
+        well = self.all_wells[well_index]
+        existing_names = [w.get("name", "") for w in self.all_wells]
+
+        dlg = SingleWellSettingsDialog(self, well, existing_names=existing_names)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        hdr = dlg.result_header()
+        if not hdr:
+            return
+
+        well["name"] = hdr["name"]
+        well["uwi"] = hdr["uwi"]
+        well["x"] = hdr["x"]
+        well["y"] = hdr["y"]
+        well["reference_type"] = hdr["reference_type"]
+        well["reference_depth"] = hdr["reference_depth"]
+        well["total_depth"] = hdr["total_depth"]
+
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.draw_panel()
+
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_top_tree"):
+            self._populate_top_tree()
+
+    def _action_export_discrete_logs_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Discrete Logs",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        # Call your actual export function
+        export_discrete_logs_to_csv(self,path)
+
+    def _action_import_discrete_logs_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import discrete logs from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        import_discrete_logs_from_csv(self,path)
 
     def set_layout_params(self, well_gap_factor: float, track_width: float):
         """Update panel layout (gap between wells and track width) and redraw."""
@@ -1231,81 +1453,8 @@ class MainWindow(QMainWindow):
         self.panel.set_panel_settings(self.panel_settings)
         self.panel.draw_panel()
 
-    
     def test_connect(self, pos):
         return True
-
-    def _on_tree_context_menu(self, pos):
-        """
-        Show a context menu for logs in the tree:
-          - logs under the 'Logs' folder
-          - logs under each track in the 'Tracks' folder
-        """
-        item = self.well_tree.itemAt(pos)
-        if item is None:
-            return
-
-        global_pos = self.well_tree.viewport().mapToGlobal(pos)
-        parent = item.parent()
-
-        # --- Wells folder or well items: show "Add new well..." ---
-        if item is self.well_root_item or parent is self.well_root_item:
-            menu = QMenu(self)
-
-            act_add_well = menu.addAction("Add new well...")
-            chosen = menu.exec_(global_pos)
-
-            if chosen == act_add_well:
-                self._action_add_new_well()
-            return
-
-        if item is self.track_root_item:
-            menu = QMenu(self)
-
-            act_add_track = menu.addAction("Add new track...")
-            chosen = menu.exec_(global_pos)
-
-            if chosen == act_add_track:
-                self._action_add_empty_track()
-            return
-
-
-
-        # --- case 1: logs under "Logs" folder ---
-        if parent is self.well_logs_folder:
-            log_name = item.data(0, Qt.UserRole) or item.text(0)
-            if not log_name:
-                return
-
-            menu = QMenu(self)
-            act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
-            chosen = menu.exec_(global_pos)
-            if chosen == act_edit:
-                self._edit_log_display_settings(log_name)
-            return
-
-        # --- case 2: log leaves under "Tracks" folder ---
-        # tracks folder: track_root_item
-        if parent is self.track_root_item:
-            # parent is the track item, 'item' is the log name
-            track_name = item.text(0)
-            if not track_name:
-                return
-
-            menu = QMenu(self)
-            act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
-            act_add_log = menu.addAction(f"Add new log to track ...")
-            act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
-            chosen = menu.exec_(global_pos)
-            if chosen == act_edit:
-                self._edit_log_display_settings(track_name)
-            elif chosen == act_add_log:
-                self._action_add_log_to_track()
-            elif chosen == act_delete_track:
-                self._action_delete_track()
-            return
-
-        # other nodes (wells, tops folders, etc.) → no context menu for logs
 
     from PyQt5.QtWidgets import QMessageBox
 
@@ -1370,7 +1519,6 @@ class MainWindow(QMainWindow):
         # 5) (Optional) refresh track/log trees for consistency
         #self._populate_well_track_tree()
         #self._populate_log_tree()
-
 
     def _load_tops_from_csv(self, path: str):
         """
@@ -1535,8 +1683,6 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
 
-
-
     def _action_import_tops_csv(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -1548,3 +1694,104 @@ class MainWindow(QMainWindow):
             return
 
         self._load_tops_from_csv(path)
+
+
+    def _on_tree_context_menu(self, pos):
+        """
+        Show a context menu for logs in the tree:
+          - logs under the 'Logs' folder
+          - logs under each track in the 'Tracks' folder
+        """
+        item = self.well_tree.itemAt(pos)
+        if item is None:
+            return
+
+        global_pos = self.well_tree.viewport().mapToGlobal(pos)
+        parent = item.parent()
+
+        # --- Wells folder or well items: show "Add new well..." ---
+        if item is self.well_root_item:
+            menu = QMenu(self)
+
+            act_add_well = menu.addAction("Add new well...")
+            act_edit_all_wells = menu.addAction("Edit all well settings ...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_well:
+                self._action_add_new_well()
+            elif chosen == act_edit_all_wells:
+                self._action_edit_all_wells()
+            return
+
+        if parent is self.well_root_item:
+            menu = QMenu(self)
+
+            well_name = item.text(0)
+            act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
+            chosen = menu.exec_(global_pos)
+            well_index = item.data(0, Qt.UserRole)
+            if well_index is None:
+                return
+            if chosen == act_edit_well:
+                self._action_edit_single_well_by_name(well_name)
+
+        # --- case 1: logs under "Logs" folder ---
+        if parent is self.well_logs_folder:
+            log_name = item.data(0, Qt.UserRole) or item.text(0)
+            if not log_name:
+                return
+
+            menu = QMenu(self)
+            act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_log_display_settings(log_name)
+            return
+
+        if item is self.well_tops_folder:
+            menu = QMenu(self)
+
+            act_edit_stratigraphy = menu.addAction("Edit well tops ...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_edit_stratigraphy:
+                self._action_edit_stratigraphy()
+            return
+
+
+        if item is self.track_root_item:
+            menu = QMenu(self)
+
+            act_add_track = menu.addAction("Add new track...")
+            act_add_disc_track = menu.addAction("Add new discrete track...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_track:
+                self._action_add_empty_track()
+            elif chosen == act_add_disc_track:
+                self._action_add_discrete_track()
+            return
+
+
+        # --- case 2: log leaves under "Tracks" folder ---
+        # tracks folder: track_root_item
+        if parent is self.track_root_item:
+            # parent is the track item, 'item' is the log name
+            track_name = item.text(0)
+            if not track_name:
+                return
+
+            menu = QMenu(self)
+            act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
+            act_add_log = menu.addAction(f"Add new log to track ...")
+            act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_log_display_settings(track_name)
+            elif chosen == act_add_log:
+                self._action_add_log_to_track()
+            elif chosen == act_delete_track:
+                self._action_delete_track()
+            return
+
+        # other nodes (wells, tops folders, etc.) → no context menu for logs

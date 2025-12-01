@@ -1,11 +1,15 @@
 import numpy as np
 from PyQt5.QtWidgets import (
-
     QDoubleSpinBox, QPushButton,
-    QDialog,  QLineEdit
+    QDialog, QLineEdit, QDialogButtonBox,
+    QDialog, QVBoxLayout, QFormLayout,
+    QComboBox, QDialogButtonBox,
+    QTableWidget, QTableWidgetItem,
+    QLabel, QMessageBox,
 )
+from collections import OrderedDict
 
-
+from PyQt5.QtCore import Qt
 
 class EditFormationTopDialog(QDialog):
     def __init__(self, parent, well_name, formation_name,
@@ -154,11 +158,6 @@ class EditFormationTopDialog(QDialog):
 
         return min_bound, max_bound
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLabel,
-    QComboBox, QDialogButtonBox
-)
-
 class AddFormationTopDialog(QDialog):
     """
     Dialog to add a new formation top at a picked depth.
@@ -190,11 +189,6 @@ class AddFormationTopDialog(QDialog):
 
     def selected_unit(self) -> str:
         return self.combo.currentText()
-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QComboBox,
-    QLineEdit, QDialogButtonBox
-)
 
 class AddLogToTrackDialog(QDialog):
     """
@@ -347,27 +341,6 @@ class NewTrackDialog(QDialog):
 
     def track_name(self) -> str:
         return self.ed_name.text().strip()
-
-
-from collections import OrderedDict
-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QTableWidget, QTableWidgetItem, QPushButton,
-    QDialogButtonBox, QLabel, QMessageBox
-)
-from PyQt5.QtCore import Qt
-
-
-from collections import OrderedDict
-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QTableWidget, QTableWidgetItem, QPushButton,
-    QDialogButtonBox, QLabel, QMessageBox
-)
-from PyQt5.QtCore import Qt
-
 
 class StratigraphyEditorDialog(QDialog):
     """
@@ -547,12 +520,6 @@ class StratigraphyEditorDialog(QDialog):
         """Return OrderedDict or None."""
         return self._accepted_strat
 
-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox,
-    QDialogButtonBox
-)
-
 class LayoutSettingsDialog(QDialog):
     def __init__(self, parent, well_gap_factor: float, track_width: float):
         super().__init__(parent)
@@ -584,12 +551,6 @@ class LayoutSettingsDialog(QDialog):
 
     def values(self):
         return float(self.spin_gap.value()), float(self.spin_track.value())
-    
-    
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QDialogButtonBox
-)
 
 class LogDisplaySettingsDialog(QDialog):
     """
@@ -665,16 +626,6 @@ class LogDisplaySettingsDialog(QDialog):
             xlim = None
 
         return color, xscale, direction, xlim
-
-from collections import OrderedDict
-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QTableWidget, QTableWidgetItem, QLineEdit,
-    QDialogButtonBox, QLabel, QMessageBox, QPushButton, QComboBox
-)
-from PyQt5.QtCore import Qt
-
 
 class AllTopsTableDialog(QDialog):
     """
@@ -1042,13 +993,6 @@ class AllTopsTableDialog(QDialog):
         """
         return self._result
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QDoubleSpinBox, QDialogButtonBox, QLabel, QMessageBox
-)
-from PyQt5.QtCore import Qt
-
-
 class NewWellDialog(QDialog):
     """
     Dialog to create a new well with basic settings.
@@ -1160,4 +1104,433 @@ class NewWellDialog(QDialog):
 
     def result_well(self):
         """Return well dict or None if cancelled."""
+        return self._result
+
+class AllWellsSettingsDialog(QDialog):
+    """
+    Edit basic settings of all wells in a single table.
+
+    Columns:
+      0: Name
+      1: UWI
+      2: X
+      3: Y
+      4: Reference type (KB/RL/RT/DF/other)
+      5: Reference depth
+      6: Total depth
+
+    Does NOT add or delete wells – just edits existing headers.
+    """
+
+    COL_NAME  = 0
+    COL_UWI   = 1
+    COL_X     = 2
+    COL_Y     = 3
+    COL_REFT  = 4
+    COL_REFZ  = 5
+    COL_TD    = 6
+
+    def __init__(self, parent, wells):
+        super().__init__(parent)
+        self.setWindowTitle("Edit well settings")
+        self.resize(900, 400)
+
+        self._wells = wells
+        self._result = None  # list of header dicts, parallel to wells
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit well header parameters.\n"
+            "Name must be unique. X/Y, reference depth, and total depth must be numeric.",
+            self
+        ))
+
+        # table
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(
+            ["Name", "UWI", "X", "Y", "Ref. type", "Ref. depth", "Total depth"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        # optional future buttons (add/delete wells) – for now we just leave empty row
+        btn_row_layout = QHBoxLayout()
+        btn_row_layout.addStretch(1)
+        layout.addLayout(btn_row_layout)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._populate_table()
+
+    # ---------- populate ----------
+
+    def _populate_table(self):
+        n = len(self._wells)
+        self.table.setRowCount(n)
+
+        for row, w in enumerate(self._wells):
+            name = w.get("name", f"Well {row+1}")
+            uwi  = w.get("uwi", "")
+
+            x = w.get("x", 0.0)
+            y = w.get("y", 0.0)
+
+            ref_type   = w.get("reference_type", "KB")
+            ref_depth  = w.get("reference_depth", 0.0)
+            total_depth = w.get("total_depth", 0.0)
+
+            # Name
+            it_name = QTableWidgetItem(str(name))
+            self.table.setItem(row, self.COL_NAME, it_name)
+
+            # UWI
+            it_uwi = QTableWidgetItem(str(uwi))
+            self.table.setItem(row, self.COL_UWI, it_uwi)
+
+            # X, Y
+            it_x = QTableWidgetItem(f"{x:.3f}")
+            it_x.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_X, it_x)
+
+            it_y = QTableWidgetItem(f"{y:.3f}")
+            it_y.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_Y, it_y)
+
+            # Reference type as combobox
+            cb_ref = QComboBox(self.table)
+            cb_ref.addItems(["KB", "RL", "RT", "DF", "Other"])
+            # if custom value, add it
+            if ref_type not in [cb_ref.itemText(i) for i in range(cb_ref.count())]:
+                cb_ref.addItem(ref_type)
+            cb_ref.setCurrentText(ref_type)
+            self.table.setCellWidget(row, self.COL_REFT, cb_ref)
+
+            # Reference depth
+            it_refz = QTableWidgetItem(f"{ref_depth:.3f}")
+            it_refz.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_REFZ, it_refz)
+
+            # Total depth
+            it_td = QTableWidgetItem(f"{total_depth:.3f}")
+            it_td.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_TD, it_td)
+
+    # ---------- accept / validate ----------
+
+    def _on_accept(self):
+        n_rows = self.table.rowCount()
+
+        # collect/validate
+        names = []
+        headers = []
+
+        for row in range(n_rows):
+            it_name = self.table.item(row, self.COL_NAME)
+            it_uwi  = self.table.item(row, self.COL_UWI)
+            it_x    = self.table.item(row, self.COL_X)
+            it_y    = self.table.item(row, self.COL_Y)
+            it_refz = self.table.item(row, self.COL_REFZ)
+            it_td   = self.table.item(row, self.COL_TD)
+            cb_ref  = self.table.cellWidget(row, self.COL_REFT)
+
+            name = it_name.text().strip() if it_name else ""
+            if not name:
+                QMessageBox.warning(
+                    self,
+                    "Well settings",
+                    f"Row {row+1}: Name is empty. Please fill a well name."
+                )
+                return
+
+            names.append(name)
+
+            uwi = it_uwi.text().strip() if it_uwi else ""
+
+            def _parse_float(item, row_label):
+                if item is None:
+                    return 0.0
+                txt = item.text().strip()
+                if not txt:
+                    return 0.0
+                try:
+                    return float(txt.replace(",", "."))
+                except ValueError:
+                    raise ValueError(f"Row {row+1}: invalid {row_label} '{txt}'.")
+
+            try:
+                x = _parse_float(it_x, "X")
+                y = _parse_float(it_y, "Y")
+                ref_depth = _parse_float(it_refz, "reference depth")
+                total_depth = _parse_float(it_td, "total depth")
+            except ValueError as e:
+                QMessageBox.warning(self, "Well settings", str(e))
+                return
+
+            ref_type = cb_ref.currentText().strip() if cb_ref else "KB"
+            if not ref_type:
+                ref_type = "KB"
+
+            headers.append({
+                "name": name,
+                "uwi": uwi,
+                "x": x,
+                "y": y,
+                "reference_type": ref_type,
+                "reference_depth": ref_depth,
+                "total_depth": total_depth,
+            })
+
+        # name uniqueness
+        if len(set(names)) != len(names):
+            QMessageBox.warning(
+                self,
+                "Well settings",
+                "Well names must be unique. Please adjust duplicates."
+            )
+            return
+
+        self._result = headers
+        self.accept()
+
+    def result_headers(self):
+        """
+        Returns list of dicts, one per row/well:
+          [{
+             "name": ...,
+             "uwi": ...,
+             "x": ...,
+             "y": ...,
+             "reference_type": ...,
+             "reference_depth": ...,
+             "total_depth": ...,
+          }, ...]
+        or None if cancelled.
+        """
+        return self._result
+
+class SingleWellSettingsDialog(QDialog):
+    """
+    Edit header settings for a single well:
+      - name, UWI, X, Y
+      - reference type, reference depth, total depth
+    """
+
+    def __init__(self, parent, well: dict, existing_names=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit well: {well.get('name', '')}")
+        self.resize(400, 300)
+
+        self._orig_name = well.get("name", "")
+        self._existing_names = set(existing_names or []) - {self._orig_name}
+        self._result = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit well header parameters.\n"
+            "Name must be unique. X/Y, reference depth, and total depth must be numeric.",
+            self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Name
+        self.ed_name = QLineEdit(self)
+        self.ed_name.setText(well.get("name", ""))
+        form.addRow("Name:", self.ed_name)
+
+        # UWI
+        self.ed_uwi = QLineEdit(self)
+        self.ed_uwi.setText(well.get("uwi", ""))
+        form.addRow("UWI:", self.ed_uwi)
+
+        # X, Y
+        self.spin_x = QDoubleSpinBox(self)
+        self.spin_x.setRange(-1e9, 1e9)
+        self.spin_x.setDecimals(3)
+        self.spin_x.setValue(float(well.get("x", 0.0)))
+        form.addRow("Surface X (m):", self.spin_x)
+
+        self.spin_y = QDoubleSpinBox(self)
+        self.spin_y.setRange(-1e9, 1e9)
+        self.spin_y.setDecimals(3)
+        self.spin_y.setValue(float(well.get("y", 0.0)))
+        form.addRow("Surface Y (m):", self.spin_y)
+
+        # Reference type
+        self.cmb_ref_type = QComboBox(self)
+        self.cmb_ref_type.addItems(["KB", "RL", "RT", "DF", "Other"])
+        ref_type = well.get("reference_type", "KB")
+        if ref_type not in [self.cmb_ref_type.itemText(i) for i in range(self.cmb_ref_type.count())]:
+            self.cmb_ref_type.addItem(ref_type)
+        self.cmb_ref_type.setCurrentText(ref_type)
+        form.addRow("Reference type:", self.cmb_ref_type)
+
+        # Reference depth
+        self.spin_ref_depth = QDoubleSpinBox(self)
+        self.spin_ref_depth.setRange(-1e5, 1e5)
+        self.spin_ref_depth.setDecimals(3)
+        self.spin_ref_depth.setValue(float(well.get("reference_depth", 0.0)))
+        form.addRow("Reference depth (m):", self.spin_ref_depth)
+
+        # Total depth
+        self.spin_td = QDoubleSpinBox(self)
+        self.spin_td.setRange(0.0, 1e6)
+        self.spin_td.setDecimals(3)
+        self.spin_td.setValue(float(well.get("total_depth", 0.0)))
+        form.addRow("Total depth (m):", self.spin_td)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        name = self.ed_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Well settings", "Please enter a well name.")
+            return
+        if name in self._existing_names:
+            QMessageBox.warning(
+                self,
+                "Well settings",
+                f"A well named '{name}' already exists.\n"
+                "Please choose another name."
+            )
+            return
+
+        uwi = self.ed_uwi.text().strip()
+        x = float(self.spin_x.value())
+        y = float(self.spin_y.value())
+        ref_type = self.cmb_ref_type.currentText().strip() or "KB"
+        ref_depth = float(self.spin_ref_depth.value())
+        total_depth = float(self.spin_td.value())
+
+        self._result = {
+            "name": name,
+            "uwi": uwi,
+            "x": x,
+            "y": y,
+            "reference_type": ref_type,
+            "reference_depth": ref_depth,
+            "total_depth": total_depth,
+        }
+        self.accept()
+
+    def result_header(self):
+        """Return dict with updated header fields, or None."""
+        return self._result
+
+class NewDiscreteTrackDialog(QDialog):
+    """
+    Dialog to define a new discrete track.
+
+    Produces a track config like:
+      {
+        "name": "<track name>",
+        "logs": [],
+        "discrete": {
+            "log": "<discrete log name>",
+            "label": "<axis label>",
+            "color_map": {},
+            "default_color": "#dddddd",
+            "missing": -999,
+        },
+      }
+    """
+
+    def __init__(self, parent, available_discrete_logs=None, existing_track_names=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add discrete track")
+        self.resize(400, 220)
+
+        self._available_discrete_logs = sorted(set(available_discrete_logs or []))
+        self._existing_track_names = set(existing_track_names or [])
+        self._result = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Define a new discrete track.\n"
+            "Choose a track name and a discrete log to display.",
+            self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Track name
+        self.ed_track_name = QLineEdit(self)
+        form.addRow("Track name:", self.ed_track_name)
+
+        # Discrete log name (combo)
+        self.cmb_log = QComboBox(self)
+        self.cmb_log.setEditable(True)  # allow typing a new name if needed
+        self.cmb_log.addItems(self._available_discrete_logs)
+        form.addRow("Discrete log:", self.cmb_log)
+
+        # Label (optional; default to discrete log name)
+        self.ed_label = QLineEdit(self)
+        form.addRow("Label (optional):", self.ed_label)
+
+        # Missing code (string, default "-999")
+        self.ed_missing = QLineEdit(self)
+        self.ed_missing.setText("-999")
+        form.addRow("Missing code:", self.ed_missing)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        track_name = self.ed_track_name.text().strip()
+        if not track_name:
+            QMessageBox.warning(self, "Discrete track", "Please enter a track name.")
+            return
+        if track_name in self._existing_track_names:
+            QMessageBox.warning(
+                self,
+                "Discrete track",
+                f"A track named '{track_name}' already exists.\n"
+                "Please choose another name."
+            )
+            return
+
+        log_name = self.cmb_log.currentText().strip()
+        if not log_name:
+            QMessageBox.warning(self, "Discrete track", "Please select or enter a discrete log name.")
+            return
+
+        label = self.ed_label.text().strip() or log_name
+
+        missing_txt = self.ed_missing.text().strip()
+        # store missing code as string; your plotting/export treats it symbolically
+        if not missing_txt:
+            missing_txt = "-999"
+
+        self._result = {
+            "name": track_name,
+            "logs": [],  # no continuous logs in this track by default
+            "discrete": {
+                "log": log_name,
+                "label": label,
+                "color_map": {},           # user can edit later via log-display dialog
+                "default_color": "#dddddd",
+                "missing": missing_txt,
+            },
+        }
+        self.accept()
+
+    def result_track(self):
+        """Return the new track dict or None."""
         return self._result

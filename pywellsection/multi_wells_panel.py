@@ -346,33 +346,54 @@ def draw_multi_wells_panel_on_figure(
                 disc_label = disc_cfg.get("label", disc_name)
                 color_map = disc_cfg.get("color_map", {})
                 default_color = disc_cfg.get("default_color", "#dddddd")
+                missing_code = disc_cfg.get("missing", -999)  # optional, default -999
 
                 disc_logs = well.get("discrete_logs", {})
                 disc_def = disc_logs.get(disc_name)
                 if disc_def is not None:
-                    tops = np.array(disc_def.get("top_depths", []), dtype=float)
-                    bottoms = np.array(disc_def.get("bottom_depths", []), dtype=float)
+                    depths = np.array(disc_def.get("depth", []), dtype=float)
                     values = np.array(disc_def.get("values", []), dtype=object)
 
-                    # same flattening as continuous logs
-                    tops_plot = [x - offset for x in tops]
-                    bottoms_plot = [x - offset for x in bottoms]
+                    if depths.size == 0 or values.size == 0:
+                        continue
 
- #                   if len(tops_plot) > 0:
- #                       order = np.argsort(tops_plot)
-#                        tops_plot = tops_plot[order]
-#                        bottoms_plot = bottoms_plot[order]
-#                        values = values[order]
+                    # sort by depth just in case
+                    order = np.argsort(depths)
+                    depths = depths[order]
+                    values = values[order]
+
+                    # flatten depths for plotting
+                    depths_plot = depths - offset
+
+                    # we need a bottom bound for the last interval
+                    ref_depth = well["reference_depth"]
+                    well_td = ref_depth + well["total_depth"]
+                    bottom_phys = bottom_phys if "bottom_phys" in locals() else well_td
+                    # use well_td as the physical bottom of this well
+                    last_bottom_phys = well_td
+                    last_bottom_plot = last_bottom_phys - offset
 
                     base_ax.set_xlim(0, 1)
                     base_ax.set_xticks([])
                     base_ax.set_xlabel(disc_label, labelpad=2)
 
-                    for top_d, bot_d, val in zip(tops_plot, bottoms_plot, values):
+                    # intervals between samples
+                    for i in range(len(depths) - 1):
+                        top_phys = depths[i]
+                        bot_phys = depths[i + 1]
+                        val = values[i]
+
+                        if val == missing_code:
+                            continue
+
+                        top_plot = top_phys - offset
+                        bot_plot = bot_phys - offset
+
                         col = color_map.get(val, default_color)
+
                         base_ax.axhspan(
-                            top_d,
-                            bot_d,
+                            top_plot,
+                            bot_plot,
                             xmin=0.0,
                             xmax=1.0,
                             facecolor=col,
@@ -381,6 +402,63 @@ def draw_multi_wells_panel_on_figure(
                             alpha=0.9,
                             zorder=0.8,
                         )
+
+                    # last sample → extend to TD if not missing
+                    last_val = values[-1]
+                    if last_val != missing_code:
+                        top_phys = depths[-1]
+                        top_plot = top_phys - offset
+                        bot_plot = last_bottom_plot
+
+                        col = color_map.get(last_val, default_color)
+                        base_ax.axhspan(
+                            top_plot,
+                            bot_plot,
+                            xmin=0.0,
+                            xmax=1.0,
+                            facecolor=col,
+                            edgecolor="k",
+                            linewidth=0.3,
+                            alpha=0.9,
+                            zorder=0.8,
+                        )
+
+            # # ---- Discrete track ----
+            # disc_cfg = track.get("discrete")
+            # if disc_cfg is not None:
+            #     disc_name = disc_cfg["log"]
+            #     disc_label = disc_cfg.get("label", disc_name)
+            #     color_map = disc_cfg.get("color_map", {})
+            #     default_color = disc_cfg.get("default_color", "#dddddd")
+            #
+            #     disc_logs = well.get("discrete_logs", {})
+            #     disc_def = disc_logs.get(disc_name)
+            #     if disc_def is not None:
+            #         tops = np.array(disc_def.get("top_depths", []), dtype=float)
+            #         bottoms = np.array(disc_def.get("bottom_depths", []), dtype=float)
+            #         values = np.array(disc_def.get("values", []), dtype=object)
+            #
+            #         # same flattening as continuous logs
+            #         tops_plot = [x - offset for x in tops]
+            #         bottoms_plot = [x - offset for x in bottoms]
+            #
+            #         base_ax.set_xlim(0, 1)
+            #         base_ax.set_xticks([])
+            #         base_ax.set_xlabel(disc_label, labelpad=2)
+            #
+            #         for top_d, bot_d, val in zip(tops_plot, bottoms_plot, values):
+            #             col = color_map.get(val, default_color)
+            #             base_ax.axhspan(
+            #                 top_d,
+            #                 bot_d,
+            #                 xmin=0.0,
+            #                 xmax=1.0,
+            #                 facecolor=col,
+            #                 edgecolor="k",
+            #                 linewidth=0.3,
+            #                 alpha=0.9,
+            #                 zorder=0.8,
+            #             )
 
     # ---- Final annotations ----
     fig.canvas.draw()
