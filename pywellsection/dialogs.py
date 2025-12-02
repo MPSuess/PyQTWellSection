@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout,
     QComboBox, QDialogButtonBox,
     QTableWidget, QTableWidgetItem,
-    QLabel, QMessageBox,
+    QLabel, QMessageBox, QHBoxLayout,
 )
 from collections import OrderedDict
 
