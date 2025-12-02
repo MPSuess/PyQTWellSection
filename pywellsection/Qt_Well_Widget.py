@@ -121,26 +121,18 @@ class WellPanelWidget(QWidget):
                 # Take the first main axis as reference (row 0, track 0)
                 ref_ax = self.axes[0]
                 y0, y1 = ref_ax.get_ylim()
-                print(f"y0={y0} y1={y1}")
-                print(f"current depth window: {self._current_depth_window}")
-                # y is in plotting coordinates (flattened); convert to true depth
+
                 offset0 = 0.0
                 if getattr(self, "_flatten_depths", None):
                     # first well offset
                     if len(self._flatten_depths) > 0:
                         offset0 = float(self._flatten_depths[0])
-                #if offset0 != self.offset0: # change the offset
-                # depth_true = depth_plot + offset
-                top_true = min(y0, y1) + offset0
-                bottom_true = max(y0, y1) + offset0
+
+                top_true = min(y0, y1)
+                bottom_true = max(y0, y1)
                 self.offset0 = offset0
-                #else:
-                #top_true = min(y0,y1)
-                #bottom_true = max(y0,y1)
 
                 self._current_depth_window = (top_true, bottom_true)
-                print(f"top_true={top_true} bottom_true={bottom_true}")
-                print(f"updated current depth window: {self._current_depth_window}")
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()

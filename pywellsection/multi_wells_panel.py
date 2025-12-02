@@ -136,20 +136,6 @@ def draw_multi_wells_panel_on_figure(
     top_phys = max(ref_depths)
     bottom_phys = max(bottoms)
 
-    if depth_window is not None:
-        print ("depth_window", depth_window)
-    #
-    if depth_window is not None:
-        #top_phys, bottom_phys = depth_window
-        # safety
-        if bottom_phys <= top_phys:
-            top_phys, bottom_phys = min(ref_depths), max(bottoms)
-    #
-    print(f"top_phys={top_phys:.0f} bottom_phys={bottom_phys:.0f}")
-    #
-    #top_phys = 1000
-    #bottom_phys = 2500
-
     # ---- 2) Compute per-well offsets and global plotting range ----
     # offset_i is in TRUE depth coordinates (e.g. formation top depth)
     offsets = []
@@ -159,26 +145,32 @@ def draw_multi_wells_panel_on_figure(
         else:
             offsets.append(0.0)
 
-    LOG.debug(f"offsets={offsets}")
-
     top_plot_candidates = []
     bottom_plot_candidates = []
     for off in offsets:
-
         top_plot_candidates.append(top_phys - off)
         bottom_plot_candidates.append(bottom_phys - off)
-
-
 
     # global plotting limits that include ALL wells after shifting
     global_top_plot = min(top_plot_candidates) + offsets[0]
     global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
-    #global_top_plot = 0
-    #global_bottom_plot = 3000
-    #global_top_plot = top_phys
-    #global_bottom_plot = bottom_phys
+    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
-    print(f"global_top_plot={global_top_plot:.0f} global_bottom_plot={global_bottom_plot:.0f}")
+
+    if depth_window is not None:
+        print ("depth_window", depth_window)
+        top_depth_window, bottom_depth_window = depth_window
+        if top_depth_window < global_mid_plot < bottom_depth_window:
+            global_top_plot = top_depth_window
+            global_bottom_plot = bottom_depth_window
+
+
+
+
+
+
+
+
 
     # ---- 3) Layout: tracks + spacer columns ----
     total_cols = n_wells * n_tracks + (n_wells - 1)
@@ -220,7 +212,7 @@ def draw_multi_wells_panel_on_figure(
 
         offset = offsets[wi]  # TRUE depth offset for this well
 
-        print(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
+        #print(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
 
         # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
@@ -258,7 +250,7 @@ def draw_multi_wells_panel_on_figure(
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
-            print(global_top_plot, global_bottom_plot)
+
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
@@ -423,42 +415,6 @@ def draw_multi_wells_panel_on_figure(
                             zorder=0.8,
                         )
 
-            # # ---- Discrete track ----
-            # disc_cfg = track.get("discrete")
-            # if disc_cfg is not None:
-            #     disc_name = disc_cfg["log"]
-            #     disc_label = disc_cfg.get("label", disc_name)
-            #     color_map = disc_cfg.get("color_map", {})
-            #     default_color = disc_cfg.get("default_color", "#dddddd")
-            #
-            #     disc_logs = well.get("discrete_logs", {})
-            #     disc_def = disc_logs.get(disc_name)
-            #     if disc_def is not None:
-            #         tops = np.array(disc_def.get("top_depths", []), dtype=float)
-            #         bottoms = np.array(disc_def.get("bottom_depths", []), dtype=float)
-            #         values = np.array(disc_def.get("values", []), dtype=object)
-            #
-            #         # same flattening as continuous logs
-            #         tops_plot = [x - offset for x in tops]
-            #         bottoms_plot = [x - offset for x in bottoms]
-            #
-            #         base_ax.set_xlim(0, 1)
-            #         base_ax.set_xticks([])
-            #         base_ax.set_xlabel(disc_label, labelpad=2)
-            #
-            #         for top_d, bot_d, val in zip(tops_plot, bottoms_plot, values):
-            #             col = color_map.get(val, default_color)
-            #             base_ax.axhspan(
-            #                 top_d,
-            #                 bot_d,
-            #                 xmin=0.0,
-            #                 xmax=1.0,
-            #                 facecolor=col,
-            #                 edgecolor="k",
-            #                 linewidth=0.3,
-            #                 alpha=0.9,
-            #                 zorder=0.8,
-            #             )
 
     # ---- Final annotations ----
     fig.canvas.draw()
@@ -643,8 +599,8 @@ def add_tops_and_correlations(
                             info["depth"],
                             xmin=0.0,
                             xmax=1.0,
-                            color=info["color"],
-                            linestyle=info["style"]["line_style"],
+                            color=stratigraphy[name]["color"],
+                            linestyle=stratigraphy[name]["hatch"],
                             linewidth=linewidth,
                             zorder=1.2 if not is_highlighted else 1.8,
                         )
@@ -654,7 +610,6 @@ def add_tops_and_correlations(
                             xmin=0.0,
                             xmax=1.0,
                             color=stratigraphy[name]["color"],
-                            #linestyle = '-',
                             linestyle=stratigraphy[name]["hatch"],
                             linewidth=linewidth,
                             zorder=1.2 if not is_highlighted else 1.8,
@@ -669,6 +624,7 @@ def add_tops_and_correlations(
                     d2 = top_depths[i + 1]
                     info = top_meta[name_upper]
                     color = info["color"]
+                    #color = stratigraphy[name_upper]['color']
                     style = info["style"]
                     if stratigraphy[name_upper]['role']=='stratigraphy':
                         for ti in range(n_tracks):
