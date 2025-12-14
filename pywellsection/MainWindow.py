@@ -29,6 +29,10 @@ from pywellsection.dialogs import NewWellDialog
 from pywellsection.dialogs import AllWellsSettingsDialog
 from pywellsection.dialogs import SingleWellSettingsDialog
 from pywellsection.dialogs import NewDiscreteTrackDialog
+from pywellsection.dialogs import DiscreteColorEditorDialog
+from pywellsection.dialogs import ImportFaciesIntervalsDialog
+from pywellsection.dialogs import LithofaciesDisplaySettingsDialog
+from pywellsection.dialogs import LithofaciesTableDialog
 
 from pathlib import Path
 from collections import OrderedDict
@@ -151,6 +155,11 @@ class MainWindow(QMainWindow):
         act_import_discrete.triggered.connect(self._action_import_discrete_logs_csv)
         import_menu.addAction(act_import_discrete)
 
+        act_import_facies = QAction("Facies intervals from CSV…", self)
+        act_import_facies.triggered.connect(self._action_import_facies_intervals_csv)
+        import_menu.addAction(act_import_facies)
+
+
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
         act_export_discrete_logs.triggered.connect(self._action_export_discrete_logs_csv)
@@ -199,6 +208,10 @@ class MainWindow(QMainWindow):
         act_edit_all_tops.triggered.connect(self._action_edit_all_tops)
         tools_menu.addAction(act_edit_all_tops)
 
+        act_edit_litho = QAction("Edit lithofacies table...", self)
+        act_edit_litho.triggered.connect(self._action_edit_lithofacies_table)
+        tools_menu.addAction(act_edit_litho)
+
 
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
@@ -227,8 +240,6 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------
     # FILE HANDLERS (placeholders for now)
     # ------------------------------------------------
-
-
 
     def _project_file_open(self):
         """Load wells/tracks data from a JSON file (example)."""
@@ -525,6 +536,20 @@ class MainWindow(QMainWindow):
             well_item.setCheckState(0, state)
             root.addChild(well_item)
 
+            # --- subfolders ---
+            cont_folder = QTreeWidgetItem(well_item, ["continuous"])
+            lith_folder = QTreeWidgetItem(well_item, ["lithofacies"])
+            disc_folder = QTreeWidgetItem(well_item, ["discrete"])
+
+            cont_folder.setExpanded(True)
+            lith_folder.setExpanded(True)
+            disc_folder.setExpanded(True)
+
+            cont_folder.setData(0, Qt.UserRole, ("folder", "continuous", well_name))
+            #lith_folder.setData(0, Qt.UserRole, ("folder", "lithofacies", well_name))
+            disc_folder.setData(0, Qt.UserRole, ("folder", "discrete", well_name))
+
+
             # --- log leaves (informational, not checkable) ---
             logs_dict = w.get("logs", {}) or {}
             if logs_dict:
@@ -534,7 +559,7 @@ class MainWindow(QMainWindow):
                 # well_item.addChild(header)
                 # parent_for_logs = header
 
-                parent_for_logs = well_item  # direct children of the well
+                parent_for_logs = cont_folder  # direct children of the well
 
                 for log_name in sorted(logs_dict.keys()):
                     log_item = QTreeWidgetItem([log_name])
@@ -547,6 +572,22 @@ class MainWindow(QMainWindow):
                     # store mnemonic for possible future actions
                     log_item.setData(0, Qt.UserRole, log_name)
                     parent_for_logs.addChild(log_item)
+
+            # --- lithofacies ---
+            # We store as a single dataset item (you can expand this later if you want per-interval children)
+            facies_intervals = w.get("facies_intervals", []) or []
+            if facies_intervals:
+                txt = f"Lithofacies (n={len(facies_intervals)})"
+            else:
+                txt = "intervals (n=0)"
+            lith_item = QTreeWidgetItem(disc_folder, [txt])
+            lith_item.setData(0, Qt.UserRole, ("Lithofacies", well_name, "intervals"))
+
+            # --- discrete logs ---
+            dlogs = (w.get("discrete_logs") or {})
+            for dlog_name in sorted(dlogs.keys(), key=str):
+                dlog_item = QTreeWidgetItem(disc_folder, [dlog_name])
+                dlog_item.setData(0, Qt.UserRole, ("Discrete", well_name, dlog_name))
 
         self.well_tree.blockSignals(False)
         self._rebuild_panel_from_tree()
@@ -1286,6 +1327,82 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_track_tree"):
             self._populate_track_tree()
 
+    def _action_edit_discrete_colors_for_track(self, track_name: str):
+        """
+        Edit the color_map and default_color for a discrete track
+        identified by its track name.
+        """
+        if not hasattr(self, "all_tracks") or not self.all_tracks:
+            QMessageBox.information(self, "Discrete colors", "No tracks in project.")
+            return
+
+        # find track
+        track = None
+        for t in self.all_tracks:
+            if t.get("name") == track_name:
+                track = t
+                break
+
+        if track is None:
+            QMessageBox.warning(
+                self,
+                "Discrete colors",
+                f"Track '{track_name}' not found."
+            )
+            return
+
+        disc_cfg = track.get("discrete")
+        if not disc_cfg:
+            QMessageBox.information(
+                self,
+                "Discrete colors",
+                f"Track '{track_name}' is not a discrete track."
+            )
+            return
+
+        log_name = disc_cfg.get("log")
+        color_map = disc_cfg.get("color_map", {}) or {}
+        default_color = disc_cfg.get("default_color", "#dddddd")
+        missing_code = disc_cfg.get("missing", "-999")
+
+        # collect values from wells for this discrete log
+        available_values = set()
+        if getattr(self, "all_wells", None):
+            for w in self.all_wells:
+                disc_logs = w.get("discrete_logs", {}) or {}
+                dlog = disc_logs.get(log_name)
+                if not dlog:
+                    continue
+                vals = dlog.get("values", []) or []
+                for v in vals:
+                    sv = str(v).strip()
+                    if sv == str(missing_code):
+                        continue
+                    if sv == "":
+                        continue
+                    available_values.add(sv)
+
+        dlg = DiscreteColorEditorDialog(
+            self,
+            log_name=log_name,
+            color_map=color_map,
+            default_color=default_color,
+            available_values=available_values,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_map, new_default = dlg.result_colors()
+        if new_map is None:
+            return
+
+        disc_cfg["color_map"] = new_map
+        disc_cfg["default_color"] = new_default
+
+        # redraw panel
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.all_tracks
+            self.panel.draw_panel()
 
     def _action_edit_all_wells(self):
         """Open dialog to edit all well header settings."""
@@ -1443,6 +1560,276 @@ class MainWindow(QMainWindow):
             return
 
         import_discrete_logs_from_csv(self,path)
+
+    def _action_edit_lithofacies_settings_for_track(self, track_name: str):
+        """
+        Open dialog to edit lithofacies display parameters for a track
+        identified by its track name (track['name']).
+        """
+        if not hasattr(self, "all_tracks") or not self.all_tracks:
+            QMessageBox.information(self, "Lithofacies settings", "No tracks in project.")
+            return
+
+        # find track by name
+        track = None
+        for t in self.all_tracks:
+            if t.get("name") == track_name:
+                track = t
+                break
+
+        if track is None:
+            QMessageBox.warning(
+                self,
+                "Lithofacies settings",
+                f"Track '{track_name}' not found."
+            )
+            return
+
+        facies_cfg = track.get("config")
+        if facies_cfg is None:
+            QMessageBox.information(
+                self,
+                "Lithofacies settings",
+                f"Track '{track_name}' has no facies configuration."
+            )
+            return
+
+        # current parameters or defaults
+        hardness_scale = facies_cfg.get("hardness_scale", 1.0)
+        spline_cfg = facies_cfg.get("spline", {}) or {}
+        spline_smooth = spline_cfg.get("smooth", 0.5)
+        spline_samples = spline_cfg.get("num_samples", 200)
+
+        dlg = LithofaciesDisplaySettingsDialog(
+            self,
+            hardness_scale=hardness_scale,
+            spline_smooth=spline_smooth,
+            spline_num_samples=spline_samples,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        params = dlg.result_params()
+        if not params:
+            return
+
+        # store back into track config
+        facies_cfg["hardness_scale"] = params["hardness_scale"]
+        facies_cfg["spline"] = params["spline"]
+
+        # redraw panel so changes take effect
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.all_tracks
+            self.panel.draw_panel()
+
+    def _action_edit_lithofacies_table(self):
+        """Open table dialog to edit lithofacies intervals for all wells."""
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Lithofacies", "No wells in project.")
+            return
+
+        dlg = LithofaciesTableDialog(self, self.all_wells)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        by_well = dlg.result_by_well()
+        if not by_well:
+            return
+
+        # map wells by name
+        wells_by_name = {w.get("name"): w for w in self.all_wells if w.get("name")}
+        unknown = []
+
+        # clear existing facies_intervals
+        for w in self.all_wells:
+            w["facies_intervals"] = []
+
+        for wname, intervals in by_well.items():
+            well = wells_by_name.get(wname)
+            if well is None:
+                unknown.append(wname)
+                continue
+            well["facies_intervals"] = list(intervals)
+
+        # redraw panel
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.draw_panel()
+
+        if unknown:
+            QMessageBox.warning(
+                self,
+                "Lithofacies",
+                "Some intervals refer to unknown wells:\n  "
+                + ", ".join(sorted(set(unknown)))
+            )
+
+
+    def _parse_lithotrend(self, litho_str: str, trend_str: str):
+        """
+        Parse 'LithoTrend' field like:
+          'SS, cu'  -> lithology='SS', trend='cu'
+          'M, fu'   -> lithology='M',  trend='fu'
+          'SS'      -> lithology='SS', trend='constant'
+        """
+
+        lithology = litho_str if litho_str else ""
+        trend_raw = trend_str if len(trend_str) > 1 else ""
+
+        tr = trend_raw.lower()
+        if tr == "cu":
+            trend = "cu"  # coarsening upward
+        elif tr == "fu":
+            trend = "fu"  # fining upward
+        else:
+            trend = "constant"
+        return lithology, trend
+
+    def _action_import_facies_intervals_csv(self):
+        """
+        Open a CSV with columns:
+            Well, ID, LithoTrend, Environment, Rel_Top, Rel_Base
+
+        Parse LithoTrend into (Lithology, Trend) and attach intervals
+        to each well as well['facies_intervals'] = [ ... ].
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import facies intervals from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        # --- read CSV ---
+        try:
+            with open(path, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+        except Exception as e:
+            QMessageBox.critical(self, "Import facies intervals", f"Failed to read file:\n{e}")
+            return
+
+        if not rows:
+            QMessageBox.information(self, "Import facies intervals", "No data rows found in CSV.")
+            return
+
+        required_cols = {"Well", "ID", "Litho", "Trend", "Environment", "Rel_Top", "Rel_Base"}
+        missing = required_cols - set(rows[0].keys())
+        if missing:
+            QMessageBox.warning(
+                self,
+                "Import facies intervals",
+                "Missing required columns in CSV:\n  " + ", ".join(sorted(missing))
+            )
+            return
+
+        # --- parse rows ---
+        intervals = []
+        skipped = 0
+        for r in rows:
+            well_name = (r.get("Well") or "").strip()
+            id_txt = (r.get("ID") or "").strip()
+            lt_txt = (r.get("Litho") or "").strip()
+            trd_txt = (r.get("Trend") or "").strip()
+            env_txt = (r.get("Environment") or "").strip()
+            top_txt = (r.get("Rel_Top") or "").strip()
+            base_txt = (r.get("Rel_Base") or "").strip()
+
+            if not well_name or not id_txt:
+                skipped += 1
+                continue
+
+            try:
+                _id = int(id_txt)
+            except ValueError:
+                skipped += 1
+                continue
+
+            try:
+                rel_top = float(top_txt.replace(",", ".")) if top_txt else None
+                rel_base = float(base_txt.replace(",", ".")) if base_txt else None
+            except ValueError:
+                skipped += 1
+                continue
+
+            lithology, trend = self._parse_lithotrend(lt_txt,trd_txt)
+
+            intervals.append({
+                "well": well_name,
+                "id": _id,
+                "litho_trend": lt_txt,
+                "lithology": lithology,
+                "trend": trend,  # "cu", "fu", or "constant"
+                "environment": env_txt,
+                "rel_top": rel_top,
+                "rel_base": rel_base,
+            })
+
+        if not intervals:
+            QMessageBox.information(
+                self,
+                "Import facies intervals",
+                f"No valid rows found. Skipped: {skipped}"
+            )
+            return
+
+        # --- preview dialog ---
+        dlg = ImportFaciesIntervalsDialog(self, intervals)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        imported = dlg.result_intervals()
+        if not imported:
+            return
+
+        # --- attach intervals to wells by name ---
+        if not getattr(self, "all_wells", None):
+            QMessageBox.warning(
+                self,
+                "Import facies intervals",
+                "No wells in project; cannot attach facies intervals."
+            )
+            return
+
+        wells_by_name = {w.get("name"): w for w in self.all_wells if w.get("name")}
+        unknown_wells = set()
+
+        # clear or merge? here: replace per well
+        for w in self.all_wells:
+            w.setdefault("facies_intervals", [])
+
+        # group by well
+        by_well = {}
+        for iv in imported:
+            wnm = iv["well"]
+            by_well.setdefault(wnm, []).append(iv)
+
+        for wname, intervals_for_well in by_well.items():
+            well = wells_by_name.get(wname)
+            if well is None:
+                unknown_wells.add(wname)
+                continue
+            # sort by rel_top descending if they are relative from top=1->0,
+            # or ascending depending on your convention – here we just keep input order
+            well["facies_intervals"] = list(intervals_for_well)
+
+        msg_lines = [
+            f"Imported {len(imported)} facies intervals.",
+            f"Skipped rows: {skipped}",
+        ]
+        if unknown_wells:
+            msg_lines.append(
+                "\nUnknown wells (not found in project):\n  "
+                + ", ".join(sorted(unknown_wells))
+            )
+
+        QMessageBox.information(
+            self,
+            "Import facies intervals",
+            "\n".join(msg_lines)
+        )
 
     def set_layout_params(self, well_gap_factor: float, track_width: float):
         """Update panel layout (gap between wells and track width) and redraw."""
@@ -1695,6 +2082,31 @@ class MainWindow(QMainWindow):
 
         self._load_tops_from_csv(path)
 
+    def _move_well(self, well_name: str, direction: int):
+        """
+        Move a well left/right in panel order.
+
+        direction:
+            -1 → move left
+            +1 → move right
+        """
+        wells = self.all_wells
+        names = [w.get("name") for w in wells]
+
+        if well_name not in names:
+            return
+
+        idx = names.index(well_name)
+        new_idx = idx + direction
+
+        if new_idx < 0 or new_idx >= len(wells):
+            return  # cannot move further
+
+        wells[idx], wells[new_idx] = wells[new_idx], wells[idx]
+
+        # redraw + rebuild tree so order stays in sync
+        self._populate_well_tree()
+        self.panel.draw_panel()
 
     def _on_tree_context_menu(self, pos):
         """
@@ -1715,6 +2127,7 @@ class MainWindow(QMainWindow):
 
             act_add_well = menu.addAction("Add new well...")
             act_edit_all_wells = menu.addAction("Edit all well settings ...")
+
             chosen = menu.exec_(global_pos)
 
             if chosen == act_add_well:
@@ -1723,17 +2136,24 @@ class MainWindow(QMainWindow):
                 self._action_edit_all_wells()
             return
 
+
         if parent is self.well_root_item:
             menu = QMenu(self)
 
             well_name = item.text(0)
             act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
+            act_left = menu.addAction("Move well left '{well_name}'...")
+            act_right = menu.addAction("Move well right '{well_name}'...")
             chosen = menu.exec_(global_pos)
             well_index = item.data(0, Qt.UserRole)
             if well_index is None:
                 return
             if chosen == act_edit_well:
                 self._action_edit_single_well_by_name(well_name)
+            elif chosen == act_left:
+                self._move_well(well_name, -1)
+            elif chosen == act_right:
+                self._move_well(well_name, +1)
 
         # --- case 1: logs under "Logs" folder ---
         if parent is self.well_logs_folder:
@@ -1760,6 +2180,11 @@ class MainWindow(QMainWindow):
 
 
         if item is self.track_root_item:
+            track_name = item.text(0)
+
+            if not track_name:
+                return
+
             menu = QMenu(self)
 
             act_add_track = menu.addAction("Add new track...")
@@ -1785,6 +2210,8 @@ class MainWindow(QMainWindow):
             act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
             act_add_log = menu.addAction(f"Add new log to track ...")
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
+            act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+            act_edit_lithofacies_settings = menu.addAction("Edit lithofacies track settings ...")
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
                 self._edit_log_display_settings(track_name)
@@ -1792,6 +2219,10 @@ class MainWindow(QMainWindow):
                 self._action_add_log_to_track()
             elif chosen == act_delete_track:
                 self._action_delete_track()
+            elif chosen == act_edit_disc_colors:
+                self._action_edit_discrete_colors_for_track(track_name)
+            elif chosen == act_edit_lithofacies_settings:
+                self._action_edit_lithofacies_settings_for_track(track_name)
             return
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs

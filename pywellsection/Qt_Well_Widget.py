@@ -1,3 +1,5 @@
+from multiprocessing.forkserver import set_forkserver_preload
+
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar,
@@ -379,6 +381,7 @@ class WellPanelWidget(QWidget):
         act_flatten = None
         act_unflatten = None
         act_add = None
+        act_move_well = None
 
                 # distance threshold based on TRUE depth range
         ref_depth = well["reference_depth"]
@@ -387,6 +390,7 @@ class WellPanelWidget(QWidget):
         max_pick_distance = depth_range * 0.02
         if min_dist > max_pick_distance or tops is None:
             act_add = menu.addAction(f"Add top '{depth_true:.2f} m'...'")
+            act_move_well = menu.addAction(f"Move well relative position ...")
         else:
 
             # highlight top (your existing helper should already respect flattening
@@ -433,6 +437,10 @@ class WellPanelWidget(QWidget):
 
         if act_unflatten is not None and chosen == act_unflatten:
             self._reset_flatten()
+            return
+
+        if chosen == act_move_well:
+            self._move_well_to(well_index = wi, depth = depth_true)
             return
 
     def _build_axis_index(self):
@@ -1091,9 +1099,17 @@ class WellPanelWidget(QWidget):
         #self._current_depth_window = None
         self.draw_panel()
 
+    def _set_offset_for_well(self, wi: int, depth: float):
+
+        fd = getattr(self,"_flatten_depth", None)
+        if not fd or wi >= len(fd):
+            return
+        setattr(self,"_flatten_depth", fd)
+
     def _get_flatten_offset_for_well(self, wi: int) -> float:
         """Return flatten offset (true depth) for well index wi, or 0.0 if not flattened."""
         fd = getattr(self, "_flatten_depths", None)
+
         if not fd or wi >= len(fd):
             return 0.0
         return float(fd[wi])

@@ -5042,21 +5042,13 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            0,
-            50,
-            100,
-            150,
-            200,
-            250
-          ],
-          "bottom_depths": [
-            50,
-            100,
-            150,
-            200,
-            250,
-            300
+          "depth": [
+            0.0,
+            50.0,
+            100.0,
+            150.0,
+            200.0,
+            250.0
           ],
           "values": [
             "Sandstone",
@@ -5083,7 +5075,129 @@
           "level": "formation",
           "color": "#000000"
         }
-      }
+      },
+      "facies_intervals": [
+        {
+          "well": "Well A",
+          "id": 1,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "cu",
+          "environment": "Distributary Mouth Bar",
+          "rel_top": 0.0,
+          "rel_base": 20.0
+        },
+        {
+          "well": "Well A",
+          "id": 2,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "cu",
+          "environment": "Distributary Mouth Bar",
+          "rel_top": 20.0,
+          "rel_base": 22.0
+        },
+        {
+          "well": "Well A",
+          "id": 3,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "constant",
+          "environment": "Inner Marine Shelf",
+          "rel_top": 22.0,
+          "rel_base": 23.1
+        },
+        {
+          "well": "Well A",
+          "id": 4,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 24.0,
+          "rel_base": 26.5
+        },
+        {
+          "well": "Well A",
+          "id": 5,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 27.0,
+          "rel_base": 35.0
+        },
+        {
+          "well": "Well A",
+          "id": 6,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "fu",
+          "environment": "Bay",
+          "rel_top": 37.0,
+          "rel_base": 48.0
+        },
+        {
+          "well": "Well A",
+          "id": 7,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Bay",
+          "rel_top": 50.0,
+          "rel_base": 52.0
+        },
+        {
+          "well": "Well A",
+          "id": 8,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 58.0,
+          "rel_base": 60.0
+        },
+        {
+          "well": "Well A",
+          "id": 9,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "constant",
+          "environment": "Distributary Channel",
+          "rel_top": 60.0,
+          "rel_base": 66.0
+        },
+        {
+          "well": "Well A",
+          "id": 10,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "fu",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 66.0,
+          "rel_base": 68.0
+        },
+        {
+          "well": "Well A",
+          "id": 11,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "constant",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 69.0,
+          "rel_base": 83.0
+        },
+        {
+          "well": "Well A",
+          "id": 12,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 83.0,
+          "rel_base": 100.0
+        }
+      ]
     },
     {
       "name": "Well B",
@@ -8115,21 +8229,13 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            500,
-            550,
-            600,
-            650,
-            700,
-            750
-          ],
-          "bottom_depths": [
-            550,
-            600,
-            650,
-            700,
-            750,
-            800
+          "depth": [
+            500.0,
+            550.0,
+            600.0,
+            650.0,
+            700.0,
+            750.0
           ],
           "values": [
             "Sandstone",
@@ -8155,7 +8261,8 @@
           "depth": 900,
           "level": "sequence"
         }
-      }
+      },
+      "facies_intervals": []
     },
     {
       "name": "Well C",
@@ -11187,21 +11294,13 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            1000,
-            1050,
-            1100,
-            1150,
-            1200,
-            1250
-          ],
-          "bottom_depths": [
-            1050,
-            1100,
-            1150,
-            1200,
-            1250,
-            1300
+          "depth": [
+            1000.0,
+            1050.0,
+            1100.0,
+            1150.0,
+            1200.0,
+            1250.0
           ],
           "values": [
             "Sandstone",
@@ -11232,15 +11331,46 @@
           "level": "formation",
           "color": "#000000"
         }
-      }
+      },
+      "facies_intervals": []
     }
   ],
   "tracks": [
     {
-            "name": "LithoFacies","type": "lithofacies"
+      "name": "LithoFacies",
+      "type": "lithofacies",
+      "config": {
+        "hardness_scale": 2,
+        "spline": {
+          "smooth": 1,
+          "num_samples": 25
+          }
+        },
+      "hatch_map" :
+        {
+            "Distributary Mouth Bar": "/",
+            "Distributary Channel":   ".\\",
+            "Bay":                    ".-.",
+            "Inner Marine Shelf":     "-",
+            "Estuarine Bay–Lagoon":   "-x"
+        }
+        ,
+      "color_map": {
+            "Distributary Mouth Bar": "orange",
+            "Distributary Channel":   "yellow",
+            "Bay":                    "blue",
+            "Inner Marine Shelf":     "grey",
+            "Estuarine Bay–Lagoon":   "green"
+        },
+      "litho_hardness": {
+        "SS":  10.0,
+        "SSa": 5.0,
+        "M":   1.0
+      }
     },
     {
-      "name": "GR-CAL","type": "continuous",
+      "name": "GR-CAL",
+      "type": "continuous",
       "logs": [
         {
           "log": "GR",
@@ -11267,7 +11397,8 @@
       ]
     },
     {
-      "name": "RT-RHOB", "type": "continuous",
+      "name": "RT-RHOB",
+      "type": "continuous",
       "logs": [
         {
           "log": "RT",
@@ -11283,7 +11414,8 @@
       ]
     },
     {
-      "name": "RHOB-PHI", "type": "continuous",
+      "name": "RHOB-PHI",
+      "type": "continuous",
       "logs": [
         {
           "log": "RHOB",
@@ -11310,7 +11442,8 @@
       ]
     },
     {
-      "name": "Facies", "type": "discrete",
+      "name": "Facies",
+      "type": "discrete",
       "discrete": {
         "log": "FACIES",
         "label": "Facies",
@@ -11327,25 +11460,39 @@
   "stratigraphy": {
     "Upper Formation A": {
       "level": "sequence",
-      "color": "#ff0000"
+      "color": "#ff0000",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Formation A": {
       "level": "formation",
-      "color": "#ffcc00"
+      "color": "#ffcc00",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Sequence 1": {
-      "level": "sequence"
+      "level": "sequence",
+      "color": "#000fff",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Member A1": {
-      "level": "member"
+      "level": "member",
+      "color": "#000fff",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Carboniferous": {
       "level": "formation",
-      "color": "#000000"
+      "color": "#000000",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Lower Formation A": {
       "level": "sequence",
-      "color": "#0000ff"
+      "color": "#0000ff",
+      "hatch": "-",
+      "role": "stratigraphy"
     }
   },
   "metadata": {
