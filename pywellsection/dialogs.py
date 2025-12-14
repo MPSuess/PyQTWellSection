@@ -6,10 +6,14 @@ from PyQt5.QtWidgets import (
     QComboBox, QDialogButtonBox,
     QTableWidget, QTableWidgetItem,
     QLabel, QMessageBox, QHBoxLayout,
+    QColorDialog, QSpinBox,
 )
 from collections import OrderedDict
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
+from PyQt5.QtCore import Qt
+
 
 class EditFormationTopDialog(QDialog):
     def __init__(self, parent, well_name, formation_name,
@@ -1534,3 +1538,658 @@ class NewDiscreteTrackDialog(QDialog):
     def result_track(self):
         """Return the new track dict or None."""
         return self._result
+
+class DiscreteColorEditorDialog(QDialog):
+    """
+    Edit color map for a discrete track.
+
+    Parameters
+    ----------
+    log_name : str
+        Name of the discrete log (for display).
+    color_map : dict
+        Existing mapping value -> color string (e.g. "#ff0000").
+    default_color : str
+        Default color used when no mapping exists.
+    available_values : iterable (optional)
+        Values encountered in wells for this discrete log; used to
+        prepopulate rows if not present in color_map.
+    """
+
+    COL_VALUE = 0
+    COL_COLOR = 1
+
+    def __init__(self, parent, log_name, color_map=None,
+                 default_color="#dddddd", available_values=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Discrete colors: {log_name}")
+        self.resize(500, 400)
+
+        self._log_name = log_name
+        self._color_map_in = dict(color_map or {})
+        self._default_color_in = default_color
+        self._available_values = set(str(v) for v in (available_values or []))
+
+        self._result_color_map = None
+        self._result_default_color = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit colors for discrete values.\n"
+            "Double-click the Color cell or use the 'Pick color' button "
+            "to choose a color.",
+            self
+        ))
+
+        # --- table of value -> color ---
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Value", "Color"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        # Buttons to add/remove rows
+        btn_row_layout = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected", self)
+        btn_row_layout.addWidget(self.btn_add)
+        btn_row_layout.addWidget(self.btn_del)
+        btn_row_layout.addStretch(1)
+        layout.addLayout(btn_row_layout)
+
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+
+        # Default color row
+        def_layout = QHBoxLayout()
+        def_layout.addWidget(QLabel("Default color:", self))
+        self.ed_default = QLineEdit(self)
+        self.ed_default.setText(self._default_color_in)
+        self.btn_pick_default = QPushButton("Pick...", self)
+        def_layout.addWidget(self.ed_default)
+        def_layout.addWidget(self.btn_pick_default)
+        def_layout.addStretch(1)
+        layout.addLayout(def_layout)
+
+        self.btn_pick_default.clicked.connect(self._pick_default_color)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # signals for color picking in table
+        self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
+
+        # populate table
+        self._populate_table()
+
+    # ---------- populate ----------
+
+    def _populate_table(self):
+        """
+        Fill table with union of color_map keys and available_values.
+        """
+        # union of values in color_map and encountered values
+        all_values = set(self._color_map_in.keys()) | self._available_values
+        all_values = sorted(all_values, key=str)
+
+        self.table.setRowCount(len(all_values))
+
+        for row, val in enumerate(all_values):
+            # value
+            it_val = QTableWidgetItem(str(val))
+            self.table.setItem(row, self.COL_VALUE, it_val)
+
+            # color
+            col_str = self._color_map_in.get(val, "")
+            it_col = QTableWidgetItem(col_str)
+            self.table.setItem(row, self.COL_COLOR, it_col)
+
+    def _add_row(self):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        # empty value/color
+        self.table.setItem(row, self.COL_VALUE, QTableWidgetItem(""))
+        self.table.setItem(row, self.COL_COLOR, QTableWidgetItem(""))
+
+    def _delete_selected_rows(self):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()},
+                      reverse=True)
+        for r in rows:
+            self.table.removeRow(r)
+
+    # ---------- color picking ----------
+
+    def _on_cell_double_clicked(self, row, col):
+        if col != self.COL_COLOR:
+            return
+        item = self.table.item(row, col)
+        current = item.text().strip() if item else ""
+        initial = QColor(current) if current else QColor("#ffffff")
+        color = QColorDialog.getColor(initial, self, "Pick color")
+        if color.isValid():
+            if item is None:
+                item = QTableWidgetItem()
+                self.table.setItem(row, col, item)
+            item.setText(color.name())
+
+    def _pick_default_color(self):
+        current = self.ed_default.text().strip()
+        initial = QColor(current) if current else QColor("#dddddd")
+        color = QColorDialog.getColor(initial, self, "Pick default color")
+        if color.isValid():
+            self.ed_default.setText(color.name())
+
+    # ---------- accept / result ----------
+
+    def _on_accept(self):
+        color_map = {}
+        n_rows = self.table.rowCount()
+
+        for row in range(n_rows):
+            it_val = self.table.item(row, self.COL_VALUE)
+            it_col = self.table.item(row, self.COL_COLOR)
+            val = it_val.text().strip() if it_val else ""
+            col = it_col.text().strip() if it_col else ""
+
+            if not val:
+                if col:
+                    QMessageBox.warning(
+                        self,
+                        "Discrete colors",
+                        f"Row {row+1}: color set but value empty.\n"
+                        "Either fill a value or clear the row."
+                    )
+                    return
+                # completely empty row -> skip
+                continue
+
+            if not col:
+                # no color -> skip this mapping (will use default)
+                continue
+
+            color_map[val] = col
+
+        default_color = self.ed_default.text().strip() or "#dddddd"
+
+        self._result_color_map = color_map
+        self._result_default_color = default_color
+        self.accept()
+
+    def result_colors(self):
+        """
+        Returns (color_map, default_color) or (None, None) if canceled.
+        """
+        return self._result_color_map, self._result_default_color
+
+class ImportFaciesIntervalsDialog(QDialog):
+    """
+    Preview dialog for facies / lithology intervals.
+
+    Expects a list of dicts with keys:
+      well, id, litho_trend, lithology, trend,
+      environment, rel_top, rel_base
+    """
+
+    def __init__(self, parent, intervals):
+        super().__init__(parent)
+        self.setWindowTitle("Import facies intervals")
+        self.resize(800, 400)
+
+        self._intervals = intervals
+        self._accepted_data = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Preview of imported facies intervals.\n"
+            "LithoTrend has been split into Lithology and Trend.",
+            self
+        ))
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(
+            ["Well", "ID", "LithoTrend", "Lithology", "Trend",
+             "Environment", "Rel_Top", "Rel_Base"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        self._populate_table()
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _populate_table(self):
+        self.table.setRowCount(len(self._intervals))
+        for row, iv in enumerate(self._intervals):
+            def set_item(col, text, align_right=False):
+                it = QTableWidgetItem(str(text))
+                if align_right:
+                    it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(row, col, it)
+
+            set_item(0, iv.get("well", ""))
+            set_item(1, iv.get("id", ""))
+            set_item(2, iv.get("litho_trend", ""))
+            set_item(3, iv.get("lithology", ""))
+            set_item(4, iv.get("trend", ""))
+            set_item(5, iv.get("environment", ""))
+            rt = iv.get("rel_top", None)
+            rb = iv.get("rel_base", None)
+            set_item(6, f"{rt:.3f}" if rt is not None else "", True)
+            set_item(7, f"{rb:.3f}" if rb is not None else "", True)
+
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+    def _on_accept(self):
+        self._accepted_data = list(self._intervals)
+        self.accept()
+
+    def result_intervals(self):
+        return self._accepted_data
+
+class LithofaciesDisplaySettingsDialog(QDialog):
+    """
+    Dialog to edit display parameters of a lithofacies track:
+
+      - hardness_scale: controls how strongly hardness is visualized
+      - spline.smooth:  smoothing factor / tension
+      - spline.num_samples: sampling resolution for curves
+
+    You can adapt names/semantics as needed in your drawing code.
+    """
+
+    def __init__(self, parent,
+                 hardness_scale: float = 1.0,
+                 spline_smooth: float = 0.5,
+                 spline_num_samples: int = 200):
+        super().__init__(parent)
+        self.setWindowTitle("Lithofacies display settings")
+        self.resize(400, 240)
+
+        self._result = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Adjust display parameters of the lithofacies track.\n"
+            "Hardness scale controls intensity; spline controls smoothing / resolution.",
+            self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Hardness scale
+        self.spin_hardness = QDoubleSpinBox(self)
+        self.spin_hardness.setRange(0.0, 100.0)
+        self.spin_hardness.setDecimals(3)
+        self.spin_hardness.setSingleStep(0.1)
+        self.spin_hardness.setValue(float(hardness_scale))
+        form.addRow("Hardness scale:", self.spin_hardness)
+
+        # Spline smoothing
+        self.spin_smooth = QDoubleSpinBox(self)
+        self.spin_smooth.setRange(0.0, 10.0)
+        self.spin_smooth.setDecimals(3)
+        self.spin_smooth.setSingleStep(0.1)
+        self.spin_smooth.setValue(float(spline_smooth))
+        form.addRow("Spline smooth:", self.spin_smooth)
+
+        # Spline resolution (number of samples)
+        self.spin_samples = QSpinBox(self)
+        self.spin_samples.setRange(10, 5000)
+        self.spin_samples.setSingleStep(10)
+        self.spin_samples.setValue(int(spline_num_samples))
+        form.addRow("Spline samples:", self.spin_samples)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        hardness = float(self.spin_hardness.value())
+        smooth   = float(self.spin_smooth.value())
+        samples  = int(self.spin_samples.value())
+
+        self._result = {
+            "hardness_scale": hardness,
+            "spline": {
+                "smooth": smooth,
+                "num_samples": samples,
+            },
+        }
+        self.accept()
+
+    def result_params(self):
+        """
+        Returns:
+            {
+              "hardness_scale": float,
+              "spline": {
+                 "smooth": float,
+                 "num_samples": int,
+              }
+            }
+        or None if cancelled.
+        """
+        return self._result
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QDialogButtonBox, QLabel, QMessageBox, QComboBox
+)
+from PyQt5.QtCore import Qt
+
+
+class LithofaciesTableDialog(QDialog):
+    """
+    Edit lithofacies intervals for all wells in a table.
+
+    Expects wells to be a list of dicts, each possibly having:
+        well["name"]
+        well["facies_intervals"] = [
+            {
+                "well": well_name,
+                "id": int,
+                "litho_trend": str,
+                "lithology": str,
+                "trend": "cu"|"fu"|"constant",
+                "environment": str,
+                "rel_top": float,
+                "rel_base": float,
+            }, ...
+        ]
+    """
+
+    COL_WELL   = 0
+    COL_ID     = 1
+    COL_LITH   = 2
+    COL_TREND  = 3
+    COL_ENV    = 4
+    COL_TOP    = 5
+    COL_BASE   = 6
+
+    def __init__(self, parent, wells):
+        super().__init__(parent)
+        self.setWindowTitle("Edit lithofacies intervals")
+        self.resize(900, 500)
+
+        self._wells = wells
+        self._well_names = [w.get("name", f"Well {i+1}") for i, w in enumerate(wells)]
+        self._accepted_intervals = None  # will become {well_name: [intervals...]}
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit lithofacies intervals for all wells.\n"
+            "Trend: 'cu' (coarsening upward), 'fu' (fining upward), "
+            "or 'constant'. Relative depths 0–1.",
+            self
+        ))
+
+        # table
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(
+            ["Well", "ID", "Lithology", "Trend", "Environment", "Rel_Top", "Rel_Base"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        # buttons row (add/delete)
+        btn_row = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected", self)
+        btn_row.addWidget(self.btn_add)
+        btn_row.addWidget(self.btn_del)
+        btn_row.addStretch(1)
+        layout.addLayout(btn_row)
+
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._populate_table()
+
+    # ------------------------------------------------------------------
+    # Populate table from wells
+    # ------------------------------------------------------------------
+    def _populate_table(self):
+        rows_data = []
+
+        for w in self._wells:
+            wname = w.get("name", "")
+            facies_list = w.get("facies_intervals", []) or []
+            for iv in facies_list:
+                rows_data.append({
+                    "well": wname,
+                    "id": iv.get("id", ""),
+                    "lithology": iv.get("lithology", ""),
+                    "trend": iv.get("trend", "constant"),
+                    "environment": iv.get("environment", ""),
+                    "rel_top": iv.get("rel_top", None),
+                    "rel_base": iv.get("rel_base", None),
+                })
+
+        self.table.setRowCount(len(rows_data))
+
+        for row, iv in enumerate(rows_data):
+            # Well (combobox)
+            cmb = QComboBox(self.table)
+            cmb.addItems(self._well_names)
+            if iv["well"] in self._well_names:
+                cmb.setCurrentText(iv["well"])
+            self.table.setCellWidget(row, self.COL_WELL, cmb)
+
+            # ID
+            it_id = QTableWidgetItem(str(iv["id"]))
+            it_id.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_ID, it_id)
+
+            # Lithology
+            it_lith = QTableWidgetItem(iv["lithology"])
+            self.table.setItem(row, self.COL_LITH, it_lith)
+
+            # Trend (combo)
+            cmb_trend = QComboBox(self.table)
+            cmb_trend.addItems(["constant", "cu", "fu"])
+            t = (iv["trend"] or "constant").lower()
+            if t not in ["constant", "cu", "fu"]:
+                t = "constant"
+            cmb_trend.setCurrentText(t)
+            self.table.setCellWidget(row, self.COL_TREND, cmb_trend)
+
+            # Environment
+            it_env = QTableWidgetItem(iv["environment"])
+            self.table.setItem(row, self.COL_ENV, it_env)
+
+            # Rel_Top
+            rt = iv["rel_top"]
+            txt_rt = "" if rt is None else f"{rt:.4f}"
+            it_rt = QTableWidgetItem(txt_rt)
+            it_rt.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_TOP, it_rt)
+
+            # Rel_Base
+            rb = iv["rel_base"]
+            txt_rb = "" if rb is None else f"{rb:.4f}"
+            it_rb = QTableWidgetItem(txt_rb)
+            it_rb.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, self.COL_BASE, it_rb)
+
+    # ------------------------------------------------------------------
+    # Row operations
+    # ------------------------------------------------------------------
+    def _add_row(self):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        # default well = first in list
+        cmb = QComboBox(self.table)
+        cmb.addItems(self._well_names)
+        self.table.setCellWidget(row, self.COL_WELL, cmb)
+
+        # ID default empty
+        self.table.setItem(row, self.COL_ID, QTableWidgetItem(""))
+
+        # Lithology
+        self.table.setItem(row, self.COL_LITH, QTableWidgetItem(""))
+
+        # Trend combo
+        cmb_trend = QComboBox(self.table)
+        cmb_trend.addItems(["constant", "cu", "fu"])
+        cmb_trend.setCurrentText("constant")
+        self.table.setCellWidget(row, self.COL_TREND, cmb_trend)
+
+        # Environment
+        self.table.setItem(row, self.COL_ENV, QTableWidgetItem(""))
+
+        # Rel_Top / Rel_Base
+        self.table.setItem(row, self.COL_TOP, QTableWidgetItem(""))
+        self.table.setItem(row, self.COL_BASE, QTableWidgetItem(""))
+
+    def _delete_selected_rows(self):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
+        for r in rows:
+            self.table.removeRow(r)
+
+    # ------------------------------------------------------------------
+    # Accept: validate & build per-well facies_intervals
+    # ------------------------------------------------------------------
+    def _on_accept(self):
+        n_rows = self.table.rowCount()
+        by_well = {}
+
+        for row in range(n_rows):
+            cmb_well = self.table.cellWidget(row, self.COL_WELL)
+            if cmb_well is None:
+                continue
+            well_name = cmb_well.currentText().strip()
+            if not well_name:
+                QMessageBox.warning(
+                    self,
+                    "Lithofacies",
+                    f"Row {row+1}: Well name is empty."
+                )
+                return
+
+            it_id   = self.table.item(row, self.COL_ID)
+            it_lith = self.table.item(row, self.COL_LITH)
+            cmb_tr  = self.table.cellWidget(row, self.COL_TREND)
+            it_env  = self.table.item(row, self.COL_ENV)
+            it_rt   = self.table.item(row, self.COL_TOP)
+            it_rb   = self.table.item(row, self.COL_BASE)
+
+            id_txt = it_id.text().strip() if it_id else ""
+            if not id_txt:
+                QMessageBox.warning(
+                    self,
+                    "Lithofacies",
+                    f"Row {row+1}: ID is empty."
+                )
+                return
+
+            try:
+                _id = int(id_txt)
+            except ValueError:
+                QMessageBox.warning(
+                    self,
+                    "Lithofacies",
+                    f"Row {row+1}: ID '{id_txt}' is not an integer."
+                )
+                return
+
+            lithology = it_lith.text().strip() if it_lith else ""
+            env_txt   = it_env.text().strip() if it_env else ""
+            trend_txt = cmb_tr.currentText().strip().lower() if cmb_tr else "constant"
+            if trend_txt not in ("constant", "cu", "fu"):
+                trend_txt = "constant"
+
+            def _parse_rel(item, label):
+                if item is None:
+                    return None
+                txt = item.text().strip()
+                if not txt:
+                    return None
+                try:
+                    return float(txt.replace(",", "."))
+                except ValueError:
+                    raise ValueError(f"Row {row+1}: invalid {label} '{txt}'")
+
+            try:
+                rel_top  = _parse_rel(it_rt, "Rel_Top")
+                rel_base = _parse_rel(it_rb, "Rel_Base")
+            except ValueError as e:
+                QMessageBox.warning(self, "Lithofacies", str(e))
+                return
+
+            # reconstruct LithoTrend string: "Lithology, cu/fu" or just Lithology
+            if trend_txt in ("cu", "fu"):
+                lithotrend = f"{lithology}, {trend_txt}"
+            else:
+                lithotrend = lithology
+
+            iv = {
+                "well": well_name,
+                "id": _id,
+                "litho_trend": lithotrend,
+                "lithology": lithology,
+                "trend": trend_txt,
+                "environment": env_txt,
+                "rel_top": rel_top,
+                "rel_base": rel_base,
+            }
+
+            by_well.setdefault(well_name, []).append(iv)
+
+        # keep them in the order entered; optionally sort by rel_top etc.
+        self._accepted_intervals = by_well
+        self.accept()
+
+    def result_by_well(self):
+        """
+        Returns dict:
+           { well_name: [intervals...] }
+        or None if cancelled.
+        """
+        return self._accepted_intervals
+
+
+class MoveWellDialog(QDialog):
+    def __init__(self, parent, well_name, max_pos, current_pos):
+        super().__init__(parent)
+        self.setWindowTitle(f"Move well: {well_name}")
+        self.resize(300, 120)
+
+        layout = QVBoxLayout(self)
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.spin = QSpinBox(self)
+        self.spin.setRange(1, max_pos)
+        self.spin.setValue(current_pos + 1)
+        form.addRow("New position:", self.spin)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def position(self):
+        return self.spin.value() - 1

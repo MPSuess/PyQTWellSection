@@ -7,6 +7,7 @@ import matplotlib.patches as patches
 import numpy as np
 
 import logging
+import pandas as pd
 from pathlib import Path
 
 logging.getLogger("ipykernel").setLevel("CRITICAL")
@@ -259,8 +260,6 @@ def draw_multi_wells_panel_on_figure(
                 base_ax.tick_params(axis="y", labelleft=True)
                 if depth_formatter is not None:
                     base_ax.yaxis.set_major_formatter(depth_formatter)
-
-
             else:
                 base_ax.tick_params(axis="y", labelleft=False )
 
@@ -276,145 +275,56 @@ def draw_multi_wells_panel_on_figure(
             #    continue
 
             # ---- Continuous logs ----
-            for j, log_cfg in enumerate(track.get("logs", [])):
-                log_name = log_cfg["log"]
+            Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
-                if visible_logs is not None and log_name not in visible_logs:
-                    continue
-
-                log_def = well.get("logs", {}).get(log_name)
-                if log_def is None:
-                    continue
-
-                depth = log_def["depth"]
-                data = log_def["data"]
-
-                # plotting depth: flattened if offset != 0
-                depth_plot = [x - offset for x in depth]
-
-                twin_ax = base_ax.twiny()
-                color = log_cfg.get("color", "black")
-                label = log_cfg.get("label", log_name)
-
-                twin_ax.plot(data, depth_plot, color=color)
-
-                # Only top spine visible
-                for spine_name, spine in twin_ax.spines.items():
-                    spine.set_visible(spine_name == "top")
-
-                # Stack multiple logs upwards
-                offset_spine = 1.0 + j * 0.08
-                twin_ax.spines["top"].set_position(("axes", offset_spine))
-
-                xscale = log_cfg.get("xscale", "linear")
-                twin_ax.set_xscale("log" if xscale == "log" else "linear")
-                if "xlim" in log_cfg:
-                    twin_ax.set_xlim(log_cfg["xlim"])
-
-                if log_cfg.get("direction", "normal") == "reverse":
-                    x_min, x_max = twin_ax.get_xlim()
-                    twin_ax.set_xlim(x_max, x_min)
-
-                twin_ax.set_xlabel(label, color=color, labelpad=2, fontsize=5)
-                twin_ax.xaxis.set_label_position("top")
-                twin_ax.xaxis.tick_top()
-                twin_ax.tick_params(
-                    axis="x",
-                    colors=color,
-                    top=True,
-                    bottom=False,
-                    labeltop=True,
-                    labelbottom=False,
-                    pad=2,
-                    labelsize=5,
-                )
-
-                twin_ax.grid(False)
-
-            # ---- Discrete track ----
             disc_cfg = track.get("discrete")
             if disc_cfg is not None:
-                disc_name = disc_cfg["log"]
-                disc_label = disc_cfg.get("label", disc_name)
-                color_map = disc_cfg.get("color_map", {})
-                default_color = disc_cfg.get("default_color", "#dddddd")
-                missing_code = disc_cfg.get("missing", -999)  # optional, default -999
+                _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs=None)
 
-                disc_logs = well.get("discrete_logs", {})
-                disc_def = disc_logs.get(disc_name)
-                if disc_def is not None:
-                    depths = np.array(disc_def.get("depth", []), dtype=float)
-                    values = np.array(disc_def.get("values", []), dtype=object)
+            if track.get("type") == "lithofacies":
+                facies = well.get("facies_intervals", [])
+                hatch_map = track.get("hatch_map", {})
+                color_map = track.get("color_map", {})
+                litho_hardness = track.get("litho_hardness", [])
+                facies_cfg = track.get("config", {})
+                hardness_scale = facies_cfg.get("hardness_scale", 1.0)
+                spline_cfg = facies_cfg.get("spline", {})
+                smooth = spline_cfg.get("smooth", 1)
+                num_samples = spline_cfg.get("num_samples", 200)
 
-                    if depths.size == 0 or values.size == 0:
-                        continue
+                if facies:
+                    draw_lithofacies_track(base_ax, facies, offset=offset, hatch_map=hatch_map, color_map=color_map,
+                                           litho_hardness=litho_hardness, smooth = smooth,
+                                           n_seg=num_samples, hardness_scale=hardness_scale)
+                continue  # skip continuous/discrete log drawing
 
-                    # sort by depth just in case
-                    order = np.argsort(depths)
-                    depths = depths[order]
-                    values = values[order]
-
-                    # flatten depths for plotting
-                    depths_plot = depths - offset
-
-                    # we need a bottom bound for the last interval
-                    ref_depth = well["reference_depth"]
-                    well_td = ref_depth + well["total_depth"]
-                    bottom_phys = bottom_phys if "bottom_phys" in locals() else well_td
-                    # use well_td as the physical bottom of this well
-                    last_bottom_phys = well_td
-                    last_bottom_plot = last_bottom_phys - offset
-
-                    base_ax.set_xlim(0, 1)
-                    base_ax.set_xticks([])
-                    base_ax.set_xlabel(disc_label, labelpad=2)
-
-                    # intervals between samples
-                    for i in range(len(depths) - 1):
-                        top_phys = depths[i]
-                        bot_phys = depths[i + 1]
-                        val = values[i]
-
-                        if val == missing_code:
-                            continue
-
-                        top_plot = top_phys - offset
-                        bot_plot = bot_phys - offset
-
-                        col = color_map.get(val, default_color)
-
-                        base_ax.axhspan(
-                            top_plot,
-                            bot_plot,
-                            xmin=0.0,
-                            xmax=1.0,
-                            facecolor=col,
-                            edgecolor="k",
-                            linewidth=0.3,
-                            alpha=0.9,
-                            zorder=0.8,
-                        )
-
-                    # last sample → extend to TD if not missing
-                    last_val = values[-1]
-                    if last_val != missing_code:
-                        top_phys = depths[-1]
-                        top_plot = top_phys - offset
-                        bot_plot = last_bottom_plot
-
-                        col = color_map.get(last_val, default_color)
-                        base_ax.axhspan(
-                            top_plot,
-                            bot_plot,
-                            xmin=0.0,
-                            xmax=1.0,
-                            facecolor=col,
-                            edgecolor="k",
-                            linewidth=0.3,
-                            alpha=0.9,
-                            zorder=0.8,
-                        )
-
+    # intervals = [
+    #     (1, "SS, cu", "Distributary Mouth Bar", 0, 20.0),
+    #     (2, "SSa, cu ", "Distributary Mouth Bar", 20, 22),
+    #     (3, "M", "Inner Marine Shelf", 22.0, 23.1),
+    #     (4, "SSa, fu", "Distributary Channel", 24, 26.5),
+    #     (5, "SS, fu", "Distributary Channel", 27, 35),
+    #     (6, "M, fu", "Bay", 37, 48),
+    #     (7, "SSa, fu", "Bay", 50, 52),
+    #     (8, "SS, fu", "Distributary Channel", 58, 60),
+    #     (9, "SS", "Distributary Channel", 60, 66),
+    #     (10, "M, fu", "Estuarine Bay–Lagoon", 66, 68),
+    #     (11, "SS", "Estuarine Bay–Lagoon", 69, 83),
+    #     (12, "SSa, fu", "Estuarine Bay–Lagoon", 83, 100)
+    # ]
+    #
+    # T = 250.0  # total thickness (m)
+    #
+    # df = pd.DataFrame(
+    #     intervals,
+    #     columns=["ID", "LithoTrend", "Environment", "Rel_Top", "Rel_Base"]
+    # )
+    #
+    # _draw_hardness_track(
+    #     base_ax=base_ax,
+    #     intervals=intervals,  # your fu/cu definition
+    #     n_seg=25  # smoothness
+    # )
 
     # ---- Final annotations ----
     fig.canvas.draw()
@@ -444,6 +354,170 @@ def draw_multi_wells_panel_on_figure(
     return axes, well_main_axes
 
 
+def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
+    for j, log_cfg in enumerate(track.get("logs", [])):
+        log_name = log_cfg["log"]
+
+        if visible_logs is not None and log_name not in visible_logs:
+            continue
+
+        log_def = well.get("logs", {}).get(log_name)
+        if log_def is None:
+            continue
+
+        depth = log_def["depth"]
+        data = log_def["data"]
+
+        # plotting depth: flattened if offset != 0
+        depth_plot = [x - offset for x in depth]
+
+        twin_ax = base_ax.twiny()
+        color = log_cfg.get("color", "black")
+        label = log_cfg.get("label", log_name)
+
+        twin_ax.plot(data, depth_plot, color=color)
+
+        # Only top spine visible
+        for spine_name, spine in twin_ax.spines.items():
+            spine.set_visible(spine_name == "top")
+
+        # Stack multiple logs upwards
+        offset_spine = 1.0 + j * 0.08
+        twin_ax.spines["top"].set_position(("axes", offset_spine))
+
+        xscale = log_cfg.get("xscale", "linear")
+        twin_ax.set_xscale("log" if xscale == "log" else "linear")
+        if "xlim" in log_cfg:
+            twin_ax.set_xlim(log_cfg["xlim"])
+
+        if log_cfg.get("direction", "normal") == "reverse":
+            x_min, x_max = twin_ax.get_xlim()
+            twin_ax.set_xlim(x_max, x_min)
+
+        twin_ax.set_xlabel(label, color=color, labelpad=2, fontsize=5)
+        twin_ax.xaxis.set_label_position("top")
+        twin_ax.xaxis.tick_top()
+        twin_ax.tick_params(
+            axis="x",
+            colors=color,
+            top=True,
+            bottom=False,
+            labeltop=True,
+            labelbottom=False,
+            pad=2,
+            labelsize=5,
+        )
+
+        twin_ax.grid(False)
+
+
+def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs=None):
+    """
+    Render a discrete log track as colored intervals.
+
+    Parameters
+    ----------
+    base_ax : matplotlib Axes
+    well : dict
+    offset : float
+        Flattening offset to subtract from true depths.
+    disc_cfg : dict
+        Configuration with keys:
+          - log (str)
+          - label (str, optional)
+          - color_map (dict, optional)
+          - default_color (str, optional)
+          - missing (any, optional; default -999)
+    visible_discrete_logs : set[str] | None
+        If provided, only draw when disc_cfg['log'] is in the set.
+    """
+    disc_name = disc_cfg["log"]
+
+    if visible_discrete_logs is not None and disc_name not in visible_discrete_logs:
+        return
+
+    disc_label = disc_cfg.get("label", disc_name)
+    color_map = disc_cfg.get("color_map", {})
+    default_color = disc_cfg.get("default_color", "#dddddd")
+    missing_code = disc_cfg.get("missing", -999)  # optional, default -999
+
+    disc_logs = well.get("discrete_logs", {})
+    disc_def = disc_logs.get(disc_name)
+    if disc_def is None:
+        return
+
+    depths = np.array(disc_def.get("depth", []), dtype=float)
+    values = np.array(disc_def.get("values", []), dtype=object)
+
+    if depths.size == 0 or values.size == 0:
+        return
+
+    # sort by depth just in case
+    order = np.argsort(depths)
+    depths = depths[order]
+    values = values[order]
+
+    # flatten depths for plotting
+    depths_plot = depths - offset  # kept for clarity; directly using top/bot below
+
+    # we need a bottom bound for the last interval
+    ref_depth = well["reference_depth"]
+    well_td = ref_depth + well["total_depth"]
+    last_bottom_phys = well_td
+    last_bottom_plot = last_bottom_phys - offset
+
+    base_ax.set_xlim(0, 1)
+    base_ax.set_xticks([])
+    base_ax.set_xlabel(disc_label, labelpad=2)
+
+    # intervals between samples
+    for i in range(len(depths) - 1):
+        top_phys = depths[i]
+        bot_phys = depths[i + 1]
+        val = values[i]
+
+        if val == missing_code:
+            continue
+
+        top_plot = top_phys - offset
+        bot_plot = bot_phys - offset
+
+        col = color_map.get(val, default_color)
+
+        base_ax.axhspan(
+            top_plot,
+            bot_plot,
+            xmin=0.0,
+            xmax=1.0,
+            facecolor=col,
+            edgecolor="k",
+            linewidth=0.3,
+            alpha=0.9,
+            zorder=0.8,
+        )
+
+    # last sample → extend to TD if not missing
+    last_val = values[-1]
+    if last_val != missing_code:
+        top_phys = depths[-1]
+        top_plot = top_phys - offset
+        bot_plot = last_bottom_plot
+
+        col = color_map.get(last_val, default_color)
+        base_ax.axhspan(
+            top_plot,
+            bot_plot,
+            xmin=0.0,
+            xmax=1.0,
+            facecolor=col,
+            edgecolor="k",
+            linewidth=0.3,
+            alpha=0.9,
+            zorder=0.8,
+        )
+
+
+
 def add_depth_range_labels(fig, axes, wells, n_tracks):
     """
     Add 'reference_depth–TD' labels below each well panel.
@@ -460,7 +534,6 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
 
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
-
 
 
 def add_tops_and_correlations(
@@ -529,7 +602,7 @@ def add_tops_and_correlations(
     tops_by_name = {}
 
 
-    # ---- pass 1: per-well tops & (optionally) within-well shading ----
+    ## ---- pass 1: per-well tops & (optionally) within-well shading ----
     for wi, (well, main_ax) in enumerate(zip(wells, well_main_axes)):
         tops = well.get("tops", {})
         if not tops:
@@ -812,3 +885,162 @@ def add_tops_and_correlations(
     return corr_artists
 
 
+
+def draw_lithofacies_track(
+    base_ax,
+    intervals,
+    offset=0.0,
+    n_seg=25,
+    spline_func=None,
+    hatch_map=None,
+    color_map=None,
+    litho_hardness=None,
+    smooth = 1,
+    hardness_scale = 1.0,
+):
+    """
+    Draw a lithology–facies hardness track on an axis.
+
+    Parameters
+    ----------
+    base_ax : matplotlib.axes.Axes
+        Axis to draw into.
+    intervals : list of dict
+        Each dict must contain:
+            "litho_trend", "environment", "rel_top", "rel_base"
+            (you may also include "well" or "id" but not required)
+    offset : float
+        Flatten offset (subtract this from true depths).
+    n_seg : int
+        Number of spline samples per interval.
+    spline_func : callable or None
+        Function f(s) for s in [0,1] controlling hardness profile.
+    hatch_map : dict or None
+        Maps environment → hatch pattern.
+    litho_hardness : dict or None
+        Maps lithology → base hardness (1–3 scale).
+    """
+
+    import numpy as np
+    from matplotlib.patches import Polygon
+
+    # ----------------------------
+    # Defaults
+    # ----------------------------
+    if spline_func is None:
+        spline_func = lambda s: smooth*(3.1*s**2.1 - 2.1*s**2.8) # cubic smoothstep
+
+    def smoothstep(t, smooth):
+        """Cubic Hermite spline between 0 and 1 with zero slope at both ends."""
+        return smooth * (3.1 * t ** 2.1 - 2.1 * t ** 2.8)
+
+
+    #3.1 * t ** 2.1 - 2.1 * t ** 2.8
+
+
+    if hatch_map is None:
+        hatch_map = {
+            "Distributary Mouth Bar": "/",
+            "Distributary Channel":   "\\",
+            "Bay":                    ".",
+            "Inner Marine Shelf":     "-",
+            "Estuarine Bay–Lagoon":   "x",
+        }
+
+    if color_map is None:
+        color_map = {
+            "Distributary Mouth Bar": "red",
+            "Distributary Channel":   "blue",
+            "Bay":                    "orange",
+            "Inner Marine Shelf":     "yellow",
+            "Estuarine Bay–Lagoon":   "brown",
+        }
+
+    if litho_hardness is None:
+        litho_hardness = {
+            "SS":  3.0,
+            "SSa": 2.0,
+            "M":   1.0,
+        }
+
+    curve_depths = []
+    curve_hardness = []
+
+    # ----------------------------
+    # Draw intervals
+    # ----------------------------
+    for iv in intervals:
+        lt = iv["lithology"]
+        trend =iv["trend"]
+        env = iv.get("environment", "")
+        top_true = iv["rel_top"]
+        base_true = iv["rel_base"]
+
+        # Apply flattening transform
+        top_depth = top_true - offset
+        base_depth = base_true - offset
+
+        # Parse lithology + trend
+        parts = [p.strip() for p in lt.split(",")]
+        lith = parts[0]
+        #trend = parts[1].lower() if len(parts) > 1 else None
+
+        # Base hardness lookup
+        h0 = litho_hardness.get(lith, 2.0)
+        delta = 0.5
+
+        # end-member hardness (raw)
+        if trend == "fu":
+            h_top_raw  = max(1.0, h0 - delta)
+            h_base_raw = min(3.0, h0 + delta)
+        elif trend == "cu":
+            h_top_raw  = min(3.0, h0 + delta)
+            h_base_raw = max(1.0, h0 - delta)
+        else:
+            h_top_raw = h_base_raw = h0
+
+        # normalize 1–3 → 0–1
+        h_top = h_top_raw / 3.0 * hardness_scale
+        h_base = h_base_raw / 3.0 * hardness_scale
+
+        # spline subdivision
+        s = np.linspace(0, 1, n_seg)
+        z_seg = top_depth + (base_depth - top_depth) * s
+
+        if trend in ("fu", "cu"):
+            #w = spline_func(s)
+            w= smoothstep(s, smooth)
+            h_seg = h_top + (h_base - h_top) * w
+        else:
+            h_seg = np.full_like(s, h_top)
+
+        curve_depths.extend(z_seg)
+        curve_hardness.extend(h_seg)
+
+        # polygon under curve
+        xs = [0.0] + list(h_seg) + [0.0]
+        ys = [z_seg[0]] + list(z_seg) + [z_seg[-1]]
+
+        poly = Polygon(
+            list(zip(xs, ys)),
+            closed=True,
+            facecolor=color_map.get(env, "white"),
+            edgecolor="black",
+            hatch=hatch_map.get(env, ""),
+            linewidth=0.6,
+            alpha=0.9,
+            zorder=0.8,
+        )
+        base_ax.add_patch(poly)
+
+    # ----------------------------
+    # Plot hardness curve
+    # ----------------------------
+    base_ax.plot(curve_hardness, curve_depths, color="black", linewidth=1.6)
+
+    # ----------------------------
+    # Axis formatting
+    # ----------------------------
+    base_ax.set_xlim(0, 1.0)
+    base_ax.xaxis.set_visible(False)
+    base_ax.grid(False)
