@@ -5060,6 +5060,23 @@
           ]
         }
       },
+      "bitmap": {
+        "path": "core1.png",
+        "top_depth": 200.0,
+        "base_depth": 300.0
+        },
+      "bitmaps": {
+          "bitmap1": {
+            "path": "core1.png",
+            "top_depth": 200.0,
+            "base_depth": 300.0
+          },
+          "bitmap2": {
+            "path": "core1.png",
+            "top_depth": 300.0,
+            "base_depth": 400.0
+          }
+        },
       "tops": {
         "Formation A": {
           "depth": 200,
@@ -11381,7 +11398,11 @@
             150
           ],
           "xscale": "linear",
-          "direction": "normal"
+          "direction": "normal",
+          "render": "points",
+          "marker": ".",
+          "markersize": 2.0,
+          "alpha": 0.9
         },
         {
           "log": "CAL",
@@ -11454,6 +11475,17 @@
           "Dolomite": "#ffd6a5"
         },
         "default_color": "#dddddd"
+      }
+    },
+    {
+      "name":  "core",
+      "type":  "bitmap",
+      "bitmap": {
+        "alpha": 1.0,
+        "cmap": "None",
+        "interpolation": "nearest",
+        "flip_vertical": "True",
+        "label": "Core photo"
       }
     }
   ],

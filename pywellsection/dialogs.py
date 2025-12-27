@@ -6,13 +6,16 @@ from PyQt5.QtWidgets import (
     QComboBox, QDialogButtonBox,
     QTableWidget, QTableWidgetItem,
     QLabel, QMessageBox, QHBoxLayout,
-    QColorDialog, QSpinBox,
+    QColorDialog, QSpinBox, QCheckBox,
+    QFileDialog
 )
 from collections import OrderedDict
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
+
+import os
 
 
 class EditFormationTopDialog(QDialog):
@@ -556,80 +559,304 @@ class LayoutSettingsDialog(QDialog):
     def values(self):
         return float(self.spin_gap.value()), float(self.spin_track.value())
 
+# class LogDisplaySettingsDialog(QDialog):
+#     """
+#     Dialog to edit display settings for a log mnemonic:
+#       - color
+#       - xscale: linear/log
+#       - direction: normal/reverse
+#       - xlim: min/max or blank for auto
+#     """
+#     def __init__(self, parent, log_name: str,
+#                  color: str, xscale: str, direction: str, xlim):
+#         super().__init__(parent)
+#         self.setWindowTitle(f"Display settings – {log_name}")
+#         self.resize(320, 200)
+#
+#         layout = QVBoxLayout(self)
+#         form = QFormLayout()
+#         layout.addLayout(form)
+#
+#         self.ed_color = QLineEdit(color or "", self)
+#         form.addRow("Color:", self.ed_color)
+#
+#         self.cmb_xscale = QComboBox(self)
+#         self.cmb_xscale.addItems(["linear", "log"])
+#         idx = self.cmb_xscale.findText(xscale or "linear")
+#         if idx < 0:
+#             idx = 0
+#         self.cmb_xscale.setCurrentIndex(idx)
+#         form.addRow("X scale:", self.cmb_xscale)
+#
+#         self.cmb_dir = QComboBox(self)
+#         self.cmb_dir.addItems(["normal", "reverse"])
+#         idx = self.cmb_dir.findText(direction or "normal")
+#         if idx < 0:
+#             idx = 0
+#         self.cmb_dir.setCurrentIndex(idx)
+#         form.addRow("Direction:", self.cmb_dir)
+#
+#         # xlim: two line edits, blank = auto
+#         xmin_txt = ""
+#         xmax_txt = ""
+#         if xlim is not None and len(xlim) == 2:
+#             try:
+#                 xmin_txt = str(xlim[0])
+#                 xmax_txt = str(xlim[1])
+#             except Exception:
+#                 pass
+#
+#         self.ed_xmin = QLineEdit(xmin_txt, self)
+#         self.ed_xmax = QLineEdit(xmax_txt, self)
+#         form.addRow("X min (blank = auto):", self.ed_xmin)
+#         form.addRow("X max (blank = auto):", self.ed_xmax)
+#
+#         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+#         btns.accepted.connect(self.accept)
+#         btns.rejected.connect(self.reject)
+#         layout.addWidget(btns)
+#
+#     def values(self):
+#         color = self.ed_color.text().strip() or None
+#         xscale = self.cmb_xscale.currentText()
+#         direction = self.cmb_dir.currentText()
+#
+#         xmin_txt = self.ed_xmin.text().strip()
+#         xmax_txt = self.ed_xmax.text().strip()
+#
+#         if xmin_txt and xmax_txt:
+#             try:
+#                 xlim = (float(xmin_txt), float(xmax_txt))
+#             except ValueError:
+#                 xlim = None
+#         else:
+#             xlim = None
+#
+#         return color, xscale, direction, xlim
+
 class LogDisplaySettingsDialog(QDialog):
     """
-    Dialog to edit display settings for a log mnemonic:
-      - color
-      - xscale: linear/log
-      - direction: normal/reverse
-      - xlim: min/max or blank for auto
+    Edit display settings for one continuous log in one track.
+
+    Existing settings (kept):
+      - color, xscale, direction, xlim
+
+    Added settings:
+      - render (line/points), linewidth, linestyle
+      - marker, markersize
+      - alpha
+      - decimate
+      - clip, mask_nan
+      - zorder
     """
-    def __init__(self, parent, log_name: str,
-                 color: str, xscale: str, direction: str, xlim):
+
+    def __init__(self, parent, log_name: str, cfg: dict):
         super().__init__(parent)
-        self.setWindowTitle(f"Display settings – {log_name}")
-        self.resize(320, 200)
+        self.setWindowTitle(f"Log display: {log_name}")
+        self.resize(420, 520)
+
+        self._log_name = log_name
+        self._cfg_in = dict(cfg or {})
+        self._result = None
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
         layout.addLayout(form)
 
-        self.ed_color = QLineEdit(color or "", self)
-        form.addRow("Color:", self.ed_color)
+        # ---- Color (with picker) ----
+        self.ed_color = QLineEdit(self)
+        self.ed_color.setText(str(self._cfg_in.get("color", "black")))
+        btn_pick = QPushButton("Pick…", self)
+        row = QHBoxLayout()
+        row.addWidget(self.ed_color)
+        row.addWidget(btn_pick)
+        form.addRow("Color:", row)
+        btn_pick.clicked.connect(self._pick_color)
 
+        # ---- X scale ----
         self.cmb_xscale = QComboBox(self)
         self.cmb_xscale.addItems(["linear", "log"])
-        idx = self.cmb_xscale.findText(xscale or "linear")
-        if idx < 0:
-            idx = 0
-        self.cmb_xscale.setCurrentIndex(idx)
+        self.cmb_xscale.setCurrentText(self._cfg_in.get("xscale", "linear"))
         form.addRow("X scale:", self.cmb_xscale)
 
+        # ---- Direction ----
         self.cmb_dir = QComboBox(self)
         self.cmb_dir.addItems(["normal", "reverse"])
-        idx = self.cmb_dir.findText(direction or "normal")
-        if idx < 0:
-            idx = 0
-        self.cmb_dir.setCurrentIndex(idx)
+        self.cmb_dir.setCurrentText(self._cfg_in.get("direction", "normal"))
         form.addRow("Direction:", self.cmb_dir)
 
-        # xlim: two line edits, blank = auto
-        xmin_txt = ""
-        xmax_txt = ""
-        if xlim is not None and len(xlim) == 2:
-            try:
-                xmin_txt = str(xlim[0])
-                xmax_txt = str(xlim[1])
-            except Exception:
-                pass
+        # ---- X limits ----
+        xlim = self._cfg_in.get("xlim", None)
+        xmn = xlim[0] if isinstance(xlim, (list, tuple)) and len(xlim) == 2 else None
+        xmx = xlim[1] if isinstance(xlim, (list, tuple)) and len(xlim) == 2 else None
 
-        self.ed_xmin = QLineEdit(xmin_txt, self)
-        self.ed_xmax = QLineEdit(xmax_txt, self)
-        form.addRow("X min (blank = auto):", self.ed_xmin)
-        form.addRow("X max (blank = auto):", self.ed_xmax)
+        self.chk_xlim = QCheckBox("Use x-limits", self)
+        self.chk_xlim.setChecked(xmn is not None and xmx is not None)
 
+        self.spin_xmin = QDoubleSpinBox(self)
+        self.spin_xmin.setRange(-1e12, 1e12)
+        self.spin_xmin.setDecimals(6)
+        self.spin_xmin.setValue(float(xmn) if xmn is not None else 0.0)
+
+        self.spin_xmax = QDoubleSpinBox(self)
+        self.spin_xmax.setRange(-1e12, 1e12)
+        self.spin_xmax.setDecimals(6)
+        self.spin_xmax.setValue(float(xmx) if xmx is not None else 1.0)
+
+        xlim_row = QHBoxLayout()
+        xlim_row.addWidget(self.chk_xlim)
+        xlim_row.addWidget(QLabel("min:", self))
+        xlim_row.addWidget(self.spin_xmin)
+        xlim_row.addWidget(QLabel("max:", self))
+        xlim_row.addWidget(self.spin_xmax)
+        form.addRow("X limits:", xlim_row)
+
+        # ---- Render mode (NEW) ----
+        self.cmb_render = QComboBox(self)
+        self.cmb_render.addItems(["line", "points"])
+        self.cmb_render.setCurrentText(self._cfg_in.get("render", "line"))
+        form.addRow("Render:", self.cmb_render)
+
+        # ---- Line settings (NEW) ----
+        self.spin_lw = QDoubleSpinBox(self)
+        self.spin_lw.setRange(0.1, 20.0)
+        self.spin_lw.setDecimals(2)
+        self.spin_lw.setSingleStep(0.1)
+        self.spin_lw.setValue(float(self._cfg_in.get("linewidth", 1.0)))
+        form.addRow("Line width:", self.spin_lw)
+
+        self.cmb_ls = QComboBox(self)
+        self.cmb_ls.addItems(["-", "--", "-.", ":", "None"])
+        self.cmb_ls.setCurrentText(str(self._cfg_in.get("style", "-")))
+        form.addRow("Line style:", self.cmb_ls)
+
+        # ---- Point settings (NEW) ----
+        self.ed_marker = QLineEdit(self)
+        self.ed_marker.setText(str(self._cfg_in.get("marker", ".")))
+        form.addRow("Marker:", self.ed_marker)
+
+        self.spin_ms = QDoubleSpinBox(self)
+        self.spin_ms.setRange(0.1, 50.0)
+        self.spin_ms.setDecimals(2)
+        self.spin_ms.setSingleStep(0.2)
+        self.spin_ms.setValue(float(self._cfg_in.get("markersize", 2.0)))
+        form.addRow("Marker size:", self.spin_ms)
+
+        # ---- Alpha (NEW) ----
+        self.spin_alpha = QDoubleSpinBox(self)
+        self.spin_alpha.setRange(0.0, 1.0)
+        self.spin_alpha.setDecimals(2)
+        self.spin_alpha.setSingleStep(0.05)
+        self.spin_alpha.setValue(float(self._cfg_in.get("alpha", 1.0)))
+        form.addRow("Alpha:", self.spin_alpha)
+
+        # ---- Decimate (NEW) ----
+        self.spin_dec = QSpinBox(self)
+        self.spin_dec.setRange(1, 1000)
+        self.spin_dec.setValue(int(self._cfg_in.get("decimate", 1)))
+        form.addRow("Decimate (every N):", self.spin_dec)
+
+        # ---- Clip / mask (NEW) ----
+        self.chk_clip = QCheckBox("Clip to x-limits (if set)", self)
+        self.chk_clip.setChecked(bool(self._cfg_in.get("clip", True)))
+        form.addRow("Clipping:", self.chk_clip)
+
+        self.chk_mask = QCheckBox("Mask NaN/Inf", self)
+        self.chk_mask.setChecked(bool(self._cfg_in.get("mask_nan", True)))
+        form.addRow("Masking:", self.chk_mask)
+
+        # ---- Z-order (NEW) ----
+        self.spin_z = QSpinBox(self)
+        self.spin_z.setRange(-100, 100)
+        self.spin_z.setValue(int(self._cfg_in.get("zorder", 2)))
+        form.addRow("Z-order:", self.spin_z)
+
+        # OK/Cancel
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self.accept)
+        btns.accepted.connect(self._on_accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
-    def values(self):
-        color = self.ed_color.text().strip() or None
-        xscale = self.cmb_xscale.currentText()
-        direction = self.cmb_dir.currentText()
+        # wiring to enable/disable based on render mode
+        self.cmb_render.currentTextChanged.connect(self._update_enable_states)
+        self.chk_xlim.toggled.connect(self._update_enable_states)
+        self._update_enable_states()
 
-        xmin_txt = self.ed_xmin.text().strip()
-        xmax_txt = self.ed_xmax.text().strip()
+    def _pick_color(self):
+        current = self.ed_color.text().strip() or "#000000"
+        qcol = QColor(current) if QColor(current).isValid() else QColor("#000000")
+        col = QColorDialog.getColor(qcol, self, "Pick log color")
+        if col.isValid():
+            self.ed_color.setText(col.name())
 
-        if xmin_txt and xmax_txt:
-            try:
-                xlim = (float(xmin_txt), float(xmax_txt))
-            except ValueError:
-                xlim = None
+    def _update_enable_states(self):
+        render = self.cmb_render.currentText().strip().lower()
+
+        # xlim enable
+        use_xlim = self.chk_xlim.isChecked()
+        self.spin_xmin.setEnabled(use_xlim)
+        self.spin_xmax.setEnabled(use_xlim)
+        self.chk_clip.setEnabled(use_xlim)
+
+        # line controls only if line
+        is_line = (render == "line")
+        self.spin_lw.setEnabled(is_line)
+        self.cmb_ls.setEnabled(is_line)
+
+        # marker controls only if points
+        is_pts = (render == "points")
+        self.ed_marker.setEnabled(is_pts)
+        self.spin_ms.setEnabled(is_pts)
+
+    def _on_accept(self):
+        # validate xlim
+        xlim = None
+        if self.chk_xlim.isChecked():
+            xmin = float(self.spin_xmin.value())
+            xmax = float(self.spin_xmax.value())
+            if np.isclose(xmin, xmax):
+                QMessageBox.warning(self, "Log settings", "x-limits min and max must differ.")
+                return
+            xlim = [xmin, xmax]
+
+        render = self.cmb_render.currentText().strip().lower()
+        style = self.cmb_ls.currentText().strip()
+        if style == "None":
+            style = "None"
+
+        out = dict(self._cfg_in)  # keep any unknown keys too
+
+        out["color"] = self.ed_color.text().strip() or "black"
+        out["xscale"] = self.cmb_xscale.currentText().strip()
+        out["direction"] = self.cmb_dir.currentText().strip()
+
+        if xlim is not None:
+            out["xlim"] = xlim
         else:
-            xlim = None
+            out.pop("xlim", None)
 
-        return color, xscale, direction, xlim
+        # NEW fields
+        out["render"] = render
+        out["alpha"] = float(self.spin_alpha.value())
+        out["decimate"] = int(self.spin_dec.value())
+        out["clip"] = bool(self.chk_clip.isChecked())
+        out["mask_nan"] = bool(self.chk_mask.isChecked())
+        out["zorder"] = int(self.spin_z.value())
+
+        # line / points specific
+        if render == "line":
+            out["linewidth"] = float(self.spin_lw.value())
+            out["style"] = style if style != "None" else "None"
+        else:
+            out["marker"] = (self.ed_marker.text().strip() or ".")
+            out["markersize"] = float(self.spin_ms.value())
+
+        self._result = out
+        self.accept()
+
+    def result_config(self) -> dict | None:
+        return self._result
+
 
 class AllTopsTableDialog(QDialog):
     """
@@ -2169,6 +2396,158 @@ class LithofaciesTableDialog(QDialog):
         """
         return self._accepted_intervals
 
+class LoadCoreBitmapDialog(QDialog):
+    """
+    Load an image (BMP/PNG/JPG) and assign it as a core bitmap to a well.
+
+    Returns dict:
+      {
+        "well_name": str,
+        "key": str,
+        "path": str,
+        "top_depth": float,
+        "base_depth": float,
+        "label": str,
+        "flip_vertical": bool,
+        "alpha": float,
+        "interpolation": str,
+        "cmap": str|None,
+      }
+    """
+
+    def __init__(self, parent, well_names, default_well=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load core bitmap")
+        self.resize(520, 260)
+
+        self._result = None
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # well selection
+        self.cmb_well = QComboBox(self)
+        self.cmb_well.addItems(list(well_names))
+        if default_well and default_well in well_names:
+            self.cmb_well.setCurrentText(default_well)
+        form.addRow("Well:", self.cmb_well)
+
+        # key/name
+        self.ed_key = QLineEdit(self)
+        self.ed_key.setText("core")
+        form.addRow("Bitmap key:", self.ed_key)
+
+        # file path + browse
+        self.ed_path = QLineEdit(self)
+        btn_browse = QPushButton("Browse…", self)
+        row_path = QHBoxLayout()
+        row_path.addWidget(self.ed_path)
+        row_path.addWidget(btn_browse)
+        form.addRow("Image file:", row_path)
+        btn_browse.clicked.connect(self._browse)
+
+        # depth interval
+        self.spin_top = QDoubleSpinBox(self)
+        self.spin_top.setRange(-1e9, 1e9)
+        self.spin_top.setDecimals(3)
+        self.spin_top.setSingleStep(1.0)
+        form.addRow("Top depth:", self.spin_top)
+
+        self.spin_base = QDoubleSpinBox(self)
+        self.spin_base.setRange(-1e9, 1e9)
+        self.spin_base.setDecimals(3)
+        self.spin_base.setSingleStep(1.0)
+        self.spin_base.setValue(1.0)
+        form.addRow("Base depth:", self.spin_base)
+
+        # label
+        self.ed_label = QLineEdit(self)
+        self.ed_label.setText("Core")
+        form.addRow("Track label:", self.ed_label)
+
+        # # alpha
+        # self.spin_alpha = QDoubleSpinBox(self)
+        # self.spin_alpha.setRange(0.0, 1.0)
+        # self.spin_alpha.setDecimals(2)
+        # self.spin_alpha.setSingleStep(0.05)
+        # self.spin_alpha.setValue(1.0)
+        # form.addRow("Alpha:", self.spin_alpha)
+
+        # # interpolation
+        # self.cmb_interp = QComboBox(self)
+        # self.cmb_interp.addItems(["nearest", "bilinear", "bicubic"])
+        # self.cmb_interp.setCurrentText("nearest")
+        # form.addRow("Interpolation:", self.cmb_interp)
+        #
+        # # colormap (optional)
+        # self.cmb_cmap = QComboBox(self)
+        # self.cmb_cmap.addItems(["(none)", "gray"])
+        # self.cmb_cmap.setCurrentText("(none)")
+        # form.addRow("Colormap:", self.cmb_cmap)
+        #
+        # # flip
+        # self.chk_flip = QCheckBox("Flip vertically", self)
+        # self.chk_flip.setChecked(False)
+        # form.addRow("Orientation:", self.chk_flip)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select image",
+            "",
+            "Images (*.bmp *.png *.jpg *.jpeg *.tif *.tiff);;All files (*.*)"
+        )
+        if path:
+            self.ed_path.setText(path)
+
+    def _on_accept(self):
+        well_name = self.cmb_well.currentText().strip()
+        key = self.ed_key.text().strip() or "core"
+        path = self.ed_path.text().strip()
+
+        if not well_name:
+            QMessageBox.warning(self, "Load core bitmap", "Please choose a well.")
+            return
+        if not path:
+            QMessageBox.warning(self, "Load core bitmap", "Please choose an image file.")
+            return
+
+        top_d = float(self.spin_top.value())
+        base_d = float(self.spin_base.value())
+        if abs(base_d - top_d) < 1e-9:
+            QMessageBox.warning(self, "Load core bitmap", "Top and Base depth must differ.")
+            return
+
+        label = self.ed_label.text().strip() or "Core"
+        # alpha = float(self.spin_alpha.value())
+        # interpolation = self.cmb_interp.currentText().strip()
+        # cmap_txt = self.cmb_cmap.currentText().strip()
+        # cmap = None if cmap_txt == "(none)" else cmap_txt
+        # flip = bool(self.chk_flip.isChecked())
+
+        self._result = {
+            "well_name": well_name,
+            "key": key,
+            "path": path,
+            "top_depth": top_d,
+            "base_depth": base_d,
+            "label": label,
+            # "alpha": alpha,
+            # "interpolation": interpolation,
+            # "cmap": cmap,
+            # "flip_vertical": flip,
+        }
+        self.accept()
+
+    def result(self):
+        return self._result
 
 class MoveWellDialog(QDialog):
     def __init__(self, parent, well_name, max_pos, current_pos):

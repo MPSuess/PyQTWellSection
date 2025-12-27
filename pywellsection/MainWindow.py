@@ -33,6 +33,7 @@ from pywellsection.dialogs import DiscreteColorEditorDialog
 from pywellsection.dialogs import ImportFaciesIntervalsDialog
 from pywellsection.dialogs import LithofaciesDisplaySettingsDialog
 from pywellsection.dialogs import LithofaciesTableDialog
+from pywellsection.dialogs import LoadCoreBitmapDialog
 
 from pathlib import Path
 from collections import OrderedDict
@@ -538,16 +539,20 @@ class MainWindow(QMainWindow):
 
             # --- subfolders ---
             cont_folder = QTreeWidgetItem(well_item, ["continuous"])
-            lith_folder = QTreeWidgetItem(well_item, ["lithofacies"])
+            #lith_folder = QTreeWidgetItem(well_item, ["lithofacies"])
             disc_folder = QTreeWidgetItem(well_item, ["discrete"])
 
+            bmp_folder = QTreeWidgetItem(well_item, ["bitmap"])
+
             cont_folder.setExpanded(True)
-            lith_folder.setExpanded(True)
+            #lith_folder.setExpanded(True)
             disc_folder.setExpanded(True)
+            bmp_folder.setExpanded(False)
 
             cont_folder.setData(0, Qt.UserRole, ("folder", "continuous", well_name))
             #lith_folder.setData(0, Qt.UserRole, ("folder", "lithofacies", well_name))
             disc_folder.setData(0, Qt.UserRole, ("folder", "discrete", well_name))
+            bmp_folder.setData(0, Qt.UserRole,("folder","bitmaps", well_name))
 
 
             # --- log leaves (informational, not checkable) ---
@@ -588,6 +593,13 @@ class MainWindow(QMainWindow):
             for dlog_name in sorted(dlogs.keys(), key=str):
                 dlog_item = QTreeWidgetItem(disc_folder, [dlog_name])
                 dlog_item.setData(0, Qt.UserRole, ("Discrete", well_name, dlog_name))
+
+            # --- bitmaps ---
+            blogs = (w.get("bitmaps", None) or {})
+            if blogs is not None:
+                for blog_name in sorted(blogs.keys(), key=str):
+                    blog_item = QTreeWidgetItem(bmp_folder,[blog_name])
+                    blog_item.setData(0, Qt.UserRole,("Bitmap",well_name,blog_name))
 
         self.well_tree.blockSignals(False)
         self._rebuild_panel_from_tree()
@@ -1664,6 +1676,99 @@ class MainWindow(QMainWindow):
                 + ", ".join(sorted(set(unknown)))
             )
 
+    from PyQt5.QtWidgets import QMessageBox
+    import os
+
+    def _ensure_bitmap_track_exists(self):
+        """
+        Ensure there is at least one bitmap track in self.tracks.
+        The bitmap track references a per-well bitmap by key.
+        """
+        if not hasattr(self, "tracks") or self.tracks is None:
+            self.tracks = []
+
+        for t in self.tracks:
+            if "bitmap" in t:
+                return  # already exists
+
+        # Create a default bitmap track
+        self.tracks.append({
+            "name": "Core",
+            "type": "bitmap",
+            "bitmap": {
+                "key": "core",  # per-well bitmap key
+                "label": "Core",
+                "alpha": 1.0,
+                "cmap": None,
+                "interpolation": "nearest",
+                "flip_vertical": False,
+            }
+        })
+
+    def _action_load_core_bitmap_to_well(self, default_well_name=None):
+        """
+        Open dialog and attach core bitmap to selected well:
+          well["bitmaps"][key] = {path, top_depth, base_depth, ...}
+        """
+
+        import os
+
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Load core bitmap", "No wells in project.")
+            return
+
+        well_names = [w.get("name") for w in self.all_wells if w.get("name")]
+        if not well_names:
+            QMessageBox.information(self, "Load core bitmap", "No named wells available.")
+            return
+
+        dlg = LoadCoreBitmapDialog(self, well_names, default_well=default_well_name)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        res = dlg.result()
+        if not res:
+            return
+
+        # find well
+        target = None
+        for w in self.all_wells:
+            if w.get("name") == res["well_name"]:
+                target = w
+                break
+        if target is None:
+            QMessageBox.warning(self, "Load core bitmap", f"Well '{res['well_name']}' not found.")
+            return
+
+        if not os.path.exists(res["path"]):
+            QMessageBox.warning(self, "Load core bitmap", "Image file does not exist.")
+            return
+
+        # attach to well
+        bitmaps = target.setdefault("bitmaps", {})
+        bitmaps[res["key"]] = {
+            "path": res["path"],
+            "top_depth": res["top_depth"],
+            "base_depth": res["base_depth"],
+            # "label": res["label"],
+            # "alpha": res["alpha"],
+            # "cmap": res["cmap"],
+            # "interpolation": res["interpolation"],
+            # "flip_vertical": res["flip_vertical"],
+        }
+
+        # ensure we have a bitmap track to display it
+#        self._ensure_bitmap_track_exists()
+
+        # push into panel & redraw
+        # if hasattr(self, "panel"):
+        #     self.panel.wells = self.all_wells
+        #     self.panel.tracks = self.tracks
+        #     self.panel.draw_panel()
+
+        # refresh tree (if you show bitmaps there)
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
 
     def _parse_lithotrend(self, litho_str: str, trend_str: str):
         """
@@ -1868,44 +1973,56 @@ class MainWindow(QMainWindow):
             )
             return
 
-        color = base_cfg.get("color", "black")
-        xscale = base_cfg.get("xscale", "linear")
-        direction = base_cfg.get("direction", "normal")
-        xlim = base_cfg.get("xlim", None)
+        dlg = LogDisplaySettingsDialog(self, log_name, base_cfg)
+        if dlg.exec_() == QDialog.Accepted:
+            new_cfg = dlg.result_config()
+            if new_cfg:
+                # store back into the track configuration
+                base_cfg.update(new_cfg)
 
-        # 2) Open dialog
-        dlg = LogDisplaySettingsDialog(self, log_name, color, xscale, direction, xlim)
-        if dlg.exec_() != QDialog.Accepted:
-            return
+                # redraw
+                self.panel.draw_panel()
 
-        new_color, new_xscale, new_direction, new_xlim = dlg.values()
 
+        # color = base_cfg.get("color", "black")
+        # xscale = base_cfg.get("xscale", "linear")
+        # direction = base_cfg.get("direction", "normal")
+        # xlim = base_cfg.get("xlim", None)
+        #
+        # # 2) Open dialog
+        # dlg = LogDisplaySettingsDialog(self, log_name, color, xscale, direction, xlim)
+        # if dlg.exec_() != QDialog.Accepted:
+        #     return
+        #
+        # new_color, new_xscale, new_direction, new_xlim = dlg.values()
+        #
         # 3) Apply updated settings to ALL track configs with this log
         for track in self.all_tracks:
             for log_cfg in track.get("logs", []):
                 if log_cfg.get("log") != log_name:
                     continue
-                if new_color is not None:
-                    log_cfg["color"] = new_color
                 else:
-                    log_cfg.pop("color", None)
+                    log_cfg=base_cfg
 
-                log_cfg["xscale"] = new_xscale or "linear"
-                log_cfg["direction"] = new_direction or "normal"
+        #         if new_color is not None:
+        #             log_cfg["color"] = new_color
+        #         else:
+        #             log_cfg.pop("color", None)
+        #
+        #         log_cfg["xscale"] = new_xscale or "linear"
+        #         log_cfg["direction"] = new_direction or "normal"
+        #
+        #         if new_xlim is not None:
+        #             log_cfg["xlim"] = new_xlim
+        #         else:
+        #             log_cfg.pop("xlim", None)  # auto scale
+        #
+        # # 4) Sync with panel and redraw
+        # if hasattr(self, "panel"):
+        #     self.panel.tracks = self.all_tracks
+        #     self.panel.draw_panel()
 
-                if new_xlim is not None:
-                    log_cfg["xlim"] = new_xlim
-                else:
-                    log_cfg.pop("xlim", None)  # auto scale
 
-        # 4) Sync with panel and redraw
-        if hasattr(self, "panel"):
-            self.panel.tracks = self.all_tracks
-            self.panel.draw_panel()
-
-        # 5) (Optional) refresh track/log trees for consistency
-        #self._populate_well_track_tree()
-        #self._populate_log_tree()
 
     def _load_tops_from_csv(self, path: str):
         """
@@ -2142,8 +2259,9 @@ class MainWindow(QMainWindow):
 
             well_name = item.text(0)
             act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
-            act_left = menu.addAction("Move well left '{well_name}'...")
-            act_right = menu.addAction("Move well right '{well_name}'...")
+            act_left = menu.addAction(f"Move well left '{well_name}'...")
+            act_right = menu.addAction(f"Move well right '{well_name}'...")
+            act_load_bitmap = menu.addAction(f"Load bitmap '{well_name}'...")
             chosen = menu.exec_(global_pos)
             well_index = item.data(0, Qt.UserRole)
             if well_index is None:
@@ -2154,6 +2272,8 @@ class MainWindow(QMainWindow):
                 self._move_well(well_name, -1)
             elif chosen == act_right:
                 self._move_well(well_name, +1)
+            if chosen == act_load_bitmap:
+                self._action_load_core_bitmap_to_well(default_well_name = well_name)
 
         # --- case 1: logs under "Logs" folder ---
         if parent is self.well_logs_folder:
