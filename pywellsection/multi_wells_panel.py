@@ -666,6 +666,7 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
     import matplotlib.image as mpimg
 
     track_cfg = track.get("bitmap", None)
+    track_name = track.get("name", None)
 
     bitmaps = None
     # bmp = well.get("bitmap", None)
@@ -676,12 +677,19 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
 
     bitmaps = well.get("bitmaps", None)
 
+    # Make it a full-width column (0..1)
+    base_ax.set_xlim(0, 1)
+    base_ax.set_xticks([])
+    base_ax.set_title(track_name, fontsize=5)
+
     if bitmaps is not None:
         for bitmap in bitmaps:
             if bitmap is not None:
                 bmp_cfg = bitmaps.get(bitmap, None)
-                if bmp_cfg is not None:
-                    # only draw if visible (optional)
+                bmp_track = bmp_cfg.get("track", None)
+
+                if bmp_cfg is not None and bmp_track == track_name:
+                    # only draw if visible (optional) and the right track
                     bmp_top = bmp_cfg.get("top_depth", None)
                     bmp_base = bmp_cfg.get("base_depth", None)
                     if bmp_top is not None and bmp_base is not None:
@@ -705,12 +713,7 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
                             if track_cfg.get("flip_vertical", False):
                                 img = np.flipud(img)
 
-                            # Make it a full-width column (0..1)
-                            base_ax.set_xlim(0, 1)
-                            base_ax.set_xticks([])
-                            base_ax.set_title(track_cfg.get("label", "Bitmap"), fontsize = 5)
-                            #base_ax.set_xlabel("tuedel", labelpad = 2)
-                            #base_ax.set_title("tuedel")
+
 
                             # IMPORTANT:
                             # - Use extent to map the image into depth coordinates.
