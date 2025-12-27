@@ -10,17 +10,19 @@ from collections import OrderedDict
 
 from PyQt5.QtGui import QColor
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QUrl
+import os
 
 class HelpDialog(QDialog):
-    def __init__(self, parent=None, html: str = ""):
+    def __init__(self, parent=None, html: str = "", title: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("Help — File Import Formats")
+        self.setWindowTitle(title)
         self.resize(820, 620)
 
         layout = QVBoxLayout(self)
 
         self.browser = QTextBrowser(self)
+        self.browser.setStyleSheet("background-color: white; color: black;")
         self.browser.setOpenExternalLinks(True)   # open links in system browser
         self.browser.setHtml(html)
         layout.addWidget(self.browser)
@@ -30,6 +32,17 @@ class HelpDialog(QDialog):
         btns.accepted.connect(self.accept)
         btns.button(QDialogButtonBox.Close).clicked.connect(self.close)
         layout.addWidget(btns)
+
+#       self.load_html('pywellsection/PyQtHelp.html')
+
+    def load_html(self, html_path: str):
+        if not os.path.exists(html_path):
+            self.browser.setPlainText(f"Help file not found:\n{html_path}")
+            return
+
+        # Use file URL so relative links (images, css) work
+        url = QUrl.fromLocalFile(os.path.abspath(html_path))
+        self.browser.setSource(url)
 
 class EditFormationTopDialog(QDialog):
     def __init__(self, parent, well_name, formation_name,
