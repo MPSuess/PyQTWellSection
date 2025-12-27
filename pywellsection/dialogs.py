@@ -1,22 +1,35 @@
 import numpy as np
+
 from PyQt5.QtWidgets import (
-    QDoubleSpinBox, QPushButton,
-    QDialog, QLineEdit, QDialogButtonBox,
-    QDialog, QVBoxLayout, QFormLayout,
-    QComboBox, QDialogButtonBox,
-    QTableWidget, QTableWidgetItem,
-    QLabel, QMessageBox, QHBoxLayout,
-    QColorDialog, QSpinBox, QCheckBox,
-    QFileDialog
+    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
+    QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
+    QFileDialog, QTextBrowser
 )
 from collections import OrderedDict
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
+
 from PyQt5.QtCore import Qt
 
-import os
+class HelpDialog(QDialog):
+    def __init__(self, parent=None, html: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle("Help — File Import Formats")
+        self.resize(820, 620)
 
+        layout = QVBoxLayout(self)
+
+        self.browser = QTextBrowser(self)
+        self.browser.setOpenExternalLinks(True)   # open links in system browser
+        self.browser.setHtml(html)
+        layout.addWidget(self.browser)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Close, self)
+        btns.rejected.connect(self.reject)
+        btns.accepted.connect(self.accept)
+        btns.button(QDialogButtonBox.Close).clicked.connect(self.close)
+        layout.addWidget(btns)
 
 class EditFormationTopDialog(QDialog):
     def __init__(self, parent, well_name, formation_name,
@@ -329,7 +342,7 @@ class AssignLasToWellDialog(QDialog):
                 self.ed_uwi.text().strip(),
             )
 
-class NewTrackDialog(QDialog):
+class OldNewTrackDialog(QDialog):
     def __init__(self, parent, suggested_name="Track"):
         super().__init__(parent)
         self.setWindowTitle("Add empty track")
@@ -348,6 +361,246 @@ class NewTrackDialog(QDialog):
 
     def track_name(self) -> str:
         return self.ed_name.text().strip()
+
+class NewTrackDialog(QDialog):
+    """
+    Create a new track of type:
+      - continuous
+      - discrete
+      - facies
+      - bitmap
+
+    Returns a dict track configuration matching your draw function conventions.
+    """
+
+    def __init__(self, parent,
+                 existing_track_names=None,
+                 available_discrete_logs=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add track")
+        self.resize(520, 380)
+
+        self._existing = set(existing_track_names or [])
+        self._available_discrete_logs = sorted(set(available_discrete_logs or []))
+        self._result = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Create a new track and select its type.\n"
+            "Continuous: multiple continuous logs\n"
+            "Discrete: interval fill log\n"
+            "Facies: lithofacies intervals (color/hatch by environment)\n"
+            "Bitmap: image/core track",
+            self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Track name
+        self.ed_name = QLineEdit(self)
+        form.addRow("Track name:", self.ed_name)
+
+        # Track type
+        self.cmb_type = QComboBox(self)
+        self.cmb_type.addItems(["continuous", "discrete", "facies", "bitmap"])
+        form.addRow("Track type:", self.cmb_type)
+
+        # -------------------------
+        # Discrete options group
+        # -------------------------
+        self.disc_log = QComboBox(self)
+        self.disc_log.setEditable(True)
+        self.disc_log.addItems(self._available_discrete_logs)
+        self.disc_label = QLineEdit(self)
+        self.disc_label.setPlaceholderText("Label shown on track (optional)")
+        self.disc_missing = QLineEdit(self)
+        self.disc_missing.setText("-999")
+        form.addRow("Discrete log:", self.disc_log)
+        form.addRow("Discrete label:", self.disc_label)
+        form.addRow("Missing code:", self.disc_missing)
+
+        # -------------------------
+        # Facies options group
+        # -------------------------
+        self.facies_label = QLineEdit(self)
+        self.facies_label.setText("Facies")
+        self.facies_color_by = QComboBox(self)
+        self.facies_color_by.addItems(["environment", "lithology"])
+        self.facies_default_color = QLineEdit(self)
+        self.facies_default_color.setText("#cccccc")
+        self.facies_default_hatch = QLineEdit(self)
+        self.facies_default_hatch.setText("//")  # fallback hatch if env not mapped
+
+        # “hardness / spline” defaults (since you added those settings)
+        self.facies_hardness = QDoubleSpinBox(self)
+        self.facies_hardness.setRange(0.0, 100.0)
+        self.facies_hardness.setDecimals(3)
+        self.facies_hardness.setValue(1.0)
+
+        self.facies_smooth = QDoubleSpinBox(self)
+        self.facies_smooth.setRange(0.0, 10.0)
+        self.facies_smooth.setDecimals(3)
+        self.facies_smooth.setValue(0.5)
+
+        self.facies_samples = QDoubleSpinBox(self)
+        self.facies_samples.setRange(10, 5000)
+        self.facies_samples.setDecimals(0)
+        self.facies_samples.setValue(200)
+
+        form.addRow("Facies label:", self.facies_label)
+        form.addRow("Color by:", self.facies_color_by)
+        form.addRow("Default color:", self.facies_default_color)
+        form.addRow("Default hatch:", self.facies_default_hatch)
+        form.addRow("Hardness scale:", self.facies_hardness)
+        form.addRow("Spline smooth:", self.facies_smooth)
+        form.addRow("Spline samples:", self.facies_samples)
+
+        # -------------------------
+        # Bitmap options group
+        # -------------------------
+        self.bmp_label = QLineEdit(self)
+        self.bmp_label.setText("Core")
+        self.bmp_key = QLineEdit(self)
+        self.bmp_key.setText("core")
+        self.bmp_alpha = QDoubleSpinBox(self)
+        self.bmp_alpha.setRange(0.0, 1.0)
+        self.bmp_alpha.setDecimals(2)
+        self.bmp_alpha.setValue(1.0)
+        self.bmp_interp = QComboBox(self)
+        self.bmp_interp.addItems(["nearest", "bilinear", "bicubic"])
+        self.bmp_cmap = QComboBox(self)
+        self.bmp_cmap.addItems(["(none)", "gray"])
+        self.bmp_flip = QCheckBox("Flip vertically", self)
+
+        form.addRow("Bitmap label:", self.bmp_label)
+        form.addRow("Bitmap key:", self.bmp_key)
+        form.addRow("Bitmap alpha:", self.bmp_alpha)
+        form.addRow("Bitmap interpolation:", self.bmp_interp)
+        form.addRow("Bitmap colormap:", self.bmp_cmap)
+        form.addRow("Bitmap:", self.bmp_flip)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # react to type changes
+        self.cmb_type.currentTextChanged.connect(self._update_visibility)
+        self._update_visibility(self.cmb_type.currentText())
+
+    def _update_visibility(self, track_type: str):
+        """Show only relevant fields for chosen type."""
+        t = (track_type or "").lower()
+
+        # discrete visible?
+        disc_vis = (t == "discrete")
+        self.disc_log.setVisible(disc_vis)
+        self.disc_label.setVisible(disc_vis)
+        self.disc_missing.setVisible(disc_vis)
+
+        # facies visible?
+        fac_vis = (t == "facies")
+        self.facies_label.setVisible(fac_vis)
+        self.facies_color_by.setVisible(fac_vis)
+        self.facies_default_color.setVisible(fac_vis)
+        self.facies_default_hatch.setVisible(fac_vis)
+        self.facies_hardness.setVisible(fac_vis)
+        self.facies_smooth.setVisible(fac_vis)
+        self.facies_samples.setVisible(fac_vis)
+
+        # bitmap visible?
+        bmp_vis = (t == "bitmap")
+        self.bmp_label.setVisible(bmp_vis)
+        self.bmp_key.setVisible(bmp_vis)
+        self.bmp_alpha.setVisible(bmp_vis)
+        self.bmp_interp.setVisible(bmp_vis)
+        self.bmp_cmap.setVisible(bmp_vis)
+        self.bmp_flip.setVisible(bmp_vis)
+
+        # continuous has no extra widgets (kept simple)
+
+    def _on_accept(self):
+        name = self.ed_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Add track", "Please provide a track name.")
+            return
+        if name in self._existing:
+            QMessageBox.warning(self, "Add track", f"Track '{name}' already exists.")
+            return
+
+        track_type = self.cmb_type.currentText().strip().lower()
+
+        # Base track skeleton
+        track = {"name": name, "logs": [], "type": track_type}
+
+        if track_type == "continuous":
+            # nothing else needed
+            pass
+
+        elif track_type == "discrete":
+            log_name = self.disc_log.currentText().strip()
+            if not log_name:
+                QMessageBox.warning(self, "Add track", "Please choose/enter a discrete log name.")
+                return
+            label = self.disc_label.text().strip() or log_name
+            missing = (self.disc_missing.text().strip() or "-999")
+
+            track["discrete"] = {
+                "log": log_name,
+                "label": label,
+                "color_map": {},           # edit later in discrete color dialog
+                "default_color": "#dddddd",
+                "missing": missing,
+            }
+
+        elif track_type == "facies":
+            label = self.facies_label.text().strip() or "Facies"
+            color_by = self.facies_color_by.currentText().strip()
+            default_color = self.facies_default_color.text().strip() or "#cccccc"
+            default_hatch = self.facies_default_hatch.text().strip() or None
+
+            track["facies"] = {
+                "label": label,
+                "color_by": color_by,
+                "env_colors": {},          # user may fill later
+                "env_hatches": {},         # user may fill later
+                "lith_colors": {},         # optional if color_by=lithology
+                "default_color": default_color,
+                "default_hatch": default_hatch,
+                "hardness_scale": float(self.facies_hardness.value()),
+                "spline": {
+                    "smooth": float(self.facies_smooth.value()),
+                    "num_samples": int(self.facies_samples.value()),
+                },
+            }
+
+        elif track_type == "bitmap":
+            label = self.bmp_label.text().strip() or "Bitmap"
+            key = self.bmp_key.text().strip() or "core"
+            cmap_txt = self.bmp_cmap.currentText().strip()
+            cmap = None if cmap_txt == "(none)" else cmap_txt
+
+            track["bitmap"] = {
+                "key": key,  # will resolve per well: well["bitmaps"][key]
+                "label": label,
+                "alpha": float(self.bmp_alpha.value()),
+                "interpolation": self.bmp_interp.currentText().strip(),
+                "cmap": cmap,
+                "flip_vertical": bool(self.bmp_flip.isChecked()),
+            }
+
+        else:
+            QMessageBox.warning(self, "Add track", f"Unknown track type: {track_type}")
+            return
+
+        self._result = track
+        self.accept()
+
+    def result_track(self):
+        return self._result
 
 class StratigraphyEditorDialog(QDialog):
     """
@@ -2433,10 +2686,10 @@ class LoadCoreBitmapDialog(QDialog):
             self.cmb_well.setCurrentText(default_well)
         form.addRow("Well:", self.cmb_well)
 
-        # key/name
+        # # key/name
         self.ed_key = QLineEdit(self)
-        self.ed_key.setText("core")
-        form.addRow("Bitmap key:", self.ed_key)
+        self.ed_key.setText("cp001")
+        form.addRow("Bitmap Id:", self.ed_key)
 
         # file path + browse
         self.ed_path = QLineEdit(self)
@@ -2464,7 +2717,7 @@ class LoadCoreBitmapDialog(QDialog):
         # label
         self.ed_label = QLineEdit(self)
         self.ed_label.setText("Core")
-        form.addRow("Track label:", self.ed_label)
+        form.addRow("Track name:", self.ed_label)
 
         # # alpha
         # self.spin_alpha = QDoubleSpinBox(self)
@@ -2525,7 +2778,7 @@ class LoadCoreBitmapDialog(QDialog):
             QMessageBox.warning(self, "Load core bitmap", "Top and Base depth must differ.")
             return
 
-        label = self.ed_label.text().strip() or "Core"
+        label = self.ed_label.text().strip() or "core"
         # alpha = float(self.spin_alpha.value())
         # interpolation = self.cmb_interp.currentText().strip()
         # cmap_txt = self.cmb_cmap.currentText().strip()
@@ -2538,7 +2791,7 @@ class LoadCoreBitmapDialog(QDialog):
             "path": path,
             "top_depth": top_d,
             "base_depth": base_d,
-            "label": label,
+            "track": label,
             # "alpha": alpha,
             # "interpolation": interpolation,
             # "cmap": cmap,

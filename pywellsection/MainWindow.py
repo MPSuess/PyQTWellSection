@@ -34,6 +34,7 @@ from pywellsection.dialogs import ImportFaciesIntervalsDialog
 from pywellsection.dialogs import LithofaciesDisplaySettingsDialog
 from pywellsection.dialogs import LithofaciesTableDialog
 from pywellsection.dialogs import LoadCoreBitmapDialog
+from pywellsection.dialogs import HelpDialog
 
 from pathlib import Path
 from collections import OrderedDict
@@ -216,7 +217,14 @@ class MainWindow(QMainWindow):
 
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
-        act_about = QAction("About...", self)
+
+        act_help = QAction("Import formats…", self)
+        act_help.triggered.connect(self._action_show_help)
+        help_menu.addAction(act_help)
+
+        help_menu.addSeparator()
+
+        act_about = QAction("About…", self)
         act_about.triggered.connect(self._show_about)
         help_menu.addAction(act_about)
 
@@ -1091,8 +1099,54 @@ class MainWindow(QMainWindow):
         self._populate_well_track_tree()  # tracks folder
         #self._populate_well_log_tree()  # logs folder still valid, but refresh for consistency
 
+    def _action_show_help(self):
+        dlg = HelpDialog(self, html=self.get_import_help_html())
+        dlg.exec_()
+
+    def get_import_help_html(self) -> str:
+
+        with open('pywellsection/PyQtHelp.html','r') as file:
+            data = file.read()
+        return data
+
+
+
+
+
     def _action_add_empty_track(self):
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            self.all_tracks = []
+
+        existing_names = [t.get("name", "") for t in self.all_tracks]
+
+        # collect discrete log names from wells (optional quality-of-life)
+        disc_names = set()
+        if getattr(self, "all_wells", None):
+            for w in self.all_wells:
+                for nm in (w.get("discrete_logs") or {}).keys():
+                    disc_names.add(nm)
+
+        dlg = NewTrackDialog(
+            self,
+            existing_track_names=existing_names,
+            available_discrete_logs=disc_names,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_track = dlg.result_track()
+        if not new_track:
+            return
+
+        self.all_tracks.append(new_track)
+
+        self._populate_well_track_tree()
+
+    def _action_add_empty_track_old(self):
         # Suggest next unique name
+
+        suggested = ""
+
         existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
         base = "Track"
         i = 1
@@ -1750,7 +1804,7 @@ class MainWindow(QMainWindow):
             "path": res["path"],
             "top_depth": res["top_depth"],
             "base_depth": res["base_depth"],
-            # "label": res["label"],
+            "track": res["track"],
             # "alpha": res["alpha"],
             # "cmap": res["cmap"],
             # "interpolation": res["interpolation"],
