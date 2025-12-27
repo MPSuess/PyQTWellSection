@@ -219,7 +219,7 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
         act_help = QAction("Import formats…", self)
-        act_help.triggered.connect(self._action_show_help)
+        act_help.triggered.connect(self._action_show_import_help)
         help_menu.addAction(act_help)
 
         help_menu.addSeparator()
@@ -1099,8 +1099,8 @@ class MainWindow(QMainWindow):
         self._populate_well_track_tree()  # tracks folder
         #self._populate_well_log_tree()  # logs folder still valid, but refresh for consistency
 
-    def _action_show_help(self):
-        dlg = HelpDialog(self, html=self.get_import_help_html())
+    def _action_show_import_help(self):
+        dlg = HelpDialog(self, html=self.get_import_help_html(), title="Help - Import Formats")
         dlg.exec_()
 
     def get_import_help_html(self) -> str:
@@ -1108,10 +1108,6 @@ class MainWindow(QMainWindow):
         with open('pywellsection/PyQtHelp.html','r') as file:
             data = file.read()
         return data
-
-
-
-
 
     def _action_add_empty_track(self):
         if not hasattr(self, "all_tracks") or self.all_tracks is None:
