@@ -5,8 +5,15 @@ import re
 import lasio
 import numpy as np
 import csv
-from PyQt5.QtWidgets import QMessageBox
+
 from collections import defaultdict
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QComboBox, QLineEdit, QPushButton, QFileDialog,
+    QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox
+)
+
 
 def load_project_from_json(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -21,7 +28,6 @@ def load_project_from_json(path):
     metadata = data.get("metadata", {})
 
     return wells, tracks, stratigraphy, metadata
-
 
 def export_project_to_json(path, wells, tracks, stratigraphy=None, extra_metadata=None):
     """
@@ -584,3 +590,156 @@ def import_discrete_logs_from_csv(self, path: str):
         "Import discrete logs",
         "\n".join(msg_lines)
     )
+
+class LoadCoreBitmapDialog(QDialog):
+    """
+    Load an image (BMP/PNG/JPG) and assign it as a core bitmap to a well.
+
+    Returns dict:
+      {
+        "well_name": str,
+        "key": str,
+        "path": str,
+        "top_depth": float,
+        "base_depth": float,
+        "label": str,
+        "flip_vertical": bool,
+        "alpha": float,
+        "interpolation": str,
+        "cmap": str|None,
+      }
+    """
+
+    def __init__(self, parent, well_names, default_well=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load core bitmap")
+        self.resize(520, 260)
+
+        self._result = None
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # well selection
+        self.cmb_well = QComboBox(self)
+        self.cmb_well.addItems(list(well_names))
+        if default_well and default_well in well_names:
+            self.cmb_well.setCurrentText(default_well)
+        form.addRow("Well:", self.cmb_well)
+
+        # key/name
+        self.ed_key = QLineEdit(self)
+        self.ed_key.setText("core")
+        form.addRow("Bitmap key:", self.ed_key)
+
+        # file path + browse
+        self.ed_path = QLineEdit(self)
+        btn_browse = QPushButton("Browse…", self)
+        row_path = QHBoxLayout()
+        row_path.addWidget(self.ed_path)
+        row_path.addWidget(btn_browse)
+        form.addRow("Image file:", row_path)
+        btn_browse.clicked.connect(self._browse)
+
+        # depth interval
+        self.spin_top = QDoubleSpinBox(self)
+        self.spin_top.setRange(-1e9, 1e9)
+        self.spin_top.setDecimals(3)
+        self.spin_top.setSingleStep(1.0)
+        form.addRow("Top depth:", self.spin_top)
+
+        self.spin_base = QDoubleSpinBox(self)
+        self.spin_base.setRange(-1e9, 1e9)
+        self.spin_base.setDecimals(3)
+        self.spin_base.setSingleStep(1.0)
+        self.spin_base.setValue(1.0)
+        form.addRow("Base depth:", self.spin_base)
+
+        # label
+        self.ed_label = QLineEdit(self)
+        self.ed_label.setText("Core")
+        form.addRow("Track label:", self.ed_label)
+
+        # alpha
+        self.spin_alpha = QDoubleSpinBox(self)
+        self.spin_alpha.setRange(0.0, 1.0)
+        self.spin_alpha.setDecimals(2)
+        self.spin_alpha.setSingleStep(0.05)
+        self.spin_alpha.setValue(1.0)
+        form.addRow("Alpha:", self.spin_alpha)
+
+        # interpolation
+        self.cmb_interp = QComboBox(self)
+        self.cmb_interp.addItems(["nearest", "bilinear", "bicubic"])
+        self.cmb_interp.setCurrentText("nearest")
+        form.addRow("Interpolation:", self.cmb_interp)
+
+        # colormap (optional)
+        self.cmb_cmap = QComboBox(self)
+        self.cmb_cmap.addItems(["(none)", "gray"])
+        self.cmb_cmap.setCurrentText("(none)")
+        form.addRow("Colormap:", self.cmb_cmap)
+
+        # flip
+        self.chk_flip = QCheckBox("Flip vertically", self)
+        self.chk_flip.setChecked(False)
+        form.addRow("Orientation:", self.chk_flip)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select image",
+            "",
+            "Images (*.bmp *.png *.jpg *.jpeg *.tif *.tiff);;All files (*.*)"
+        )
+        if path:
+            self.ed_path.setText(path)
+
+    def _on_accept(self):
+        well_name = self.cmb_well.currentText().strip()
+        key = self.ed_key.text().strip() or "core"
+        path = self.ed_path.text().strip()
+
+        if not well_name:
+            QMessageBox.warning(self, "Load core bitmap", "Please choose a well.")
+            return
+        if not path:
+            QMessageBox.warning(self, "Load core bitmap", "Please choose an image file.")
+            return
+
+        top_d = float(self.spin_top.value())
+        base_d = float(self.spin_base.value())
+        if abs(base_d - top_d) < 1e-9:
+            QMessageBox.warning(self, "Load core bitmap", "Top and Base depth must differ.")
+            return
+
+        label = self.ed_label.text().strip() or "Core"
+        alpha = float(self.spin_alpha.value())
+        interpolation = self.cmb_interp.currentText().strip()
+        cmap_txt = self.cmb_cmap.currentText().strip()
+        cmap = None if cmap_txt == "(none)" else cmap_txt
+        flip = bool(self.chk_flip.isChecked())
+
+        self._result = {
+            "well_name": well_name,
+            "key": key,
+            "path": path,
+            "top_depth": top_d,
+            "base_depth": base_d,
+            "label": label,
+            "alpha": alpha,
+            "interpolation": interpolation,
+            "cmap": cmap,
+            "flip_vertical": flip,
+        }
+        self.accept()
+
+    def result(self):
+        return self._result
