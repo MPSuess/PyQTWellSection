@@ -32,7 +32,7 @@ class HelpDialog(QDialog):
         btns.accepted.connect(self.accept)
         btns.button(QDialogButtonBox.Close).clicked.connect(self.close)
         layout.addWidget(btns)
-
+#       alternative method calling load_html ...
 #       self.load_html('pywellsection/PyQtHelp.html')
 
     def load_html(self, html_path: str):
