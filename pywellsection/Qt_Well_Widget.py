@@ -10,8 +10,12 @@ import sys
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QScrollArea, QDialog, QMenu, QVBoxLayout, QMessageBox
+    QScrollArea, QDialog, QMenu, QVBoxLayout, QMessageBox,
+    QDockWidget
 )
+
+from PyQt5.QtCore import Qt, pyqtSignal, QEvent
+
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
 from .multi_wells_panel import add_tops_and_correlations
@@ -52,12 +56,15 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
         self.redraw_requested = panel_settings["redraw_requested"]
+#        self.window_name = panel_settings["window_name"]
 
         self.highlight_top = None
         self.visible_tops = None
         self.visible_logs = None
         self.visible_discrete_logs = None
         self.visible_tracks = tracks
+        self.visible_wells = set()
+
         #self._temp_highlight_top = None
 
         self.fig = Figure(figsize=(12, 6), dpi=100)
@@ -113,11 +120,14 @@ class WellPanelWidget(QWidget):
 
         redraw_requested = self.panel_settings["redraw_requested"]
 
+
         if not redraw_requested:
             return
 
+        if self.visible_wells is None:
+            return
 
-        if len(self.wells) != 0:
+        if len(self.visible_wells)!= 0:
             top_true = bottom_true = None
             if hasattr(self, "axes") and self.axes:
                 # Take the first main axis as reference (row 0, track 0)
@@ -145,7 +155,7 @@ class WellPanelWidget(QWidget):
             visible_discrete_logs = self.visible_discrete_logs
             visible_tracks = self.visible_tracks
 
-            n_wells = len(self.wells)
+            n_wells = len(self.visible_wells)
 
             if visible_tracks is None:
                 filtered_tracks = self.tracks[:]
@@ -161,6 +171,8 @@ class WellPanelWidget(QWidget):
 
             self.canvas.setFixedSize(total_cols*100, 800)
 
+#            print(f"in draw panel, stratigraphy: {self.stratigraphy, visible_tops}")
+
             self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
                 self.fig,
                 self.wells,
@@ -172,6 +184,7 @@ class WellPanelWidget(QWidget):
                 corr_artists=self._corr_artists,
                 highlight_top=self.highlight_top,
                 flatten_depths=flatten_depths,
+                visible_wells=self.visible_wells,
                 visible_tops = visible_tops,
                 visible_logs = visible_logs,
                 visible_discrete_logs=visible_discrete_logs,
@@ -191,6 +204,7 @@ class WellPanelWidget(QWidget):
         self.wells = wells
         self.stratigraphy = stratigraphy
         self.panel_settings = panel_settings
+        print(f"stratigraphy: {stratigraphy}")
         self.draw_panel()
 
     def enable_top_picking(self):
@@ -449,7 +463,7 @@ class WellPanelWidget(QWidget):
         Spacer axes are ignored.
         """
         self.axis_index.clear()
-        n_wells = len(self.wells)
+        n_wells = len(self.visible_wells)
         #n_tracks = len(self.tracks)
 
         if self.visible_tracks is None:
@@ -878,13 +892,16 @@ class WellPanelWidget(QWidget):
         inserted at that depth (without violating self.stratigraphy order),
         let the user choose one, and insert it.
         """
-        well = self.wells[well_index]
+
+        wells = [w for w in self.wells if (w.get("name") in self.visible_wells)]
+
+        well = wells[well_index]
         tops = well.setdefault("tops", {})
 
-        if self._flatten_depths is not None:
-            flatten_depth = self._flatten_depths[well_index]
-        else:
-            flatten_depth = 0
+        # if len(self._flatten_depths) != 0:
+        #     flatten_depth = self._flatten_depths[well_index]
+        # else:
+        #     flatten_depth = 0
 
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
@@ -1004,7 +1021,7 @@ class WellPanelWidget(QWidget):
         self.axes = []
         self.axis_index = {}
 
-        self.n_wells = len(self.wells)
+        self.n_wells = len(self.visible_wells)
         self.n_tracks = len(self.tracks)
 
         # Example layout: each well has n_tracks + 1 spacer axes horizontally
@@ -1154,20 +1171,37 @@ class WellPanelWidget(QWidget):
 
     def set_wells(self, wells):
         self.wells = wells
+        #self.visible_wells = wells
         self._flatten_depths = None
-        self.draw_panel()
+ #       if wells and self.stratigraphy is not None:
+ #           self.draw_panel()
+
+    def set_visible_wells(self, visible_wells):
+        self.visible_wells = visible_wells
+
+    def get_visible_wells(self):
+        return self.visible_wells
 
     def set_visible_tops(self, visible_tops):
         self.visible_tops = visible_tops
-        self.draw_panel()
+#        self.draw_panel()
+
+    def get_visible_tops(self):
+        return self.visible_tops
 
     def set_visible_logs(self, visible_logs):
         self.visible_logs = visible_logs
-        self.draw_panel()
+#        self.draw_panel()
+
+    def get_visible_logs(self):
+        return self.visible_logs
 
     def set_visible_tracks(self, visible_tracks):
         self.visible_tracks = visible_tracks
         self.draw_panel()
+
+    def get_visible_tracks(self):
+        return  self.visible_tracks
 
     def _reset_flatten(self):
         """
@@ -1181,4 +1215,119 @@ class WellPanelWidget(QWidget):
     def set_panel_settings(self, settings):
         self.well_gap_factor = settings["well_gap_factor"]
         self.track_gap_factor = settings["track_gap_factor"]
-        self.track_width = settings["track_width"]        
+        self.track_width = settings["track_width"]
+
+    def set_draw_panel(self, state = True):
+        self.panel_settings["redraw_requested"] = state
+        return state
+
+class WellPanelWindow(QMainWindow):
+    """
+    Additional window containing a WellPanelWidget.
+    Uses the same project data references by default.
+    """
+    _counter = 1
+
+    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings, title_prefix="Well Panel"):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+
+        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
+        self.setCentralWidget(self.panel)
+
+        self.setWindowTitle(f"{title_prefix} {WellPanelWindow._counter}")
+        WellPanelWindow._counter += 1
+
+        # initial draw
+        self.panel.draw_panel()
+
+    def refresh(self, wells=None, tracks=None, stratigraphy=None):
+        """Update data refs and redraw."""
+        if wells is not None:
+            self.panel.wells = wells
+        if tracks is not None:
+            self.panel.tracks = tracks
+        if stratigraphy is not None:
+            self.panel.stratigraphy = stratigraphy
+        self.panel.draw_panel()
+
+class WellPanelDockOld(QDockWidget):
+    """
+    Dockable Well Panel inside the MainWindow.
+    """
+    _counter = 1
+
+    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
+        title = f"Well Panel {WellPanelDock._counter}"
+        super().__init__(title, parent)
+
+        WellPanelDock._counter += 1
+
+        self.setAllowedAreas(
+            Qt.LeftDockWidgetArea |
+            Qt.RightDockWidgetArea |
+            Qt.TopDockWidgetArea |
+            Qt.BottomDockWidgetArea
+        )
+        self.setFeatures(
+            QDockWidget.DockWidgetMovable |
+            QDockWidget.DockWidgetClosable |
+            QDockWidget.DockWidgetFloatable
+        )
+
+        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
+        self.setWidget(self.panel)
+
+        self.panel.draw_panel()
+
+class WellPanelDock(QDockWidget):
+    activated = pyqtSignal(object)  # emits self when activated
+
+    _counter = 1
+
+    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
+        title = f"Well Panel {WellPanelDock._counter}"
+        super().__init__(title, parent)
+        WellPanelDock._counter += 1
+
+        self.setAllowedAreas(
+            Qt.LeftDockWidgetArea |
+            Qt.RightDockWidgetArea |
+            Qt.TopDockWidgetArea |
+            Qt.BottomDockWidgetArea
+        )
+        self.setFeatures(
+            QDockWidget.DockWidgetMovable |
+            QDockWidget.DockWidgetClosable |
+            QDockWidget.DockWidgetFloatable
+        )
+
+#        self.tabifiedDockWidgetActivated.connect(self.window_activate)
+
+        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
+        self.setWidget(self.panel)
+        self.panel.draw_panel()
+
+        # Detect “activation” by focus/click inside panel
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj is self:
+            if event.type() in (QEvent.MouseButtonPress, QEvent.FocusIn):
+                self.activated.emit(self)
+        return super().eventFilter(obj, event)
+
+    def draw_panel(self):
+        self.panel.draw_panel()
+
+    def window_activate(self,dockwidget):
+        if isinstance(dockwidget,bool):
+            return
+        else:
+            name=dockwidget.objectName()
+            children=dockwidget.children()
+            for child in children:
+                LOG.debug(f'We try to activate {child}')
+
+        return
+

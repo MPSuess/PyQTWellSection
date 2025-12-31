@@ -90,6 +90,7 @@ def draw_multi_wells_panel_on_figure(
     corr_artists=None,
     highlight_top=None,
     flatten_depths=None,
+    visible_wells=None,
     visible_tops = None,
     visible_logs = None,
     visible_discrete_logs = None,
@@ -110,9 +111,18 @@ def draw_multi_wells_panel_on_figure(
       - y-axis always labels TRUE depth (not relative depth)
     """
 
+    print(f" draw ! visible tops: {visible_tops}")
+
     fig.clf()
 
-    n_wells = len(wells)
+
+
+    n_wells = len(visible_wells)
+
+    if n_wells == 0:
+        return n_wells
+
+    selected_wells = [w for w in wells if (w.get("name") in visible_wells)]
 
     if visible_tracks is None:
         filtered_tracks = tracks[:]
@@ -130,8 +140,8 @@ def draw_multi_wells_panel_on_figure(
 
     # ---- 1) Physical depth window (no offsets here) ----
 
-    ref_depths = [w["reference_depth"] for w in wells]
-    bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
+    ref_depths = [w["reference_depth"] for w in selected_wells]
+    bottoms = [w["reference_depth"] + w["total_depth"] for w in selected_wells]
 
     # top_phys = highest reference depth, bottom_phys = deepest bottom
     top_phys = max(ref_depths)
@@ -201,7 +211,12 @@ def draw_multi_wells_panel_on_figure(
     well_main_axes = []
 
     # ---- 4) Draw wells ----
-    for wi, well in enumerate(wells):
+
+
+
+    for wi, well in enumerate(selected_wells):
+
+
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
 
@@ -284,7 +299,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     fig.canvas.draw()
-    add_depth_range_labels(fig, axes, wells, n_tracks)
+    add_depth_range_labels(fig, axes, selected_wells, n_tracks)
 
     if corr_artists is None:
         corr_artists = []
@@ -292,7 +307,7 @@ def draw_multi_wells_panel_on_figure(
     add_tops_and_correlations(
         fig,
         axes,
-        wells,
+        selected_wells,
         well_main_axes,
         n_tracks,
         correlations_only=False,
@@ -879,6 +894,12 @@ def add_tops_and_correlations(
                                       and highlight_top[1] == name)
 
                     linewidth = style["line_width"] * (1.0 if not is_highlighted else 1.8)
+#                    print(stratigraphy)
+
+                    if len(stratigraphy) == 0:
+                        return len(stratigraphy)
+
+#                    print(f"add_tops_and_correlations stratigraphy: {stratigraphy}")
 
                     if stratigraphy[name]['role'] == 'stratigraphy':
                         base_ax.axhline(
