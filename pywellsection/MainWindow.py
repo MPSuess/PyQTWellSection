@@ -847,34 +847,34 @@ class MainWindow(QMainWindow):
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
-        print("on_tree_item_changed!")
+        print(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
+        #self.panel.set_draw_panel(False)
+
+        if item.data(0, Qt.UserRole) is None:
+            return 0
 
         p = item.parent()
         if item  is self.well_root_item or p is self.well_root_item:
-            self._rebuild_panel_from_tree()
-            return
+            self._rebuild_wells_from_tree()
 
         if item  is self.stratigraphy_root or p is self.stratigraphy_root:
             self._rebuild_visible_tops_from_tree()
-            return
 
         if item  is self.faults_root or p is self.faults_root:
             self._rebuild_visible_tops_from_tree()
-            return
 
         if item  is self.other_root or p is self.other_root:
             self._rebuild_visible_tops_from_tree()
-            return
 
         # Logs
         if item is self.well_logs_folder:
             self._rebuild_visible_logs_from_tree()
-            return
 
         # Tracks
         if item is self.track_root_item or p is self.track_root_item:
             self._rebuild_visible_tracks_from_tree()
-            return
+
+        #self.panel.set_draw_panel(True)
 
     def _select_all_wells(self):
         self.well_tree.blockSignals(True)
@@ -987,6 +987,27 @@ class MainWindow(QMainWindow):
         # If none selected, you can either show none or all; here: show none
         #self.panel.set_wells(selected)
         self.panel.set_visible_wells(checked_names)
+
+    def _rebuild_wells_from_tree(self):
+        """Collect checked wells (by name) and send to panel."""
+        checked_names = set()
+
+        checked_names = set()
+        root = self.well_root_item
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                checked_names.add(it.data(0, Qt.UserRole))
+
+        # Map names → well dicts (keep original order)
+        #selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
+        # If none selected, you can either show none or all; here: show none
+        # self.panel.set_wells(selected)
+
+        print(f"rebuild_wells_from_tree: {checked_names}")
+
+        self.panel.set_visible_wells(checked_names)
+        self.panel.draw_panel()
 
     def _rebuild_visible_tops_from_tree(self):
         root = self.stratigraphy_root
