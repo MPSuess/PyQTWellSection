@@ -120,11 +120,19 @@ class WellPanelWidget(QWidget):
 
         redraw_requested = self.panel_settings["redraw_requested"]
 
+        print (f"redraw requested: {self.visible_wells}")
 
         if not redraw_requested:
             return
 
         if self.visible_wells is None:
+            self.fig.clear()
+            self.canvas.draw()
+            return
+
+        if len(self.visible_wells) == 0:
+            self.fig.clear()
+            self.canvas.draw()
             return
 
         if len(self.visible_wells)!= 0:
