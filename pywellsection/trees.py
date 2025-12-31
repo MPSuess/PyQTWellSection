@@ -29,7 +29,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.well_root_item.setCheckState(0, Qt.Checked)
+    self.well_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.well_root_item)
 
     self.well_tops_folder = QTreeWidgetItem(["Well Tops"])
@@ -42,40 +42,41 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
 
-    self.well_tops_folder.setCheckState(0, Qt.Checked)
+    self.well_tops_folder.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.well_tops_folder)
 
     self.stratigraphy_root = QTreeWidgetItem(["Stratigraphy"])
     self.stratigraphy_root.setFlags(
         self.stratigraphy_root.flags()
         | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.stratigraphy_root.setCheckState(0, Qt.Checked)
+    self.stratigraphy_root.setCheckState(0, Qt.Unchecked)
     self.well_tops_folder.addChild(self.stratigraphy_root)
 
     self.faults_root = QTreeWidgetItem(["Faults"])
     self.faults_root.setFlags(
         self.faults_root.flags()
         | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.faults_root.setCheckState(0, Qt.Checked)
+    self.faults_root.setCheckState(0, Qt.Unchecked)
     self.well_tops_folder.addChild(self.faults_root)
 
     self.other_root = QTreeWidgetItem(["Other"])
     self.other_root.setFlags(
         self.other_root.flags()
         | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.other_root.setCheckState(0, Qt.Checked)
+    self.other_root.setCheckState(0, Qt.Unchecked)
     self.well_tops_folder.addChild(self.other_root)
-
-
 
     self.well_logs_folder = QTreeWidgetItem(["Logs"])
     # tristate so checking it checks/unchecks children
@@ -87,12 +88,8 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
 
-    self.well_logs_folder.setCheckState(0, Qt.Checked)
+    self.well_logs_folder.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.well_logs_folder)
-
-
-
-
 
     # --- Folder: Tracks (structure only, not necessarily checkable) ---
     self.track_root_item = QTreeWidgetItem(["Tracks"])
@@ -104,7 +101,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.track_root_item.setCheckState(0, Qt.Checked)
+    self.track_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.track_root_item)
 
     ### Setup the Dock
@@ -114,9 +111,9 @@ def setup_well_widget_tree(self):
     self.well_dock.setWidget(self.well_tree)
     self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
 
-    self.splitDockWidget(self.well_dock, self.dock_panel, Qt.Horizontal)
-    self.splitDockWidget(self.dock_panel, self.dock_console, Qt.Vertical)
-    self.resizeDocks([self.dock_panel, self.dock_console], [4, 1], Qt.Vertical)
+    self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
+    self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
+    self.resizeDocks([self.dock, self.dock_console], [4, 1], Qt.Vertical)
 
     self.tabifyDockWidget(self.dock_console, self.dock_commands)
     self.tabifyDockWidget(self.dock_commands, self.dock_logger)
@@ -127,6 +124,6 @@ def setup_well_widget_tree(self):
     self._populate_well_tops_tree()
     self._populate_well_log_tree()
     self._populate_well_track_tree()
-    self.redraw_requested = True
+    self.redraw_requested = False
 
 
