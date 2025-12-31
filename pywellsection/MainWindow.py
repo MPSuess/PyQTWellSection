@@ -337,10 +337,10 @@ class MainWindow(QMainWindow):
                         if log in self.all_logs:
                             continue
                         else:
-                            print("appending log:" , log)
+                            LOG.debug("appending log:" , log)
                             self.all_logs = self.all_logs|{log}
                 else:
-                    print("No logs found")
+                    LOG.debug("No logs found")
 
             for well in wells:
                 disc_logs = well.get("discrete_logs", {})
@@ -396,10 +396,10 @@ class MainWindow(QMainWindow):
 
         try:
             wells = getattr(self.panel, "wells", [])
-            #print ("Saving",wells[0])
+            #LOG.debug ("Saving",wells[0])
 
             for well in wells:
-                print("Saving",well["name"], "")
+                LOG.debug("Saving",well["name"], "")
 
             tracks = getattr(self.panel, "tracks", [])
             stratigraphy = getattr(self.panel, "stratigraphy", None)
@@ -412,7 +412,7 @@ class MainWindow(QMainWindow):
 
 
 
-            print("Saving",project["wells"][0]["name"], "done")
+            LOG.debug("Saving",project["wells"][0]["name"], "done")
 
 
 
@@ -847,7 +847,7 @@ class MainWindow(QMainWindow):
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
-        print(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
+        LOG.debug(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
         #self.panel.set_draw_panel(False)
 
         if item.data(0, Qt.UserRole) is None:
@@ -894,7 +894,7 @@ class MainWindow(QMainWindow):
 
     def _set_tree_from_panel(self):
 
-        print("Setting well tree ... .")
+        LOG.debug("Setting well tree ... .")
         self.well_tree.itemChanged.connect(self.do_nothing)
 
         wells = self.panel.get_visible_wells()
@@ -950,7 +950,7 @@ class MainWindow(QMainWindow):
         """Collect checked wells (by name) and send to panel."""
         checked_names = set()
 
-        print("rebuild_panel_from_tree")
+        LOG.debug("rebuild_panel_from_tree")
 
         root = self.stratigraphy_root
         for i in range(root.childCount()):
@@ -970,7 +970,7 @@ class MainWindow(QMainWindow):
                 checked_names.add(it.data(0, Qt.UserRole))
         selected = checked_names
 
-        print (f"rebuild_panel tracks{selected}")
+        LOG.debug (f"rebuild_panel tracks{selected}")
 
         self.panel.set_visible_tracks(selected)
 
@@ -1004,7 +1004,7 @@ class MainWindow(QMainWindow):
         # If none selected, you can either show none or all; here: show none
         # self.panel.set_wells(selected)
 
-        print(f"rebuild_wells_from_tree: {checked_names}")
+        LOG.debug(f"rebuild_wells_from_tree: {checked_names}")
 
         self.panel.set_visible_wells(checked_names)
         self.panel.draw_panel()
@@ -1034,7 +1034,7 @@ class MainWindow(QMainWindow):
                 if nm:
                     visible.add(nm)
 
-        print (f"_rebuild_visible_tops_from_tree visible:{visible}")
+        LOG.debug (f"_rebuild_visible_tops_from_tree visible:{visible}")
 
         self.panel.set_visible_tops(visible if visible else None)
         self.panel.draw_panel()
@@ -1127,7 +1127,7 @@ class MainWindow(QMainWindow):
         # 5) propagate to panel & tree widgets
         #if self.panel.tracks is not None:
         #    self.panel.tracks = self.panel.tracks
-        #    print(self.panel.tracks)# keep panel in sync
+        #    LOG.debug(self.panel.tracks)# keep panel in sync
         #self.panel.draw_panel()
 
         # refresh log+track trees so the new log shows up
@@ -2001,7 +2001,7 @@ class MainWindow(QMainWindow):
         # Optionally bring dock to front/tab
         dock.raise_()
 
-        print ("Activated new window")
+        LOG.debug ("Activated new window")
 
         # If you need the tree to reflect active_panel view filters, do that here.
 
