@@ -120,7 +120,7 @@ class WellPanelWidget(QWidget):
 
         redraw_requested = self.panel_settings["redraw_requested"]
 
-        print (f"redraw requested: {self.visible_wells}")
+        LOG.debug(f"redraw requested: {self.visible_wells}")
 
         if not redraw_requested:
             return
@@ -212,7 +212,7 @@ class WellPanelWidget(QWidget):
         self.wells = wells
         self.stratigraphy = stratigraphy
         self.panel_settings = panel_settings
-        print(f"stratigraphy: {stratigraphy}")
+        LOG.debug(f"stratigraphy: {stratigraphy}")
         self.draw_panel()
 
     def enable_top_picking(self):
@@ -229,7 +229,7 @@ class WellPanelWidget(QWidget):
     def edit_top_dialog_accepted(self):
         """OK clicked on dialog: update top and redraw."""
         if self._active_top_dialog is None:
-            print ("no more top dialog?")
+            LOG.debug ("no more top dialog?")
             return
 
         wi = self._active_pick_context["wi"]
@@ -311,7 +311,7 @@ class WellPanelWidget(QWidget):
             flatten_depth = self._flatten_depths[wi]
         else:
             flatten_depth = 0
-        print("dialog pick event received")
+        LOG.debug("dialog pick event received")
 
         ctx = self._active_pick_context
         depth = None
@@ -543,7 +543,7 @@ class WellPanelWidget(QWidget):
         hatched band at the mouse depth for the selected well.
         """
         if self._active_top_dialog is None:
-            print("dialog is None")
+            LOG.debug("dialog is None")
 
         if not self._in_dialog_pick_mode:
             return
@@ -560,11 +560,11 @@ class WellPanelWidget(QWidget):
         else:
             flatten_depth = 0
 
-        print(f"depth={depth} flatten_depth={flatten_depth}")
+        LOG.debug(f"depth={depth} flatten_depth={flatten_depth}")
 
         depth = depth - flatten_depth
 
-        print (f"recalculated depth={depth}")
+        LOG.debug (f"recalculated depth={depth}")
 
         formation_name = self._active_pick_context["formation_name"]
 
@@ -577,7 +577,7 @@ class WellPanelWidget(QWidget):
             #     depth = max-flatten_depth
 
 
-        print("move", event.ydata, min, max, depth, flatten_depth)
+        LOG.debug("move", event.ydata, min, max, depth, flatten_depth)
 
 
         # draw a thin hatched band across ALL tracks of the selected well
@@ -613,7 +613,7 @@ class WellPanelWidget(QWidget):
     #       - update dialog spinbox
     #       - ALWAYS exit pick mode, remove band, and show dialog again
     #     """
-    #     print("click", event.ydata)
+    #     LOG.debug("click", event.ydata)
     #
     #     if not self._in_dialog_pick_mode:
     #         return
@@ -803,7 +803,7 @@ class WellPanelWidget(QWidget):
         dlg.accepted.connect(self.edit_top_dialog_accepted)
         dlg.rejected.connect(self.edit_top_dialog_rejected)
         #
-        print ("Starting Dialog")
+        LOG.debug ("Starting Dialog")
         dlg.show()
 
     def _delete_formation_top(self, well_index: int, top_name: str):
