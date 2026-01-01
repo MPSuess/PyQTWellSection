@@ -5061,19 +5061,19 @@
         }
       },
       "bitmaps": {
-          "bitmap1": {
-            "path": "core1.png",
-            "top_depth": 200.0,
-            "base_depth": 300.0,
-            "track":"core"
-          },
-          "bitmap2": {
-            "path": "core1.png",
-            "top_depth": 300.0,
-            "base_depth": 400.0,
-            "track": "core2"
-          }
+        "bitmap1": {
+          "path": "core1.png",
+          "top_depth": 200.0,
+          "base_depth": 300.0,
+          "track": "core"
         },
+        "bitmap2": {
+          "path": "core1.png",
+          "top_depth": 300.0,
+          "base_depth": 400.0,
+          "track": "core2"
+        }
+      },
       "tops": {
         "Formation A": {
           "depth": 200,
@@ -11358,28 +11358,26 @@
         "spline": {
           "smooth": 1,
           "num_samples": 25
-          }
-        },
-      "hatch_map" :
-        {
-            "Distributary Mouth Bar": "/",
-            "Distributary Channel":   ".\\",
-            "Bay":                    ".-.",
-            "Inner Marine Shelf":     "-",
-            "Estuarine Bay–Lagoon":   "-x"
         }
-        ,
+      },
+      "hatch_map": {
+        "Distributary Mouth Bar": "/",
+        "Distributary Channel": ".\\",
+        "Bay": ".-.",
+        "Inner Marine Shelf": "-",
+        "Estuarine Bay\u2013Lagoon": "-x"
+      },
       "color_map": {
-            "Distributary Mouth Bar": "orange",
-            "Distributary Channel":   "yellow",
-            "Bay":                    "blue",
-            "Inner Marine Shelf":     "grey",
-            "Estuarine Bay–Lagoon":   "green"
-        },
+        "Distributary Mouth Bar": "orange",
+        "Distributary Channel": "yellow",
+        "Bay": "blue",
+        "Inner Marine Shelf": "grey",
+        "Estuarine Bay\u2013Lagoon": "green"
+      },
       "litho_hardness": {
-        "SS":  10.0,
+        "SS": 10.0,
         "SSa": 5.0,
-        "M":   1.0
+        "M": 1.0
       }
     },
     {
@@ -11475,8 +11473,8 @@
       }
     },
     {
-      "name":  "core",
-      "type":  "bitmap",
+      "name": "core",
+      "type": "bitmap",
       "bitmap": {
         "alpha": 1.0,
         "cmap": "None",
@@ -11485,8 +11483,9 @@
         "label": "Core photo"
       }
     },
-    {"name":  "core2",
-      "type":  "bitmap",
+    {
+      "name": "core2",
+      "type": "bitmap",
       "bitmap": {
         "alpha": 1.0,
         "cmap": "None",
@@ -11537,5 +11536,116 @@
   "metadata": {
     "app": "pywellsection",
     "version": "0.1.0"
-  }
+  },
+  "window_dict": [
+    {
+      "type": "WellSection",
+      "visible": true,
+      "window_title": "Well Section C",
+      "visible_tops": {
+        "Upper Formation A": {
+          "level": "sequence",
+          "color": "#ff0000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Formation A": {
+          "level": "formation",
+          "color": "#ffcc00",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Sequence 1": {
+          "level": "sequence",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Member A1": {
+          "level": "member",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Carboniferous": {
+          "level": "formation",
+          "color": "#000000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Lower Formation A": {
+          "level": "sequence",
+          "color": "#0000ff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        }
+      },
+      "visible_logs": [
+        "RT",
+        "PHI",
+        "RHOB",
+        "GR",
+        "CAL"
+      ],
+      "visible_tracks": [
+        "Facies",
+        "core",
+        "RT-RHOB",
+        "LithoFacies",
+        "RHOB-PHI",
+        "core2",
+        "GR-CAL"
+      ],
+      "visible_wells": [
+        "Well C",
+        "Well A",
+        "Well B"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true
+      }
+    },
+    {
+      "type": "WellSection",
+      "visible": true,
+      "window_title": "Well Section A",
+      "visible_tops": null,
+      "visible_logs": [],
+      "visible_tracks": [],
+      "visible_wells": [
+        "Well A",
+        "Well B"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true
+      }
+    },
+    {
+      "type": "WellSection",
+      "visible": true,
+      "window_title": "Well Section B",
+      "visible_tops": null,
+      "visible_logs": [
+        "GR"
+      ],
+      "visible_tracks": [
+        "GR-CAL"
+      ],
+      "visible_wells": [
+        "Well B"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true
+      }
+    }
+  ]
 }

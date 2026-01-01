@@ -111,7 +111,7 @@ def draw_multi_wells_panel_on_figure(
       - y-axis always labels TRUE depth (not relative depth)
     """
 
-    print(f" draw ! visible tops: {visible_tops}")
+    #print(f" draw ! visible tops: {visible_tops}")
 
     fig.clf()
 
@@ -169,7 +169,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     if depth_window is not None:
-        print ("depth_window", depth_window)
+        #print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
         if top_depth_window < global_mid_plot < bottom_depth_window:
             global_top_plot = top_depth_window
@@ -329,8 +329,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
     for j, log_cfg in enumerate(track.get("logs", [])):
         log_name = log_cfg["log"]
 
-        if visible_logs is not None and log_name not in visible_logs:
-            continue
+        if visible_logs is not None:
+            if log_name not in visible_logs:
+                continue
 
         log_def = well.get("logs", {}).get(log_name)
         if log_def is None:

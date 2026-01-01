@@ -25,11 +25,12 @@ def load_project_from_json(path):
     wells = data.get("wells", [])
     tracks = data.get("tracks", [])
     stratigraphy = data.get("stratigraphy", [])
+    window_dict = data.get("window_dict", {})
     metadata = data.get("metadata", {})
 
-    return wells, tracks, stratigraphy, metadata
+    return window_dict, wells, tracks, stratigraphy, metadata
 
-def export_project_to_json(path, wells, tracks, stratigraphy=None, extra_metadata=None):
+def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, extra_metadata=None):
     """
     Export the current project to a JSON file (NumPy-safe).
 
@@ -56,6 +57,8 @@ def export_project_to_json(path, wells, tracks, stratigraphy=None, extra_metadat
         project["stratigraphy"] = stratigraphy
     if extra_metadata:
         project["metadata"] = extra_metadata
+    if window_dict:
+        project["window_dict"] = window_dict
 
     with path.open("w", encoding="utf-8") as f:
         json.dump(project, f, indent=2, default=_json_serializer)

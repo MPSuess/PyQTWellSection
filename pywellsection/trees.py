@@ -8,6 +8,27 @@ import logging
 LOG = logging.getLogger(__name__)
 LOG.setLevel("INFO")
 
+def setup_window_tree(self):
+    self.window_tree = QTreeWidget(self)
+    self.window_tree.setHeaderHidden(True)
+    self.window_tree.itemChanged.connect(self._on_window_item_changed)
+    self.window_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.window_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+
+    # 👇 create the folder item once
+    self.window_root = QTreeWidgetItem(["Windows"])
+    # tristate so checking it checks/unchecks children
+    self.window_root.setFlags(
+        self.window_root.flags()
+        | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
+        | Qt.ItemIsSelectable
+        | Qt.ItemIsEnabled
+    )
+    self.window_root.setCheckState(0, Qt.Unchecked)
+    self.window_tree.addTopLevelItem(self.window_root)
+
+
 def setup_well_widget_tree(self):
     ### --- Define the Input Tree ###
     self.well_tree = QTreeWidget(self)
@@ -104,26 +125,6 @@ def setup_well_widget_tree(self):
     self.track_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.track_root_item)
 
-    ### Setup the Dock
 
-    self.well_dock = QDockWidget("Input Data", self)
-    self.well_dock.setObjectName("Input")
-    self.well_dock.setWidget(self.well_tree)
-    self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
-
-    self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
-    self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
-    self.resizeDocks([self.dock, self.dock_console], [4, 1], Qt.Vertical)
-
-    self.tabifyDockWidget(self.dock_console, self.dock_commands)
-    self.tabifyDockWidget(self.dock_commands, self.dock_logger)
-    self.dock_console.raise_()
-
-    # --- intial build of the well tree
-    self._populate_well_tree()
-    self._populate_well_tops_tree()
-    self._populate_well_log_tree()
-    self._populate_well_track_tree()
-    self.redraw_requested = False
 
 
