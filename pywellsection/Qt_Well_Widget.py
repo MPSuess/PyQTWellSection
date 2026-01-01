@@ -52,6 +52,8 @@ class WellPanelWidget(QWidget):
 
         self.panel_settings = panel_settings
 
+        self.active_panel = False
+
         self.well_gap_factor = panel_settings["well_gap_factor"]
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
@@ -64,6 +66,7 @@ class WellPanelWidget(QWidget):
         self.visible_discrete_logs = None
         self.visible_tracks = tracks
         self.visible_wells = set()
+
 
         #self._temp_highlight_top = None
 
@@ -1229,74 +1232,19 @@ class WellPanelWidget(QWidget):
         self.panel_settings["redraw_requested"] = state
         return state
 
-class WellPanelWindow(QMainWindow):
-    """
-    Additional window containing a WellPanelWidget.
-    Uses the same project data references by default.
-    """
-    _counter = 1
-
-    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings, title_prefix="Well Panel"):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
-
-        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
-        self.setCentralWidget(self.panel)
-
-        self.setWindowTitle(f"{title_prefix} {WellPanelWindow._counter}")
-        WellPanelWindow._counter += 1
-
-        # initial draw
-        self.panel.draw_panel()
-
-    def refresh(self, wells=None, tracks=None, stratigraphy=None):
-        """Update data refs and redraw."""
-        if wells is not None:
-            self.panel.wells = wells
-        if tracks is not None:
-            self.panel.tracks = tracks
-        if stratigraphy is not None:
-            self.panel.stratigraphy = stratigraphy
-        self.panel.draw_panel()
-
-class WellPanelDockOld(QDockWidget):
-    """
-    Dockable Well Panel inside the MainWindow.
-    """
-    _counter = 1
-
-    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
-        title = f"Well Panel {WellPanelDock._counter}"
-        super().__init__(title, parent)
-
-        WellPanelDock._counter += 1
-
-        self.setAllowedAreas(
-            Qt.LeftDockWidgetArea |
-            Qt.RightDockWidgetArea |
-            Qt.TopDockWidgetArea |
-            Qt.BottomDockWidgetArea
-        )
-        self.setFeatures(
-            QDockWidget.DockWidgetMovable |
-            QDockWidget.DockWidgetClosable |
-            QDockWidget.DockWidgetFloatable
-        )
-
-        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
-        self.setWidget(self.panel)
-
-        self.panel.draw_panel()
-
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
 
     _counter = 1
 
     def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
-        title = f"Well Panel {WellPanelDock._counter}"
+        title = f"Well Section {WellPanelDock._counter}"
         super().__init__(title, parent)
         WellPanelDock._counter += 1
+
+        self.title = title
+        self.type = "WellSection"
+        self.visible = True
 
         self.setAllowedAreas(
             Qt.LeftDockWidgetArea |
@@ -1338,4 +1286,22 @@ class WellPanelDock(QDockWidget):
                 LOG.debug(f'We try to activate {child}')
 
         return
+
+    def set_visible(self, state):
+        if state:
+            self.visible = True
+        else:
+            self.visible = False
+
+    def get_visible(self):
+        return self.visible
+
+    def get_title(self):
+        return self.title
+
+    def set_title(self, title):
+        self.title = title
+        self.setWindowTitle(title)
+
+
 
