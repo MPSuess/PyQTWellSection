@@ -11541,6 +11541,7 @@
     {
       "type": "WellSection",
       "visible": true,
+      "floating": false,
       "window_title": "Well Section C",
       "visible_tops": {
         "Upper Formation A": {
@@ -11581,38 +11582,42 @@
         }
       },
       "visible_logs": [
-        "RT",
         "PHI",
-        "RHOB",
         "GR",
-        "CAL"
+        "RT",
+        "CAL",
+        "RHOB"
       ],
       "visible_tracks": [
-        "Facies",
-        "core",
-        "RT-RHOB",
-        "LithoFacies",
-        "RHOB-PHI",
         "core2",
-        "GR-CAL"
+        "core",
+        "GR-CAL",
+        "RHOB-PHI",
+        "RT-RHOB",
+        "Facies",
+        "LithoFacies"
       ],
       "visible_wells": [
         "Well C",
-        "Well A",
-        "Well B"
+        "Well B",
+        "Well A"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
         "track_gap_factor": 1.0,
         "track_width": 1.0,
-        "redraw_requested": true
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
       }
     },
     {
       "type": "WellSection",
       "visible": true,
+      "floating": false,
       "window_title": "Well Section A",
-      "visible_tops": null,
+      "visible_tops": [
+        "Sequence 1"
+      ],
       "visible_logs": [],
       "visible_tracks": [],
       "visible_wells": [
@@ -11623,12 +11628,14 @@
         "well_gap_factor": 3.0,
         "track_gap_factor": 1.0,
         "track_width": 1.0,
-        "redraw_requested": true
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
       }
     },
     {
       "type": "WellSection",
       "visible": true,
+      "floating": false,
       "window_title": "Well Section B",
       "visible_tops": null,
       "visible_logs": [
@@ -11644,8 +11651,28 @@
         "well_gap_factor": 3.0,
         "track_gap_factor": 1.0,
         "track_width": 1.0,
-        "redraw_requested": true
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
       }
     }
-  ]
+  ],
+  "ui_layout": {
+    "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAP3AAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAEXAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABGAAAAt8AAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABDAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAHABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEEBAAAD+AAAAswAAAAAAAAAAPwAAAAYAAADbAAAAMABAAAU+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAF8A////+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAXwD///8AAAAAAAADbAAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
+    "tab_groups": [
+      [
+        "Console",
+        "Commands",
+        "Log"
+      ],
+      [
+        "Input",
+        "Windows"
+      ],
+      [
+        "Well Section B",
+        "Well Section A"
+      ]
+    ]
+  }
 }
