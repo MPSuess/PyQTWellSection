@@ -794,6 +794,9 @@ def add_tops_and_correlations(
       - list that will collect Line2D and Polygon artists for correlations
         so they can be removed/redrawn when zooming.
     """
+    if visible_tops is None:
+        # do nothing if not visible_tops is provided
+        return 0
 
     n_wells = len(wells)
     if corr_artists is None:

@@ -1,10 +1,11 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
-    QTableWidgetItem,QDialog, QInputDialog, QMenu)
+    QTableWidgetItem, QDialog, QInputDialog, QMenu)
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, QPoint, QEvent
+from PyQt5.QtCore import Qt, QPoint, QEvent, QByteArray
 
+import base64
 import numpy as np
 import csv
 
@@ -14,7 +15,6 @@ from pywellsection.Qt_Well_Widget import WellPanelWidget, WellPanelDock
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
-
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
@@ -39,7 +39,6 @@ from pywellsection.dialogs import HelpDialog
 from pathlib import Path
 from collections import OrderedDict
 
-
 import logging
 
 # This file is part of the `pywellsection` project and licensed under
@@ -53,7 +52,7 @@ logging.getLogger("parso").setLevel("CRITICAL")
 logging.getLogger("parso.cache").setLevel("CRITICAL")
 
 LOG = logging.getLogger(__name__)
-LOG.setLevel("DEBUG")
+LOG.setLevel("ERROR")
 
 
 class MainWindow(QMainWindow):
@@ -64,6 +63,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyQTWellSection")
         self.resize(1200, 1000)
         self.redraw_requested = False
+        self.current_project_path = None
 
         # The Windows
         ### central widget ----
@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings = self.panel_settings
+            panel_settings=self.panel_settings
         )
         self.dock.activated.connect(self._on_panel_activated)
 
@@ -97,11 +97,9 @@ class MainWindow(QMainWindow):
         self.dock.panel.active_panel = True
         self.panel = self.dock.panel
 
-        self.WindowList=[]
-
+        self.WindowList = []
 
         self.active_window = self.dock
-
 
         self.WindowList.append(self.active_window)
 
@@ -109,11 +107,13 @@ class MainWindow(QMainWindow):
         self.console = QIPythonWidget(self)
         self.dock_console = QDockWidget("Console", self)
         self.dock_console.setWidget(self.console)
+        self.dock_console.setObjectName("Console")
         self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_console)
 
         # commands
         self.textedit_commands = QTextEditCommands(self)
         self.dock_commands = QDockWidget("Commands", self)
+        self.dock_commands.setObjectName("Commands")
         self.dock_commands.setWidget(self.textedit_commands)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_commands)
 
@@ -124,6 +124,7 @@ class MainWindow(QMainWindow):
         logging.getLogger().addHandler(self.textbox_logger)
         logging.getLogger().setLevel("DEBUG")
         self.dock_logger = QDockWidget("Log", self)
+        self.dock_logger.setObjectName("Log")
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
         setup_well_widget_tree(self)
@@ -140,7 +141,6 @@ class MainWindow(QMainWindow):
         self.window_dock.setObjectName("Windows")
         self.window_dock.setWidget(self.window_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.window_dock)
-
 
         self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
         self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
@@ -160,12 +160,11 @@ class MainWindow(QMainWindow):
         self._populate_window_tree()
         #self.redraw_requested = False
 
-
-
-        self.redraw_requested=True
+        self.redraw_requested = True
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width, "redraw_requested": self.redraw_requested}
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+                               "panel_title":self.dock.title}
 
         self.panel.set_visible_wells(None)
         self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
@@ -185,8 +184,13 @@ class MainWindow(QMainWindow):
         act_open.triggered.connect(self._project_file_open)
         file_menu.addAction(act_open)
 
+        act_save_as = QAction("Save project as...", self)
+        act_save_as.setShortcut("Ctrl+S")
+        act_save_as.triggered.connect(self._project_file_save_as)
+        file_menu.addAction(act_save_as)
+
         act_save = QAction("Save project...", self)
-        act_save.setShortcut("Ctrl+S")
+        act_save.setShortcut("Ctrl+Shift+S")
         act_save.triggered.connect(self._project_file_save)
         file_menu.addAction(act_save)
 
@@ -214,7 +218,6 @@ class MainWindow(QMainWindow):
         act_import_facies = QAction("Facies intervals from CSV…", self)
         act_import_facies.triggered.connect(self._action_import_facies_intervals_csv)
         import_menu.addAction(act_import_facies)
-
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
@@ -277,7 +280,6 @@ class MainWindow(QMainWindow):
         act_edit_litho.triggered.connect(self._action_edit_lithofacies_table)
         tools_menu.addAction(act_edit_litho)
 
-
         # --- Help menu (unchanged) ---
         help_menu = menubar.addMenu("&Help")
 
@@ -291,7 +293,7 @@ class MainWindow(QMainWindow):
         act_about.triggered.connect(self._show_about)
         help_menu.addAction(act_about)
 
-            # (keep any existing View items like “Select all wells” etc.)
+        # (keep any existing View items like “Select all wells” etc.)
 
     def _show_about(self):
         QMessageBox.information(
@@ -313,117 +315,18 @@ class MainWindow(QMainWindow):
     # FILE HANDLERS (placeholders for now)
     # ------------------------------------------------
 
-    def _project_file_open_old(self):
-        """Load wells/tracks data from a JSON file (example)."""
-        path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
-        if not path:
-            return
-        try:
-            wells, tracks, raw_strat, _ = load_project_from_json(path)
-            self.panel.wells = wells
-            self.panel.tracks = tracks
-            #self.all_stratigraphy = None
-            self.all_logs = []
-            self.all_tracks = tracks
-            self.all_wells = wells
-
-            # ---- normalize stratigraphy ----
-            # Ensure it's an ordered mapping of name -> dict(meta)
-            if isinstance(raw_strat, dict):
-                strat_items = raw_strat.items()
-            elif isinstance(raw_strat, list):
-                # in case older format is a list of (name, meta) pairs
-                strat_items = raw_strat
-            else:
-                strat_items = []
-
-            stratigraphy = OrderedDict()
-            for name, meta in strat_items:
-                if meta is None or not isinstance(meta, dict):
-                    meta = {}
-
-                # keep existing fields
-                level = meta.get("level", "")
-                color = meta.get("color", "#000fff")
-                hatch = meta.get("hatch", "-")
-                role = meta.get("role", "stratigraphy")  # 👈 default if missing
-
-                stratigraphy[name] = {
-                    "level": level,
-                    "color": color,
-                    "hatch": hatch,
-                    "role": role,
-                }
-
-            if not self.all_stratigraphy:
-                self.all_stratigraphy = stratigraphy
-            else:
-                self.all_stratigraphy.update(stratigraphy)
-
-            for well in wells:
-                logs = well.get("logs")
-                if logs:
-                    for log in logs:
-                        if not self.all_logs:
-                            self.all_logs = logs.keys()
-                        if log in self.all_logs:
-                            continue
-                        else:
-                            #LOG.debug("appending log:" , log)
-                            self.all_logs = self.all_logs|{log}
-                else:
-                    LOG.debug("No logs found")
-
-            for well in wells:
-                disc_logs = well.get("discrete_logs", {})
-                for log_name, d in list(disc_logs.items()):
-                    if "top_depths" in d and "bottom_depths" in d:
-                        tops = np.array(d["top_depths"], dtype=float)
-                        values = np.array(d["values"], dtype=object)
-                        # convert to depth/value representation (top sample)
-                        disc_logs[log_name] = {
-                            "depth": tops.tolist(),
-                            "values": values.tolist(),
-                        }
-
-
-
-            self.redraw_requested = False
-            self.panel_settings["redraw_requested"] = False
-
-
-            # populate well tree
-            self._populate_well_tree()
-            self._populate_well_tops_tree()
-            self._populate_well_log_tree()
-            self._populate_well_track_tree()
-
-#            self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
-
-            self.panel.set_visible_tops(self.all_stratigraphy)
-
-            self._refresh_all_panels()
-
-            # ✅ Trigger full redraw
-#            self.redraw_requested = True
-            self.panel_settings["redraw_requested"] = True
-            self.panel.draw_panel()
-
-
-        except Exception as e:
-            QMessageBox.critical(self, "Open Error", str(e))
-
     def _project_file_open(self):
 
-#        BaseWindow = WindowList[0]
-
+        #        BaseWindow = WindowList[0]
 
         """Load wells/tracks data from a JSON file (example)."""
         path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
         if not path:
             return
         try:
-            window_dict, wells, tracks, raw_strat, _ = load_project_from_json(path)
+            window_dict, wells, tracks, raw_strat, ui_layout, _ = load_project_from_json(path)
+
+            self.current_project_path = path
 
             # remove all existing windows
             self.panel = self.WindowList[0].panel
@@ -506,10 +409,9 @@ class MainWindow(QMainWindow):
 
             #
 
-
             #add all remaining windows back in
             for window in window_dict[1:]:
-                if(window["type"] == "WellSection"):
+                if (window["type"] == "WellSection"):
                     dock = self._add_well_panel_dock(window["window_title"], window["visible_tops"],
                                                      window["visible_logs"], window["visible_tracks"],
                                                      window["visible_wells"], window["panel_settings"])
@@ -528,6 +430,7 @@ class MainWindow(QMainWindow):
             self._populate_well_log_tree()
             self._populate_well_track_tree()
             self._populate_window_tree()
+            self._dock_layout_restore(ui_layout)
 
             #            self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
 
@@ -548,26 +451,38 @@ class MainWindow(QMainWindow):
         for win in self.WindowList:
             win.panel.draw_panel()
 
-
-
-    def _project_file_save(self):
-
-
-        """Save wells/tracks data to a JSON file (example)."""
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save project",
-            "",
-            "Well project (*.json);;All files (*.*)"
-        )
+    def _project_file_save_as(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save project as", "", "Well project (*.json);;All files (*.*)")
         if not path:
             return
+        LOG.debug(f"Saving project as {path}")
+        self._project_file_save(path)
 
-        path = Path(path)
+    def _project_file_save(self, path=None):
+
+        if not path and self.current_project_path:
+            path = self.current_project_path
+
+        if path is None:
+
+            """Save wells/tracks data to a JSON file (example)."""
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save project",
+                "",
+                "Well project (*.json);;All files (*.*)"
+            )
+            if not path:
+                return
+
+            path = Path(path)
+
+        else:
+            path = Path(path)
 
         try:
             wells = getattr(self.panel, "wells", [])
-            LOG.debug (f"Saving {wells[0]}")
+            LOG.debug(f"Saving {wells[0]}")
 
             for well in wells:
                 LOG.debug(f"Saving {well["name"]}")
@@ -578,35 +493,38 @@ class MainWindow(QMainWindow):
                 "app": "pywellsection",
                 "version": "0.1.0",
             }
-
+            ui_layout = self._dock_layout_snapshot()
             window_list = []
             window_dict = {}
 
             for window in self.WindowList:
                 panel = window.panel
                 panel_settings = getattr(window.panel, "panel_settings", None)
-                print(panel_settings)
-                title=window.title
+                #print(panel_settings)
+                title = window.title
                 visible = window.get_visible()
-                print(title)
+
+                floating = window.isFloating()
+
+                #print(title)
                 if window.type == "WellSection":
                     visible_tops = getattr(window.panel, "visible_tops", None)
                     visible_logs = getattr(window.panel, "visible_logs", None)
                     visible_tracks = getattr(window.panel, "visible_tracks", None)
                     visible_wells = getattr(window.panel, "visible_wells", None)
-                    window_dict={"type": "WellSection", "visible": visible,
-                                 "window_title": title,"visible_tops":visible_tops,
-                                 "visible_logs":visible_logs, "visible_tracks":visible_tracks,
-                                 "visible_wells":visible_wells, "panel_settings":panel_settings}
-                    print(window_dict)
+                    window_dict = {"type": "WellSection", "visible": visible, "floating": floating,
+                                   "window_title": title, "visible_tops": visible_tops,
+                                   "visible_logs": visible_logs, "visible_tracks": visible_tracks,
+                                   "visible_wells": visible_wells, "panel_settings": panel_settings}
+                    #print(window_dict)
                     window_list.append(window_dict)
 
-            print(window_list)
-            project = export_project_to_json(path, wells, tracks, stratigraphy, window_list, extra_metadata)
-
-
+            project = export_project_to_json(path, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
 
             LOG.debug(f"Saving {project["wells"][0]["name"]} done")
+
+            self.current_project_path = path
+            LOG.debug(f"Project saved as: {self.current_project_path}")
 
 
         except Exception as e:
@@ -693,10 +611,9 @@ class MainWindow(QMainWindow):
             self.all_wells.append(wi)
 
             if self.all_logs is None:
-                 self.all_logs = logs
+                self.all_logs = logs
             else:
-                 self.all_logs = self.all_logs|logs # this operator merges the two dictionaries
-
+                self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
 
         # Update panel + tree views
         self.panel.set_wells(self.all_wells)
@@ -719,7 +636,7 @@ class MainWindow(QMainWindow):
         self.well_tree.setHeaderHidden(True)
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
 
-         # 👇 create the folder item once
+        # 👇 create the folder item once
         self.well_root_item = QTreeWidgetItem(["All wells"])
         # tristate so checking it checks/unchecks children
         self.well_root_item.setFlags(
@@ -786,8 +703,7 @@ class MainWindow(QMainWindow):
             cont_folder.setData(0, Qt.UserRole, ("folder", "continuous", well_name))
             #lith_folder.setData(0, Qt.UserRole, ("folder", "lithofacies", well_name))
             disc_folder.setData(0, Qt.UserRole, ("folder", "discrete", well_name))
-            bmp_folder.setData(0, Qt.UserRole,("folder","bitmaps", well_name))
-
+            bmp_folder.setData(0, Qt.UserRole, ("folder", "bitmaps", well_name))
 
             # --- log leaves (informational, not checkable) ---
             logs_dict = w.get("logs", {}) or {}
@@ -832,8 +748,8 @@ class MainWindow(QMainWindow):
             blogs = (w.get("bitmaps", None) or {})
             if blogs is not None:
                 for blog_name in sorted(blogs.keys(), key=str):
-                    blog_item = QTreeWidgetItem(bmp_folder,[blog_name])
-                    blog_item.setData(0, Qt.UserRole,("Bitmap",well_name,blog_name))
+                    blog_item = QTreeWidgetItem(bmp_folder, [blog_name])
+                    blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
 
         self.well_tree.blockSignals(False)
         self._rebuild_panel_from_tree()
@@ -874,13 +790,12 @@ class MainWindow(QMainWindow):
         # remove all children under the folder
         faults_root.takeChildren()
 
-
         # add wells as children of "All wells"
 
-        strat_list = list (self.all_stratigraphy)
+        strat_list = list(self.all_stratigraphy)
 
         for strat_name in strat_list:
-            if self.all_stratigraphy[strat_name]['role']=='stratigraphy':
+            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
                 strat_it = QTreeWidgetItem([strat_name])
                 strat_it.setFlags(
                     strat_it.flags()
@@ -897,7 +812,7 @@ class MainWindow(QMainWindow):
                     state = Qt.Checked if strat_name in strat_prev_selected else Qt.Unchecked
                 strat_it.setCheckState(0, state)
                 strat_root.addChild(strat_it)
-            elif self.all_stratigraphy[strat_name]['role']=='fault':
+            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
                 fault_it = QTreeWidgetItem([strat_name])
                 fault_it.setFlags(
                     fault_it.flags()
@@ -913,7 +828,7 @@ class MainWindow(QMainWindow):
                     state = Qt.Checked if strat_name in faults_prev_selected else Qt.Unchecked
                 fault_it.setCheckState(0, state)
                 faults_root.addChild(fault_it)
-            elif self.all_stratigraphy[strat_name]['role']=='other':
+            elif self.all_stratigraphy[strat_name]['role'] == 'other':
                 other_it = QTreeWidgetItem([strat_name])
                 other_it.setFlags(
                     other_it.flags()
@@ -929,7 +844,6 @@ class MainWindow(QMainWindow):
                     state = Qt.Checked if strat_name in other_prev_selected else Qt.Unchecked
                 other_it.setCheckState(0, state)
                 other_root.addChild(other_it)
-
 
         self.well_tree.blockSignals(False)
 
@@ -954,7 +868,6 @@ class MainWindow(QMainWindow):
         # add wells as children of "All wells"
 
         log_names = set()
-
 
         if self.all_logs is None:
             return
@@ -1075,8 +988,6 @@ class MainWindow(QMainWindow):
             root.addChild(window_item)
         self.window_tree.blockSignals(False)
 
-
-
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
@@ -1087,16 +998,16 @@ class MainWindow(QMainWindow):
             return 0
 
         p = item.parent()
-        if item  is self.well_root_item or p is self.well_root_item:
+        if item is self.well_root_item or p is self.well_root_item:
             self._rebuild_wells_from_tree()
 
-        if item  is self.stratigraphy_root or p is self.stratigraphy_root:
+        if item is self.stratigraphy_root or p is self.stratigraphy_root:
             self._rebuild_visible_tops_from_tree()
 
-        if item  is self.faults_root or p is self.faults_root:
+        if item is self.faults_root or p is self.faults_root:
             self._rebuild_visible_tops_from_tree()
 
-        if item  is self.other_root or p is self.other_root:
+        if item is self.other_root or p is self.other_root:
             self._rebuild_visible_tops_from_tree()
 
         # Logs
@@ -1287,7 +1198,8 @@ class MainWindow(QMainWindow):
 
         self.panel.set_visible_tops(visible if visible else None)
         self.panel.draw_panel()
-#        self.panel.set_visible_tops(visible)
+
+    #        self.panel.set_visible_tops(visible)
 
     def _rebuild_visible_logs_from_tree(self):
         """Collect checked logs and inform the panel."""
@@ -1412,9 +1324,10 @@ class MainWindow(QMainWindow):
             if self.tracks is None:
                 existing_names = set()
             else:
-    #            existing_names = {t.get("name", "") for t in self.tracks}
+                #            existing_names = {t.get("name", "") for t in self.tracks}
                 existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
-        else: existing_names = {t.get("name", "") for t in self.all_tracks}
+        else:
+            existing_names = {t.get("name", "") for t in self.all_tracks}
 
         if not track_name:
             # Generate "Track N" that isn't used yet
@@ -1436,7 +1349,6 @@ class MainWindow(QMainWindow):
             self.all_tracks = []
         self.all_tracks.append(new_track)
         #self.all_tracks.append(new_track)
-
 
         # Keep panel in sync
         #self.panel.tracks = self.tracks
@@ -1491,7 +1403,7 @@ class MainWindow(QMainWindow):
 
     def get_import_help_html(self) -> str:
 
-        with open('pywellsection/PyQtHelp.html','r') as file:
+        with open('pywellsection/PyQtHelp.html', 'r') as file:
             data = file.read()
         return data
 
@@ -1579,7 +1491,7 @@ class MainWindow(QMainWindow):
             self.panel.draw_panel()
 
         # 3) refresh "Stratigraphic tops" folder in tree
-#        if hasattr(self, "_populate_top_tree"):
+        #        if hasattr(self, "_populate_top_tree"):
         self._populate_well_tops_tree()
 
     def _action_layout_settings(self):
@@ -1973,7 +1885,7 @@ class MainWindow(QMainWindow):
             return
 
         # Call your actual export function
-        export_discrete_logs_to_csv(self,path)
+        export_discrete_logs_to_csv(self, path)
 
     def _action_import_discrete_logs_csv(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1985,7 +1897,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
 
-        import_discrete_logs_from_csv(self,path)
+        import_discrete_logs_from_csv(self, path)
 
     def _action_edit_lithofacies_settings_for_track(self, track_name: str):
         """
@@ -2169,7 +2081,7 @@ class MainWindow(QMainWindow):
         }
 
         # ensure we have a bitmap track to display it
-#        self._ensure_bitmap_track_exists()
+        #        self._ensure_bitmap_track_exists()
 
         # push into panel & redraw
         # if hasattr(self, "panel"):
@@ -2181,14 +2093,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
-    def _add_well_panel_dock(self, window_title = None, visible_tops = None, visible_logs=None, visible_tracks = None,
-                             visible_wells = None, panel_settings = None):
+    def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
+                             visible_wells=None, panel_settings=None):
         dock = WellPanelDock(
             parent=self,
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings = panel_settings
+            panel_settings=panel_settings
         )
         dock.activated.connect(self._on_panel_activated)
 
@@ -2209,7 +2121,7 @@ class MainWindow(QMainWindow):
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings = self.panel_settings
+            panel_settings=self.panel_settings
         )
 
         dock.activated.connect(self._on_panel_activated)
@@ -2225,7 +2137,6 @@ class MainWindow(QMainWindow):
 
         item = self.window_root.child(nWindows - 1)
         item.setCheckState(0, Qt.Checked)
-
 
         def _remove_dock_safely(obj=None, dock_ref=dock):
             # Remove by identity if present; ignore if already removed
@@ -2407,7 +2318,7 @@ class MainWindow(QMainWindow):
                 skipped += 1
                 continue
 
-            lithology, trend = self._parse_lithotrend(lt_txt,trd_txt)
+            lithology, trend = self._parse_lithotrend(lt_txt, trd_txt)
 
             intervals.append({
                 "well": well_name,
@@ -2529,7 +2440,6 @@ class MainWindow(QMainWindow):
                 # redraw
                 self.panel.draw_panel()
 
-
         # color = base_cfg.get("color", "black")
         # xscale = base_cfg.get("xscale", "linear")
         # direction = base_cfg.get("direction", "normal")
@@ -2548,7 +2458,7 @@ class MainWindow(QMainWindow):
                 if log_cfg.get("log") != log_name:
                     continue
                 else:
-                    log_cfg=base_cfg
+                    log_cfg = base_cfg
 
         #         if new_color is not None:
         #             log_cfg["color"] = new_color
@@ -2797,7 +2707,6 @@ class MainWindow(QMainWindow):
                 self._action_edit_all_wells()
             return
 
-
         if parent is self.well_root_item:
             menu = QMenu(self)
 
@@ -2817,7 +2726,7 @@ class MainWindow(QMainWindow):
             elif chosen == act_right:
                 self._move_well(well_name, +1)
             if chosen == act_load_bitmap:
-                self._action_load_core_bitmap_to_well(default_well_name = well_name)
+                self._action_load_core_bitmap_to_well(default_well_name=well_name)
 
         # --- case 1: logs under "Logs" folder ---
         if parent is self.well_logs_folder:
@@ -2842,7 +2751,6 @@ class MainWindow(QMainWindow):
                 self._action_edit_stratigraphy()
             return
 
-
         if item is self.track_root_item:
             track_name = item.text(0)
 
@@ -2860,7 +2768,6 @@ class MainWindow(QMainWindow):
             elif chosen == act_add_disc_track:
                 self._action_add_discrete_track()
             return
-
 
         # --- case 2: log leaves under "Tracks" folder ---
         # tracks folder: track_root_item
@@ -2891,7 +2798,6 @@ class MainWindow(QMainWindow):
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
 
-
     def _refresh_all_panels(self):
         # central panel
         if hasattr(self, "panel") and self.panel:
@@ -2899,7 +2805,7 @@ class MainWindow(QMainWindow):
             self.panel.tracks = self.all_tracks
             self.panel.stratigraphy = self.all_stratigraphy
             self.panel.panel_settings = self.panel_settings
-#            self.panel.draw_panel()
+        #            self.panel.draw_panel()
 
         # docked panels
         for dock in list(self.WindowList):
@@ -2911,7 +2817,7 @@ class MainWindow(QMainWindow):
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
-        print(f"Window item changed: {item.text(0)}")
+        #print(f"Window item changed: {item.text(0)}")
 
         win_name = item.data(0, Qt.UserRole)
 
@@ -2921,15 +2827,119 @@ class MainWindow(QMainWindow):
             if win.title == win_name:
                 if state == Qt.Checked:
                     win.setVisible(True)
-        #            _on_panel_activated(self.WindowList[win_name])
+                #            _on_panel_activated(self.WindowList[win_name])
                 else:
                     win.setVisible(False)
 
-    def _on_window_tree_context_menu(self, item, pos):
+    def _on_window_tree_context_menu(self, item, pos=None):
         """Show a context menu for the tree."""
+        if pos is None:
+            return
+
         item = self.window_tree.itemAt(pos)
         if item is None:
             return
         global_pos = self.window_tree.viewport().mapToGlobal(pos)
         parent = item.parent()
         chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
+
+    def _dock_layout_snapshot(self) -> dict:
+        """
+        Serialize dock layout (positions + tabbing) into a JSON-friendly dict.
+        Uses QMainWindow.saveState/saveGeometry (encoded as base64 strings).
+        Also stores an explicit tab-group listing for transparency/debugging.
+
+        Returns:
+          {
+            "geometry_b64": "...",
+            "state_b64": "...",
+            "tab_groups": [["DockA","DockB"], ["DockC","DockD","DockE"]],
+          }
+        """
+        # Qt binary blobs
+        geom: QByteArray = self.saveGeometry()
+        state: QByteArray = self.saveState(version=1)
+
+        geometry_b64 = base64.b64encode(bytes(geom)).decode("ascii")
+        state_b64 = base64.b64encode(bytes(state)).decode("ascii")
+
+        # Explicit tab groups (optional but useful)
+        tab_groups = self._get_tabified_groups()
+
+        return {
+            "geometry_b64": geometry_b64,
+            "state_b64": state_b64,
+            "tab_groups": tab_groups,
+        }
+
+    def _get_tabified_groups(self) -> list[list[str]]:
+        """
+        Returns a list of tab groups. Each group is a list of dock objectNames
+        that are tabified together.
+
+        Qt itself already stores this in saveState(); this is extra metadata.
+        """
+        docks = self.findChildren(QDockWidget)
+        visited = set()
+        groups = []
+
+        for d in docks:
+            if d.objectName() in visited:
+                continue
+
+            # tabifiedDockWidgets() returns widgets tabbed with 'd'
+            tabs = list(self.tabifiedDockWidgets(d))
+            if not tabs:
+                # single dock; still track it as visited
+                visited.add(d.objectName())
+                continue
+
+            group = [d] + tabs
+            names = []
+            for g in group:
+                nm = g.objectName()
+                if nm:
+                    names.append(nm)
+                    visited.add(nm)
+
+            # normalize order & dedupe
+            names = list(dict.fromkeys(names))
+            if len(names) >= 2:
+                groups.append(names)
+
+        # normalize groups (sorted by first name) for stable JSON diffs
+        groups.sort(key=lambda x: x[0] if x else "")
+        return groups
+
+    def _dock_layout_restore(self, layout: dict) -> bool:
+        """
+        Restore dock layout from dict produced by _dock_layout_snapshot().
+
+        IMPORTANT:
+          - QDockWidgets must already exist with correct objectName().
+          - Call after you have created your WellPanelDock widgets.
+
+        Returns True if restore seems successful.
+        """
+        if not layout:
+            return False
+
+        geometry_b64 = layout.get("geometry_b64")
+        state_b64 = layout.get("state_b64")
+        if not geometry_b64 or not state_b64:
+            return False
+
+        try:
+            geom = QByteArray(base64.b64decode(geometry_b64.encode("ascii")))
+            state = QByteArray(base64.b64decode(state_b64.encode("ascii")))
+        except Exception:
+            return False
+
+        ok_geom = self.restoreGeometry(geom)
+        ok_state = self.restoreState(state, version=1)
+
+        # Optional: if you also want to enforce tab groups explicitly,
+        # you can apply them after restore (usually not needed).
+        # self._apply_tab_groups(layout.get("tab_groups", []))
+
+        return bool(ok_geom and ok_state)

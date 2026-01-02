@@ -40,7 +40,7 @@ import numpy as np
 
 
 class WellPanelWidget(QWidget):
-    def __init__(self, wells, tracks, stratigraphy, panel_settings, parent=None):
+    def __init__(self, wells, tracks, stratigraphy, panel_settings, panel_title = None, parent=None):
         super().__init__(parent)
         self.wells = wells
         self.well = None
@@ -58,7 +58,11 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
         self.redraw_requested = panel_settings["redraw_requested"]
+#        self.panel_title = panel_settings["panel_title"]
 #        self.window_name = panel_settings["window_name"]
+
+        #self.panel_title = self.parent.objectName()
+        self.panel_title = panel_title
 
         self.highlight_top = None
         self.visible_tops = None
@@ -191,7 +195,7 @@ class WellPanelWidget(QWidget):
                 well_gap_factor=self.well_gap_factor,
                 track_gap_factor=self.track_gap_factor,
                 track_width=self.track_width,
-                suptitle="Well Log Panel",
+                suptitle=self.panel_title,
                 corr_artists=self._corr_artists,
                 highlight_top=self.highlight_top,
                 flatten_depths=flatten_depths,
@@ -1238,13 +1242,16 @@ class WellPanelDock(QDockWidget):
     _counter = 1
 
     def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
-        title = f"Well Section {WellPanelDock._counter}"
+        title = f"Well_Section_{WellPanelDock._counter}"
         super().__init__(title, parent)
         WellPanelDock._counter += 1
 
         self.title = title
         self.type = "WellSection"
         self.visible = True
+        self.tabified = False
+        self.setObjectName(title)
+        self.setWindowTitle(title.replace("_", " "))
 
         self.setAllowedAreas(
             Qt.LeftDockWidgetArea |
@@ -1258,9 +1265,9 @@ class WellPanelDock(QDockWidget):
             QDockWidget.DockWidgetFloatable
         )
 
-#        self.tabifiedDockWidgetActivated.connect(self.window_activate)
+ #       self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
-        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings)
+        self.panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings, title)
         self.setWidget(self.panel)
         self.panel.draw_panel()
 
@@ -1271,6 +1278,8 @@ class WellPanelDock(QDockWidget):
         if obj is self:
             if event.type() in (QEvent.MouseButtonPress, QEvent.FocusIn):
                 self.activated.emit(self)
+#            if event.type() == QEvent.topLevelChanged:
+#                self.set_tabify(self)
         return super().eventFilter(obj, event)
 
     def draw_panel(self):
@@ -1287,6 +1296,10 @@ class WellPanelDock(QDockWidget):
 
         return
 
+#    def self.set_tabify (self):
+#        self.tabified = self.isfloating()
+
+
     def set_visible(self, state):
         if state:
             self.visible = True
@@ -1299,9 +1312,16 @@ class WellPanelDock(QDockWidget):
     def get_title(self):
         return self.title
 
+    def istabified(self):
+        if self.tabified:
+            return True
+        else:
+            return False
+
     def set_title(self, title):
         self.title = title
         self.setWindowTitle(title)
+        self.setObjectName(title)
 
 
 
