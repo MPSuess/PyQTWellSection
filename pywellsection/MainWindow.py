@@ -245,14 +245,14 @@ class MainWindow(QMainWindow):
         act_layout.triggered.connect(self._action_layout_settings)
         view_menu.addAction(act_layout)
 
-        act_new_window = QAction("New Well Section Window ...", self)
-        act_new_window.triggered.connect(self._action_add_well_panel_dock)
-        view_menu.addAction(act_new_window)
+        # act_new_window = QAction("New Well Section Window ...", self)
+        # act_new_window.triggered.connect(self._action_add_well_panel_dock)
+        # view_menu.addAction(act_new_window)
 
-        act_close_panel = QAction("Close active well panel", self)
-        act_close_panel.setShortcut("Ctrl+W")
-        act_close_panel.triggered.connect(self._remove_well_panel_dock)
-        view_menu.addAction(act_close_panel)
+        # act_close_panel = QAction("Close active well panel", self)
+        # act_close_panel.setShortcut("Ctrl+W")
+        # act_close_panel.triggered.connect(self._remove_well_panel_dock)
+        # view_menu.addAction(act_close_panel)
 
         tools_menu = menubar.addMenu("&Tools")
 
@@ -2154,9 +2154,8 @@ class MainWindow(QMainWindow):
 
         dock.show()
 
-    from PyQt5.QtWidgets import QMessageBox
 
-    def _remove_well_panel_dock(self, dock=None, confirm=True):
+    def _remove_well_panel_dock(self, dock_name = None, dock=None, confirm=True):
         """
         Remove a WellPanelDock from the main window.
 
@@ -2176,8 +2175,14 @@ class MainWindow(QMainWindow):
                     break
 
         if dock is None:
-            QMessageBox.information(self, "Remove panel", "No well panel selected.")
-            return
+            if dock_name is None:
+                QMessageBox.information(self, "Remove panel", "No well panel selected.")
+                return
+            else:
+                for window in self.WindowList:
+                    if window.title == dock_name:
+                        dock = window
+                        break
 
         if confirm:
             res = QMessageBox.question(
@@ -2200,10 +2205,10 @@ class MainWindow(QMainWindow):
             pass
 
         # Clear active panel if needed
-        if getattr(self, "active_panel", None) is dock.panel:
-            self.active_window = self.panel  # fall back to central panel
-
-        dock.deleteLater()
+        if dock is not None:
+            if getattr(self, "active_panel", None) is dock.panel:
+                self.active_window = self.panel  # fall back to central panel
+            dock.deleteLater()
 
     def _on_panel_activated(self, dock: WellPanelDock):
         """
@@ -2685,6 +2690,9 @@ class MainWindow(QMainWindow):
           - logs under the 'Logs' folder
           - logs under each track in the 'Tracks' folder
         """
+
+#        print("tree context menu")
+
         item = self.well_tree.itemAt(pos)
         if item is None:
             return
@@ -2831,8 +2839,11 @@ class MainWindow(QMainWindow):
                 else:
                     win.setVisible(False)
 
-    def _on_window_tree_context_menu(self, item, pos=None):
+    def _on_window_tree_context_menu(self, pos=None):
         """Show a context menu for the tree."""
+
+        print("window tree context menu at POS", pos)
+
         if pos is None:
             return
 
@@ -2840,8 +2851,26 @@ class MainWindow(QMainWindow):
         if item is None:
             return
         global_pos = self.window_tree.viewport().mapToGlobal(pos)
+        print ("item:", item)
         parent = item.parent()
-        chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
+        if item is self.window_root:
+            menu = QMenu(self)
+            act_add_window = menu.addAction("Add new well section window...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_add_window:
+                self._action_add_well_panel_dock()
+
+        elif parent is self.window_root:
+            menu = QMenu(self)
+            win_name = item.text(0)
+            act_remove = menu.addAction(f"Remove window '{win_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_remove:
+                self._remove_well_panel_dock(dock_name=win_name)
+                self._populate_window_tree()
+
+
+        #chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
 
     def _dock_layout_snapshot(self) -> dict:
         """
