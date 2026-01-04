@@ -329,6 +329,7 @@ class MainWindow(QMainWindow):
     def _project_file_open(self):
 
         #        BaseWindow = WindowList[0]
+        #try
 
         """Load wells/tracks data from a JSON file (example)."""
         path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
