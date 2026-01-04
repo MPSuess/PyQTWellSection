@@ -50,6 +50,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
+
     self.well_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.well_root_item)
 
@@ -110,7 +111,43 @@ def setup_well_widget_tree(self):
     )
 
     self.well_logs_folder.setCheckState(0, Qt.Unchecked)
+#    self.well_root_item.addChild(self.well_logs_folder)
     self.well_tree.addTopLevelItem(self.well_logs_folder)
+
+    self.continous_logs_folder = QTreeWidgetItem(["Continous Logs"])
+    self.continous_logs_folder.setFlags(
+        self.continous_logs_folder.flags()
+        | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
+        | Qt.ItemIsSelectable
+        | Qt.ItemIsEnabled
+    )
+    self.continous_logs_folder.setCheckState(0, Qt.Unchecked)
+    self.well_logs_folder.addChild(self.continous_logs_folder)
+
+    self.discrete_logs_folder = QTreeWidgetItem(["Discrete Logs"])
+    self.discrete_logs_folder.setFlags(
+        self.discrete_logs_folder.flags()
+        | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
+        | Qt.ItemIsSelectable
+        | Qt.ItemIsEnabled
+    )
+    self.discrete_logs_folder.setCheckState(0, Qt.Unchecked)
+    self.well_logs_folder.addChild(self.discrete_logs_folder)
+
+    self.bitmaps_folder = QTreeWidgetItem(["Bitmaps"])
+    self.bitmaps_folder.setFlags(
+        self.bitmaps_folder.flags()
+        | Qt.ItemIsUserCheckable
+        | Qt.ItemIsTristate
+        | Qt.ItemIsSelectable
+        | Qt.ItemIsEnabled
+    )
+    self.bitmaps_folder.setCheckState(0, Qt.Unchecked)
+    self.well_logs_folder.addChild(self.bitmaps_folder)
+
+
 
     # --- Folder: Tracks (structure only, not necessarily checkable) ---
     self.track_root_item = QTreeWidgetItem(["Tracks"])

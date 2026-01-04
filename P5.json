@@ -5058,6 +5058,24 @@
             "Dolomite",
             "Shale"
           ]
+        },
+        "FACIES3": {
+          "depth": [
+            0.0,
+            50.0,
+            100.0,
+            150.0,
+            200.0,
+            250.0
+          ],
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
         }
       },
       "bitmaps": {
@@ -5072,6 +5090,18 @@
           "top_depth": 300.0,
           "base_depth": 400.0,
           "track": "core2"
+        },
+        "cp077": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 0.0,
+          "base_depth": 100.0,
+          "track": "core"
+        },
+        "cpb777": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 500.0,
+          "base_depth": 600.0,
+          "track": "core"
         }
       },
       "tops": {
@@ -8259,6 +8289,24 @@
             "Dolomite",
             "Shale"
           ]
+        },
+        "FACIES3": {
+          "depth": [
+            500.0,
+            550.0,
+            600.0,
+            650.0,
+            700.0,
+            750.0
+          ],
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
         }
       },
       "tops": {
@@ -8276,7 +8324,15 @@
           "level": "sequence"
         }
       },
-      "facies_intervals": []
+      "facies_intervals": [],
+      "bitmaps": {
+        "cp001": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 500.0,
+          "base_depth": 600.0,
+          "track": "core"
+        }
+      }
     },
     {
       "name": "Well C",
@@ -11324,6 +11380,24 @@
             "Dolomite",
             "Shale"
           ]
+        },
+        "FACIES3": {
+          "depth": [
+            1000.0,
+            1050.0,
+            1100.0,
+            1150.0,
+            1200.0,
+            1250.0
+          ],
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
         }
       },
       "tops": {
@@ -11484,14 +11558,20 @@
       }
     },
     {
-      "name": "core2",
-      "type": "bitmap",
-      "bitmap": {
-        "alpha": 1.0,
-        "cmap": "None",
-        "interpolation": "nearest",
-        "flip_vertical": "True",
-        "label": "Core photo"
+      "name": "f3",
+      "logs": [],
+      "type": "discrete",
+      "discrete": {
+        "log": "FACIES3",
+        "label": "FX3",
+        "color_map": {
+          "Dolomite": "#ff5c22",
+          "Limestone": "#5efcff",
+          "Sandstone": "#feff15",
+          "Shale": "#aa7942"
+        },
+        "default_color": "#e45c53",
+        "missing": "-999"
       }
     }
   ],
@@ -11542,59 +11622,29 @@
       "type": "WellSection",
       "visible": true,
       "floating": false,
-      "window_title": "Well Section C",
-      "visible_tops": {
-        "Upper Formation A": {
-          "level": "sequence",
-          "color": "#ff0000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Formation A": {
-          "level": "formation",
-          "color": "#ffcc00",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Sequence 1": {
-          "level": "sequence",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Member A1": {
-          "level": "member",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Carboniferous": {
-          "level": "formation",
-          "color": "#000000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Lower Formation A": {
-          "level": "sequence",
-          "color": "#0000ff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        }
-      },
+      "window_title": "Well Section NNW-SSE",
+      "visible_tops": [
+        "Carboniferous",
+        "Lower Formation A",
+        "Formation A",
+        "Sequence 1",
+        "Member A1",
+        "Upper Formation A"
+      ],
       "visible_logs": [
+        "RT",
         "PHI",
         "GR",
-        "RT",
-        "CAL",
-        "RHOB"
+        "RHOB",
+        "CAL"
       ],
       "visible_tracks": [
-        "core2",
         "core",
         "GR-CAL",
-        "RHOB-PHI",
-        "RT-RHOB",
         "Facies",
+        "RHOB-PHI",
+        "f3",
+        "RT-RHOB",
         "LithoFacies"
       ],
       "visible_wells": [
@@ -11614,7 +11664,7 @@
       "type": "WellSection",
       "visible": true,
       "floating": false,
-      "window_title": "Well Section A",
+      "window_title": "Section N-S",
       "visible_tops": [
         "Sequence 1"
       ],
@@ -11636,7 +11686,7 @@
       "type": "WellSection",
       "visible": true,
       "floating": false,
-      "window_title": "Well Section B",
+      "window_title": "Well Section E-W",
       "visible_tops": null,
       "visible_logs": [
         "GR"
@@ -11658,7 +11708,7 @@
   ],
   "ui_layout": {
     "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAP3AAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAEXAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABGAAAAt8AAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABDAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAHABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEEBAAAD+AAAAswAAAAAAAAAAPwAAAAYAAADbAAAAMABAAAU+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAF8A////+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAXwD///8AAAAAAAADbAAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAP3AAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAEXAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABGAAAAt8AAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAHPAAABtQAAAKsA////+gAAAAEBAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAF8A////AAAAAAAAA2wAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
     "tab_groups": [
       [
         "Console",
@@ -11666,12 +11716,8 @@
         "Log"
       ],
       [
-        "Input",
-        "Windows"
-      ],
-      [
-        "Well Section B",
-        "Well Section A"
+        "Windows",
+        "Input"
       ]
     ]
   }
