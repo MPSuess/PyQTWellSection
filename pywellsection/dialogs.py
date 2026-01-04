@@ -4,11 +4,13 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
-    QFileDialog, QTextBrowser
+    QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem
 )
 from collections import OrderedDict
 
 from PyQt5.QtGui import QColor
+
+from PyQt5.QtCore import Qt
 
 from PyQt5.QtCore import QUrl
 import os
@@ -408,7 +410,8 @@ class NewTrackDialog(QDialog):
             self
         ))
 
-        form = QFormLayout()
+        self.form = QFormLayout()
+        form = self.form
         layout.addLayout(form)
 
         # Track name
@@ -502,7 +505,35 @@ class NewTrackDialog(QDialog):
 
         # react to type changes
         self.cmb_type.currentTextChanged.connect(self._update_visibility)
+#        self.cmb_type.currentTextChanged.connect(self._show_hide_form_row)
         self._update_visibility(self.cmb_type.currentText())
+
+    def _show_hide_form_row(self, track_type: str):
+        form_layout = self.form
+        nrows = form_layout.rowCount()
+        nindex = nrows*2
+
+        t = (track_type or "").lower()
+        # discrete visible?
+        disc_vis = (t == "discrete")
+        for idx in range(0, nindex):
+            widgetItem = form_layout.itemAt(idx)
+            print(widgetItem.widget)
+            if widgetItem != None:
+                widget = widgetItem.widget()
+                print(widget.text())
+                widget.hide()
+                #widget.show()
+
+            #
+            #     if toggleBtn.isChecked():
+            #         widget.show()
+            #     else:
+            #         widget.hide()
+
+
+
+        #row.setVisible(show)
 
     def _update_visibility(self, track_type: str):
         """Show only relevant fields for chosen type."""
@@ -794,7 +825,7 @@ class StratigraphyEditorDialog(QDialog):
         return self._accepted_strat
 
 class LayoutSettingsDialog(QDialog):
-    def __init__(self, parent, well_gap_factor: float, track_width: float):
+    def __init__(self, parent, well_gap_factor: float, track_width: float, vertical_scale: float):
         super().__init__(parent)
         self.setWindowTitle("Layout settings")
         self.resize(300, 150)
@@ -816,6 +847,13 @@ class LayoutSettingsDialog(QDialog):
         self.spin_track.setSingleStep(0.1)
         self.spin_track.setValue(float(track_width))
         form.addRow("Track width:", self.spin_track)
+
+        self.spin_scale = QDoubleSpinBox(self)
+        self.spin_scale.setRange(0.1, 1000.0)
+        self.spin_scale.setDecimals(2)
+        self.spin_scale.setSingleStep(0.1)
+        self.spin_scale.setValue(float(vertical_scale))
+        form.addRow("Vertical scale:", self.spin_scale)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         btns.accepted.connect(self.accept)
@@ -2377,13 +2415,6 @@ class LithofaciesDisplaySettingsDialog(QDialog):
         """
         return self._result
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QDialogButtonBox, QLabel, QMessageBox, QComboBox
-)
-from PyQt5.QtCore import Qt
-
-
 class LithofaciesTableDialog(QDialog):
     """
     Edit lithofacies intervals for all wells in a table.
@@ -2838,3 +2869,160 @@ class MoveWellDialog(QDialog):
 
     def position(self):
         return self.spin.value() - 1
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QComboBox, QLineEdit, QPushButton, QFileDialog,
+    QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox, QLabel
+)
+
+class LoadBitmapForTrackDialog(QDialog):
+    """
+    Load an image and assign it to a well for a specific bitmap track key.
+    Key comes from the track and is not editable.
+
+    Returns:
+      {
+        "well_name": str,
+        "path": str,
+        "top_depth": float,
+        "base_depth": float,
+        "label": str,
+        "alpha": float,
+        "interpolation": str,
+        "cmap": str|None,
+        "flip_vertical": bool,
+      }
+    """
+
+    def __init__(self, parent, well_names, track_name: str, bitmap_cfg: dict):
+        super().__init__(parent)
+        self.setWindowTitle(f"Load bitmap → Track: {track_name}")
+        self.resize(560, 280)
+
+        self._result = None
+        self._well_names = list(well_names)
+        self._bitmap_cfg = dict(bitmap_cfg or {})
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Well selection
+        self.cmb_well = QComboBox(self)
+        self.cmb_well.addItems(self._well_names)
+        form.addRow("Well:", self.cmb_well)
+
+        # Track key (locked)
+        key = self._bitmap_cfg.get("key", "bitmap")
+        self.lbl_key = QLabel(key, self)
+        form.addRow("Bitmap key:", self.lbl_key)
+
+        # File path + browse
+        self.ed_path = QLineEdit(self)
+        btn_browse = QPushButton("Browse…", self)
+        row_path = QHBoxLayout()
+        row_path.addWidget(self.ed_path)
+        row_path.addWidget(btn_browse)
+        form.addRow("Image file:", row_path)
+        btn_browse.clicked.connect(self._browse)
+
+        # Depth interval
+        self.spin_top = QDoubleSpinBox(self)
+        self.spin_top.setRange(-1e9, 1e9)
+        self.spin_top.setDecimals(3)
+        self.spin_top.setSingleStep(1.0)
+        form.addRow("Top depth:", self.spin_top)
+
+        self.spin_base = QDoubleSpinBox(self)
+        self.spin_base.setRange(-1e9, 1e9)
+        self.spin_base.setDecimals(3)
+        self.spin_base.setSingleStep(1.0)
+        self.spin_base.setValue(1.0)
+        form.addRow("Base depth:", self.spin_base)
+
+        # Label defaults from track
+        self.ed_label = QLineEdit(self)
+        self.ed_label.setText(self._bitmap_cfg.get("label", "Bitmap"))
+        form.addRow("Label:", self.ed_label)
+
+        # Alpha defaults from track
+        self.spin_alpha = QDoubleSpinBox(self)
+        self.spin_alpha.setRange(0.0, 1.0)
+        self.spin_alpha.setDecimals(2)
+        self.spin_alpha.setSingleStep(0.05)
+        self.spin_alpha.setValue(float(self._bitmap_cfg.get("alpha", 1.0)))
+        form.addRow("Alpha:", self.spin_alpha)
+
+        # Interpolation defaults from track
+        self.cmb_interp = QComboBox(self)
+        self.cmb_interp.addItems(["nearest", "bilinear", "bicubic"])
+        self.cmb_interp.setCurrentText(self._bitmap_cfg.get("interpolation", "nearest"))
+        form.addRow("Interpolation:", self.cmb_interp)
+
+        # Cmap defaults from track
+        self.cmb_cmap = QComboBox(self)
+        self.cmb_cmap.addItems(["(none)", "gray"])
+        cmap = self._bitmap_cfg.get("cmap", None)
+        self.cmb_cmap.setCurrentText("gray" if cmap == "gray" else "(none)")
+        form.addRow("Colormap:", self.cmb_cmap)
+
+        # Flip defaults from track
+        self.chk_flip = QCheckBox("Flip vertically", self)
+        self.chk_flip.setChecked(bool(self._bitmap_cfg.get("flip_vertical", False)))
+        form.addRow("Orientation:", self.chk_flip)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select image",
+            "",
+            "Images (*.bmp *.png *.jpg *.jpeg *.tif *.tiff);;All files (*.*)"
+        )
+        if path:
+            self.ed_path.setText(path)
+
+    def _on_accept(self):
+        well_name = self.cmb_well.currentText().strip()
+        path = self.ed_path.text().strip()
+
+        if not well_name:
+            QMessageBox.warning(self, "Load bitmap", "Please choose a well.")
+            return
+        if not path:
+            QMessageBox.warning(self, "Load bitmap", "Please choose an image file.")
+            return
+        if not os.path.exists(path):
+            QMessageBox.warning(self, "Load bitmap", "Image file does not exist.")
+            return
+
+        top_d = float(self.spin_top.value())
+        base_d = float(self.spin_base.value())
+        if abs(base_d - top_d) < 1e-9:
+            QMessageBox.warning(self, "Load bitmap", "Top and Base depth must differ.")
+            return
+
+        cmap_txt = self.cmb_cmap.currentText().strip()
+        cmap = None if cmap_txt == "(none)" else cmap_txt
+
+        self._result = {
+            "well_name": well_name,
+            "path": path,
+            "top_depth": top_d,
+            "base_depth": base_d,
+            "label": self.ed_label.text().strip() or "Bitmap",
+            "alpha": float(self.spin_alpha.value()),
+            "interpolation": self.cmb_interp.currentText().strip(),
+            "cmap": cmap,
+            "flip_vertical": bool(self.chk_flip.isChecked()),
+        }
+        self.accept()
+
+    def result(self):
+        return self._result

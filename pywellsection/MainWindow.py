@@ -35,11 +35,13 @@ from pywellsection.dialogs import LithofaciesDisplaySettingsDialog
 from pywellsection.dialogs import LithofaciesTableDialog
 from pywellsection.dialogs import LoadCoreBitmapDialog
 from pywellsection.dialogs import HelpDialog
+from pywellsection.dialogs import LoadBitmapForTrackDialog
 
 from pathlib import Path
 from collections import OrderedDict
 
 import logging
+import os
 
 # This file is part of the `pywellsection` project and licensed under
 # EUPL 1.2
@@ -72,15 +74,20 @@ class MainWindow(QMainWindow):
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
         self.all_logs = None
+        self.all_discrete_logs = None
+        self.all_bitmaps = None
         self.all_tracks = tracks
 
         self.well_gap_factor = 3.0
         self.track_gap_factor = 1.0
         self.track_width = 1.0
+        self.vertical_scale = 2.0
+
         window_name = "Well Section 1"
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width, "redraw_requested": self.redraw_requested
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+                               "vertical_scale": self.vertical_scale
                                }
 
         self.dock = WellPanelDock(
@@ -199,7 +206,7 @@ class MainWindow(QMainWindow):
         import_menu = file_menu.addMenu("&Import")
 
         act_import_tops = QAction("Import tops from CSV...", self)
-        act_import_tops.triggered.connect(self._action_import_tops_csv)
+        act_import_tops.triggered.connect(self._file_import_tops_csv)
         import_menu.addAction(act_import_tops)
 
         # 👇 NEW: Import Petrel well heads
@@ -212,16 +219,20 @@ class MainWindow(QMainWindow):
         import_menu.addAction(act_import_las)
 
         act_import_discrete = QAction("Discrete logs from CSV…", self)
-        act_import_discrete.triggered.connect(self._action_import_discrete_logs_csv)
+        act_import_discrete.triggered.connect(self._file_import_discrete_logs_csv)
         import_menu.addAction(act_import_discrete)
 
         act_import_facies = QAction("Facies intervals from CSV…", self)
-        act_import_facies.triggered.connect(self._action_import_facies_intervals_csv)
+        act_import_facies.triggered.connect(self._file_import_facies_intervals_csv)
         import_menu.addAction(act_import_facies)
+
+        act_import_bitmap = QAction("Import bitmaps...", self)
+        act_import_bitmap.triggered.connect(self._action_load_core_bitmap_to_well)
+        import_menu.addAction(act_import_bitmap)
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
-        act_export_discrete_logs.triggered.connect(self._action_export_discrete_logs_csv)
+        act_export_discrete_logs.triggered.connect(self._file_export_discrete_logs_csv)
         export_menu.addAction(act_export_discrete_logs)
 
         file_menu.addSeparator()
@@ -233,26 +244,26 @@ class MainWindow(QMainWindow):
 
         # --- View menu: select/deselect all wells ---
         view_menu = menubar.addMenu("&View")
-        act_sel_all = QAction("Select all wells", self)
-        act_sel_all.triggered.connect(self._select_all_wells)
-        view_menu.addAction(act_sel_all)
-
-        act_sel_none = QAction("Select no wells", self)
-        act_sel_none.triggered.connect(self._select_no_wells)
-        view_menu.addAction(act_sel_none)
+        # act_sel_all = QAction("Select all wells", self)
+        # act_sel_all.triggered.connect(self._select_all_wells)
+        # view_menu.addAction(act_sel_all)
+        #
+        # act_sel_none = QAction("Select no wells", self)
+        # act_sel_none.triggered.connect(self._select_no_wells)
+        # view_menu.addAction(act_sel_none)
 
         act_layout = QAction("Layout settings...", self)
         act_layout.triggered.connect(self._action_layout_settings)
         view_menu.addAction(act_layout)
 
-        act_new_window = QAction("New Well Section Window ...", self)
-        act_new_window.triggered.connect(self._action_add_well_panel_dock)
-        view_menu.addAction(act_new_window)
-
-        act_close_panel = QAction("Close active well panel", self)
-        act_close_panel.setShortcut("Ctrl+W")
-        act_close_panel.triggered.connect(self._remove_well_panel_dock)
-        view_menu.addAction(act_close_panel)
+        # act_new_window = QAction("New Well Section Window ...", self)
+        # act_new_window.triggered.connect(self._action_add_well_panel_dock)
+        # view_menu.addAction(act_new_window)
+        #
+        # act_close_panel = QAction("Close active well panel", self)
+        # act_close_panel.setShortcut("Ctrl+W")
+        # act_close_panel.triggered.connect(self._remove_well_panel_dock)
+        # view_menu.addAction(act_close_panel)
 
         tools_menu = menubar.addMenu("&Tools")
 
@@ -338,6 +349,8 @@ class MainWindow(QMainWindow):
 
             # self.all_stratigraphy = None
             self.all_logs = []
+            self.all_bitmaps = []
+            self.all_discrete_logs = []
             self.all_tracks = tracks
             self.all_wells = wells
 
@@ -390,6 +403,8 @@ class MainWindow(QMainWindow):
 
             for well in wells:
                 disc_logs = well.get("discrete_logs", {})
+                self.all_discrete_logs=disc_logs
+
                 for log_name, d in list(disc_logs.items()):
                     if "top_depths" in d and "bottom_depths" in d:
                         tops = np.array(d["top_depths"], dtype=float)
@@ -399,6 +414,12 @@ class MainWindow(QMainWindow):
                             "depth": tops.tolist(),
                             "values": values.tolist(),
                         }
+            for well in wells:
+                bitmaps = well.get("bitmaps", None)
+                if bitmaps:
+                    for bitmap in bitmaps:
+                        if bitmap is not None:
+                            self.all_bitmaps.append(bitmap)
 
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
             self.panel.visible_tops = window_dict[0]["visible_tops"]
@@ -626,6 +647,355 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
 
+    def _file_import_facies_intervals_csv(self):
+        """
+        Open a CSV with columns:
+            Well, ID, LithoTrend, Environment, Rel_Top, Rel_Base
+
+        Parse LithoTrend into (Lithology, Trend) and attach intervals
+        to each well as well['facies_intervals'] = [ ... ].
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import facies intervals from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        # --- read CSV ---
+        try:
+            with open(path, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+        except Exception as e:
+            QMessageBox.critical(self, "Import facies intervals", f"Failed to read file:\n{e}")
+            return
+
+        if not rows:
+            QMessageBox.information(self, "Import facies intervals", "No data rows found in CSV.")
+            return
+
+        required_cols = {"Well", "ID", "Litho", "Trend", "Environment", "Rel_Top", "Rel_Base"}
+        missing = required_cols - set(rows[0].keys())
+        if missing:
+            QMessageBox.warning(
+                self,
+                "Import facies intervals",
+                "Missing required columns in CSV:\n  " + ", ".join(sorted(missing))
+            )
+            return
+
+        # --- parse rows ---
+        intervals = []
+        skipped = 0
+        for r in rows:
+            well_name = (r.get("Well") or "").strip()
+            id_txt = (r.get("ID") or "").strip()
+            lt_txt = (r.get("Litho") or "").strip()
+            trd_txt = (r.get("Trend") or "").strip()
+            env_txt = (r.get("Environment") or "").strip()
+            top_txt = (r.get("Rel_Top") or "").strip()
+            base_txt = (r.get("Rel_Base") or "").strip()
+
+            if not well_name or not id_txt:
+                skipped += 1
+                continue
+
+            try:
+                _id = int(id_txt)
+            except ValueError:
+                skipped += 1
+                continue
+
+            try:
+                rel_top = float(top_txt.replace(",", ".")) if top_txt else None
+                rel_base = float(base_txt.replace(",", ".")) if base_txt else None
+            except ValueError:
+                skipped += 1
+                continue
+
+            lithology, trend = self._parse_lithotrend(lt_txt, trd_txt)
+
+            intervals.append({
+                "well": well_name,
+                "id": _id,
+                "litho_trend": lt_txt,
+                "lithology": lithology,
+                "trend": trend,  # "cu", "fu", or "constant"
+                "environment": env_txt,
+                "rel_top": rel_top,
+                "rel_base": rel_base,
+            })
+
+        if not intervals:
+            QMessageBox.information(
+                self,
+                "Import facies intervals",
+                f"No valid rows found. Skipped: {skipped}"
+            )
+            return
+
+        # --- preview dialog ---
+        dlg = ImportFaciesIntervalsDialog(self, intervals)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        imported = dlg.result_intervals()
+        if not imported:
+            return
+
+        # --- attach intervals to wells by name ---
+        if not getattr(self, "all_wells", None):
+            QMessageBox.warning(
+                self,
+                "Import facies intervals",
+                "No wells in project; cannot attach facies intervals."
+            )
+            return
+
+        wells_by_name = {w.get("name"): w for w in self.all_wells if w.get("name")}
+        unknown_wells = set()
+
+        # clear or merge? here: replace per well
+        for w in self.all_wells:
+            w.setdefault("facies_intervals", [])
+
+        # group by well
+        by_well = {}
+        for iv in imported:
+            wnm = iv["well"]
+            by_well.setdefault(wnm, []).append(iv)
+
+        for wname, intervals_for_well in by_well.items():
+            well = wells_by_name.get(wname)
+            if well is None:
+                unknown_wells.add(wname)
+                continue
+            # sort by rel_top descending if they are relative from top=1->0,
+            # or ascending depending on your convention – here we just keep input order
+            well["facies_intervals"] = list(intervals_for_well)
+
+        msg_lines = [
+            f"Imported {len(imported)} facies intervals.",
+            f"Skipped rows: {skipped}",
+        ]
+        if unknown_wells:
+            msg_lines.append(
+                "\nUnknown wells (not found in project):\n  "
+                + ", ".join(sorted(unknown_wells))
+            )
+
+        QMessageBox.information(
+            self,
+            "Import facies intervals",
+            "\n".join(msg_lines)
+        )
+
+    def _file_import_tops_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import tops from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)",
+        )
+        if not path:
+            return
+
+        self._file_load_tops_from_csv(path)
+
+    def _file_load_tops_from_csv(self, path: str):
+        """
+        Load formation / fault tops from a CSV file with columns:
+            Well_name, MD, Horizon, Name, Type
+
+        and merge them into:
+            - self.all_wells[*]["tops"]
+            - self.stratigraphy (adds role if needed)
+
+        Rules:
+          - well must exist in self.all_wells (matched by well['name'])
+          - top name is taken from:
+              * if Type == 'Fault':  Name or Horizon
+              * else:                Horizon or Name
+          - role:
+              * if Type == 'Fault'  -> 'fault'
+              * else                -> 'stratigraphy'
+          - depth is MD (float)
+        """
+        # ---- read CSV ----
+        try:
+            with open(path, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter=";")
+                rows = list(reader)
+        except Exception as e:
+            QMessageBox.critical(self, "Load tops CSV", f"Failed to read file:\n{e}")
+            return
+
+        if not rows:
+            QMessageBox.information(self, "Load tops CSV", "No data rows found in CSV.")
+            return
+
+        # ---- index wells by name ----
+        if not hasattr(self, "all_wells") or not self.all_wells:
+            QMessageBox.warning(
+                self,
+                "Load tops CSV",
+                "No wells in project. Please create/import wells before loading tops."
+            )
+            return
+
+        wells_by_name = {}
+        for w in self.all_wells:
+            nm = w.get("name")
+            if nm:
+                wells_by_name[nm] = w
+
+        # ---- ensure we have a stratigraphy dict ----
+        strat = getattr(self, "stratigraphy", None)
+        if strat is None or not isinstance(strat, dict):
+            strat = OrderedDict()
+        else:
+            # preserve existing order
+            strat = OrderedDict(strat)
+
+        unknown_wells = set()
+        skipped_rows = 0
+        added_tops = 0
+        updated_tops = 0
+
+        for row in rows:
+            well_name = (row.get("Well_name") or "").strip()
+            md_str = (row.get("MD") or "").strip()
+            horizon = (row.get("Horizon") or "").strip()
+            name_col = (row.get("Name") or "").strip()
+            type_col = (row.get("Type") or "").strip()
+
+            if not well_name or not md_str:
+                skipped_rows += 1
+                continue
+
+            # parse depth
+            try:
+                depth = float(md_str.replace(",", "."))  # comma or dot decimals
+            except ValueError:
+                skipped_rows += 1
+                continue
+
+            # find well
+            well = wells_by_name.get(well_name)
+            if well is None:
+                unknown_wells.add(well_name)
+                skipped_rows += 1
+                continue
+
+            # determine top name + role
+            # For Faults -> name comes from Name or Horizon
+            # For others -> name from Horizon or Name
+            ttype = type_col.strip()
+            if ttype == "Fault":
+                top_name = name_col or horizon
+                role = "fault"
+            else:
+                top_name = horizon or name_col
+                role = "stratigraphy"
+
+            if not top_name:
+                # can't use an unnamed row
+                skipped_rows += 1
+                continue
+
+            # ---- update stratigraphy meta ----
+            meta = strat.get(top_name, {})
+            if not isinstance(meta, dict):
+                meta = {}
+
+            # keep existing fields, just ensure role exists / updated
+            meta.setdefault("level", "")  # you can refine this later
+            meta.setdefault("color", "#000000")
+            meta.setdefault("hatch", "-")
+            # if no role defined yet, set it; if already set, we do NOT overwrite
+            meta.setdefault("role", role)
+
+            strat[top_name] = meta
+
+            # ---- update well tops ----
+            tops = well.setdefault("tops", {})
+            old_val = tops.get(top_name)
+
+            if isinstance(old_val, dict):
+                old_val["depth"] = depth
+                tops[top_name] = old_val
+                updated_tops += 1
+            elif old_val is not None:
+                # old was a bare number
+                tops[top_name] = {"depth": depth}
+                updated_tops += 1
+            else:
+                tops[top_name] = {"depth": depth}
+                added_tops += 1
+
+        # store stratigraphy back
+        self.stratigraphy = strat
+
+        # ---- update panel ----
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.stratigraphy = self.stratigraphy
+            # keep zoom/flatten; if you want to reset, uncomment:
+            # self.panel._current_depth_window = None
+            # self.panel._flatten_depths = None
+            self.panel.draw_panel()
+
+        # ---- refresh trees ----
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_top_tree"):
+            self._populate_top_tree()
+
+        # ---- summary message ----
+        msg = [
+            f"Added tops:   {added_tops}",
+            f"Updated tops: {updated_tops}",
+            f"Skipped rows: {skipped_rows}",
+        ]
+        if unknown_wells:
+            msg.append(
+                "\nUnknown wells encountered (not in project):\n  "
+                + ", ".join(sorted(unknown_wells))
+            )
+
+        QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
+
+    def _file_export_discrete_logs_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Discrete Logs",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        # Call your actual export function
+        export_discrete_logs_to_csv(self, path)
+
+
+        self._file_load_tops_from_csv(path)
+
+    def _file_import_discrete_logs_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import discrete logs from CSV",
+            "",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        if not path:
+            return
+
+        import_discrete_logs_from_csv(self, path)
+
     def _build_well_tree_dock(self):
         """Left dock: tree with checkboxes to toggle wells."""
         self.well_dock = QDockWidget("Wells", self)
@@ -671,6 +1041,8 @@ class MainWindow(QMainWindow):
 
         self.well_tree.blockSignals(True)
         root.takeChildren()
+
+        self._populate_well_log_tree()
 
         for w in self.all_wells:
             well_name = w.get("name") or "UNKNOWN"
@@ -852,31 +1224,28 @@ class MainWindow(QMainWindow):
 
     def _populate_well_log_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
-        # Remember current selection by name
+        ### add logs as children of "All logs"
+        # delete all logs under the folder and rebuild from scratch
+        ### Remember current selection by name
+        ### First continous Logs
+        self.well_tree.blockSignals(True)
         prev_selected = set()
-        root = self.well_logs_folder
+        ### Start with populating the continous logs tree ###
+        root = self.continous_logs_folder
         for i in range(root.childCount()):
             it = root.child(i)
             if it.checkState(0) == Qt.Checked:
                 prev_selected.add(it.data(0, Qt.UserRole))
-
-        self.well_tree.blockSignals(True)
-
         # remove all wells under the folder
         root.takeChildren()
 
-        # add wells as children of "All wells"
-
         log_names = set()
-
         if self.all_logs is None:
             return
-
         for log in self.all_logs:
             name = log
             if name:
                 log_names.add(name)
-
         for name in sorted(log_names):
             it = QTreeWidgetItem([name])
             it.setFlags(
@@ -886,10 +1255,67 @@ class MainWindow(QMainWindow):
                 | Qt.ItemIsEnabled
             )
             it.setData(0, Qt.UserRole, name)
-
             state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
             it.setCheckState(0, state)
             root.addChild(it)
+
+        ### Second discrete Logs ###
+        prev_selected = set()
+        root = self.discrete_logs_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+        root.takeChildren()
+
+        dlog_names = set()
+        if self.all_discrete_logs:
+            for dlog in self.all_discrete_logs:
+                name = dlog
+                if dlog:
+                    dlog_names.add(name)
+            for name in sorted(dlog_names):
+                it = QTreeWidgetItem([name])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                it.setData(0, Qt.UserRole, name)
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                root.addChild(it)
+
+        ### Third bitmap Logs ###
+        prev_selected = set()
+        root = self.bitmaps_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+        root.takeChildren()
+
+        bmp_names = set()
+        if self.all_bitmaps:
+            for bmp in self.all_bitmaps:
+                name = bmp
+                if bmp:
+                    bmp_names.add(name)
+            for name in sorted(bmp_names):
+                it = QTreeWidgetItem([name])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                it.setData(0, Qt.UserRole, name)
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                root.addChild(it)
+
+
         self.well_tree.blockSignals(False)
         self._rebuild_visible_logs_from_tree()
 
@@ -977,6 +1403,7 @@ class MainWindow(QMainWindow):
                 | Qt.ItemIsUserCheckable
                 | Qt.ItemIsSelectable
                 | Qt.ItemIsEnabled
+                | Qt.ItemIsEditable
             )
             window_item.setData(0, Qt.UserRole, window_name)
             state = (
@@ -1011,7 +1438,7 @@ class MainWindow(QMainWindow):
             self._rebuild_visible_tops_from_tree()
 
         # Logs
-        if item is self.well_logs_folder or p is self.well_logs_folder:
+        if item is self.continous_logs_folder or p is self.continous_logs_folder:
             #LOG.debug("LOGS FOLDER changed")
             self._rebuild_visible_logs_from_tree()
             self.panel.draw_panel()
@@ -1088,7 +1515,7 @@ class MainWindow(QMainWindow):
 
         logs = self.panel.get_visible_logs()
         #LOG.debug("getting visible logs", logs)
-        root = self.well_logs_folder
+        root = self.continous_logs_folder
         for i in range(root.childCount()):
             it = root.child(i)
             state = Qt.Unchecked
@@ -1203,7 +1630,7 @@ class MainWindow(QMainWindow):
 
     def _rebuild_visible_logs_from_tree(self):
         """Collect checked logs and inform the panel."""
-        root = self.well_logs_folder
+        root = self.continous_logs_folder
         visible = set()
         for i in range(root.childCount()):
             it = root.child(i)
@@ -1503,6 +1930,7 @@ class MainWindow(QMainWindow):
             self,
             well_gap_factor=self.panel.well_gap_factor,
             track_width=self.panel.track_width,
+            vertical_scale = 1,
         )
         if dlg.exec_() != QDialog.Accepted:
             return
@@ -1874,31 +2302,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_top_tree"):
             self._populate_top_tree()
 
-    def _action_export_discrete_logs_csv(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Discrete Logs",
-            "",
-            "CSV files (*.csv);;All files (*.*)"
-        )
-        if not path:
-            return
-
-        # Call your actual export function
-        export_discrete_logs_to_csv(self, path)
-
-    def _action_import_discrete_logs_csv(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import discrete logs from CSV",
-            "",
-            "CSV files (*.csv);;All files (*.*)"
-        )
-        if not path:
-            return
-
-        import_discrete_logs_from_csv(self, path)
-
     def _action_edit_lithofacies_settings_for_track(self, track_name: str):
         """
         Open dialog to edit lithofacies display parameters for a track
@@ -2002,31 +2405,92 @@ class MainWindow(QMainWindow):
                 + ", ".join(sorted(set(unknown)))
             )
 
-    def _ensure_bitmap_track_exists(self):
-        """
-        Ensure there is at least one bitmap track in self.tracks.
-        The bitmap track references a per-well bitmap by key.
-        """
-        if not hasattr(self, "tracks") or self.tracks is None:
-            self.tracks = []
+    def _action_change_window_title(self, title: str):
+        """Change the title of the selected window."""
+        for window in self.WindowList:
+            if window.title == title:
+                window.setWindowTitle(title)
 
-        for t in self.tracks:
-            if "bitmap" in t:
-                return  # already exists
+                return window
+        return None
 
-        # Create a default bitmap track
-        self.tracks.append({
-            "name": "Core",
-            "type": "bitmap",
-            "bitmap": {
-                "key": "core",  # per-well bitmap key
-                "label": "Core",
-                "alpha": 1.0,
-                "cmap": None,
-                "interpolation": "nearest",
-                "flip_vertical": False,
-            }
-        })
+    from PyQt5.QtWidgets import QMessageBox
+
+    def _action_load_bitmap_into_bitmap_track(self, track_name: str):
+        """
+        Load an image and assign it to a selected well under the bitmap key
+        of the selected bitmap track.
+        """
+        LOG.debug(f"Loading bitmap into track '{track_name}'...")
+
+        if not getattr(self, "all_tracks", None):
+            QMessageBox.information(self, "Load bitmap", "No tracks in project.")
+            return
+        if not getattr(self, "all_wells", None):
+            QMessageBox.information(self, "Load bitmap", "No wells in project.")
+            return
+
+        # Find the track
+        track = None
+        for t in self.all_tracks:
+            if t.get("name") == track_name:
+                track = t
+                break
+        if track is None or "bitmaps" not in track:
+            QMessageBox.warning(self, "Load bitmap", f"Track '{track_name}' is not a bitmap track.")
+            return
+
+        bmp_cfg = track.get("bitmap", {}) or {}
+        key = bmp_cfg.get("key", None)
+        if not key:
+            QMessageBox.warning(self, "Load bitmap", "Bitmap track has no 'key' configured.")
+            return
+
+        well_names = [w.get("name") for w in self.all_wells if w.get("name")]
+        if not well_names:
+            QMessageBox.information(self, "Load bitmap", "No named wells available.")
+            return
+
+        dlg = LoadBitmapForTrackDialog(self, well_names, track_name, bmp_cfg)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        res = dlg.result()
+        if not res:
+            return
+
+        # Resolve well
+        well = None
+        for w in self.all_wells:
+            if w.get("name") == res["well_name"]:
+                well = w
+                break
+        if well is None:
+            QMessageBox.warning(self, "Load bitmap", f"Well '{res['well_name']}' not found.")
+            return
+
+        # Store under this track key
+        bitmaps = well.setdefault("bitmaps", {})
+        bitmaps[key] = {
+            "path": res["path"],
+            "top_depth": res["top_depth"],
+            "base_depth": res["base_depth"],
+            "label": res["label"],
+            "alpha": res["alpha"],
+            "interpolation": res["interpolation"],
+            "cmap": res["cmap"],
+            "flip_vertical": res["flip_vertical"],
+        }
+
+        # Redraw
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.tracks = self.tracks
+            self.panel.draw_panel()
+
+        # If you have multiple dock panels:
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
 
     def _action_load_core_bitmap_to_well(self, default_well_name=None):
         """
@@ -2034,7 +2498,7 @@ class MainWindow(QMainWindow):
           well["bitmaps"][key] = {path, top_depth, base_depth, ...}
         """
 
-        import os
+        LOG.debug("Loading core bitmap to well...")
 
         if not getattr(self, "all_wells", None):
             QMessageBox.information(self, "Load core bitmap", "No wells in project.")
@@ -2093,28 +2557,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
-    def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
-                             visible_wells=None, panel_settings=None):
-        dock = WellPanelDock(
-            parent=self,
-            wells=self.all_wells,
-            tracks=self.all_tracks,
-            stratigraphy=self.all_stratigraphy,
-            panel_settings=panel_settings
-        )
-        dock.activated.connect(self._on_panel_activated)
-
-        dock.panel.visible_tops = visible_tops
-        dock.panel.visible_logs = visible_logs
-        dock.panel.visible_tracks = visible_tracks
-        dock.panel.visible_wells = visible_wells
-        dock.setWindowTitle(window_title)
-
-        self.addDockWidget(Qt.RightDockWidgetArea, dock)
-        #self._on_panel_activated(dock)
-        self.WindowList.append(dock)
-        return dock
-
     def _action_add_well_panel_dock(self):
         dock = WellPanelDock(
             parent=self,
@@ -2154,7 +2596,57 @@ class MainWindow(QMainWindow):
 
         dock.show()
 
-    from PyQt5.QtWidgets import QMessageBox
+    def _ensure_bitmap_track_exists(self):
+        """
+        Ensure there is at least one bitmap track in self.tracks.
+        The bitmap track references a per-well bitmap by key.
+        """
+        if not hasattr(self, "tracks") or self.tracks is None:
+            self.tracks = []
+
+        for t in self.tracks:
+            if "bitmap" in t:
+                return t# already exists
+
+        # Create a default bitmap track
+        self.tracks.append({
+            "name": "Core",
+            "type": "bitmap",
+            "bitmap": {
+                "key": "core",  # per-well bitmap key
+                "label": "Core",
+                "alpha": 1.0,
+                "cmap": None,
+                "interpolation": "nearest",
+                "flip_vertical": False,
+            }
+        })
+
+        self.all_tracks = self.tracks
+
+        return self.tracks[0]
+
+    def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
+                             visible_wells=None, panel_settings=None):
+        dock = WellPanelDock(
+            parent=self,
+            wells=self.all_wells,
+            tracks=self.all_tracks,
+            stratigraphy=self.all_stratigraphy,
+            panel_settings=panel_settings
+        )
+        dock.activated.connect(self._on_panel_activated)
+
+        dock.panel.visible_tops = visible_tops
+        dock.panel.visible_logs = visible_logs
+        dock.panel.visible_tracks = visible_tracks
+        dock.panel.visible_wells = visible_wells
+        dock.setWindowTitle(window_title)
+
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        #self._on_panel_activated(dock)
+        self.WindowList.append(dock)
+        return dock
 
     def _remove_well_panel_dock(self, dock=None, confirm=True):
         """
@@ -2249,152 +2741,6 @@ class MainWindow(QMainWindow):
             trend = "constant"
         return lithology, trend
 
-    def _action_import_facies_intervals_csv(self):
-        """
-        Open a CSV with columns:
-            Well, ID, LithoTrend, Environment, Rel_Top, Rel_Base
-
-        Parse LithoTrend into (Lithology, Trend) and attach intervals
-        to each well as well['facies_intervals'] = [ ... ].
-        """
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import facies intervals from CSV",
-            "",
-            "CSV files (*.csv);;All files (*.*)"
-        )
-        if not path:
-            return
-
-        # --- read CSV ---
-        try:
-            with open(path, "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-        except Exception as e:
-            QMessageBox.critical(self, "Import facies intervals", f"Failed to read file:\n{e}")
-            return
-
-        if not rows:
-            QMessageBox.information(self, "Import facies intervals", "No data rows found in CSV.")
-            return
-
-        required_cols = {"Well", "ID", "Litho", "Trend", "Environment", "Rel_Top", "Rel_Base"}
-        missing = required_cols - set(rows[0].keys())
-        if missing:
-            QMessageBox.warning(
-                self,
-                "Import facies intervals",
-                "Missing required columns in CSV:\n  " + ", ".join(sorted(missing))
-            )
-            return
-
-        # --- parse rows ---
-        intervals = []
-        skipped = 0
-        for r in rows:
-            well_name = (r.get("Well") or "").strip()
-            id_txt = (r.get("ID") or "").strip()
-            lt_txt = (r.get("Litho") or "").strip()
-            trd_txt = (r.get("Trend") or "").strip()
-            env_txt = (r.get("Environment") or "").strip()
-            top_txt = (r.get("Rel_Top") or "").strip()
-            base_txt = (r.get("Rel_Base") or "").strip()
-
-            if not well_name or not id_txt:
-                skipped += 1
-                continue
-
-            try:
-                _id = int(id_txt)
-            except ValueError:
-                skipped += 1
-                continue
-
-            try:
-                rel_top = float(top_txt.replace(",", ".")) if top_txt else None
-                rel_base = float(base_txt.replace(",", ".")) if base_txt else None
-            except ValueError:
-                skipped += 1
-                continue
-
-            lithology, trend = self._parse_lithotrend(lt_txt, trd_txt)
-
-            intervals.append({
-                "well": well_name,
-                "id": _id,
-                "litho_trend": lt_txt,
-                "lithology": lithology,
-                "trend": trend,  # "cu", "fu", or "constant"
-                "environment": env_txt,
-                "rel_top": rel_top,
-                "rel_base": rel_base,
-            })
-
-        if not intervals:
-            QMessageBox.information(
-                self,
-                "Import facies intervals",
-                f"No valid rows found. Skipped: {skipped}"
-            )
-            return
-
-        # --- preview dialog ---
-        dlg = ImportFaciesIntervalsDialog(self, intervals)
-        if dlg.exec_() != QDialog.Accepted:
-            return
-
-        imported = dlg.result_intervals()
-        if not imported:
-            return
-
-        # --- attach intervals to wells by name ---
-        if not getattr(self, "all_wells", None):
-            QMessageBox.warning(
-                self,
-                "Import facies intervals",
-                "No wells in project; cannot attach facies intervals."
-            )
-            return
-
-        wells_by_name = {w.get("name"): w for w in self.all_wells if w.get("name")}
-        unknown_wells = set()
-
-        # clear or merge? here: replace per well
-        for w in self.all_wells:
-            w.setdefault("facies_intervals", [])
-
-        # group by well
-        by_well = {}
-        for iv in imported:
-            wnm = iv["well"]
-            by_well.setdefault(wnm, []).append(iv)
-
-        for wname, intervals_for_well in by_well.items():
-            well = wells_by_name.get(wname)
-            if well is None:
-                unknown_wells.add(wname)
-                continue
-            # sort by rel_top descending if they are relative from top=1->0,
-            # or ascending depending on your convention – here we just keep input order
-            well["facies_intervals"] = list(intervals_for_well)
-
-        msg_lines = [
-            f"Imported {len(imported)} facies intervals.",
-            f"Skipped rows: {skipped}",
-        ]
-        if unknown_wells:
-            msg_lines.append(
-                "\nUnknown wells (not found in project):\n  "
-                + ", ".join(sorted(unknown_wells))
-            )
-
-        QMessageBox.information(
-            self,
-            "Import facies intervals",
-            "\n".join(msg_lines)
-        )
-
     def set_layout_params(self, well_gap_factor: float, track_width: float):
         """Update panel layout (gap between wells and track width) and redraw."""
         self.well_gap_factor = max(0.1, float(well_gap_factor))
@@ -2478,181 +2824,6 @@ class MainWindow(QMainWindow):
         #     self.panel.tracks = self.all_tracks
         #     self.panel.draw_panel()
 
-    def _load_tops_from_csv(self, path: str):
-        """
-        Load formation / fault tops from a CSV file with columns:
-            Well_name, MD, Horizon, Name, Type
-
-        and merge them into:
-            - self.all_wells[*]["tops"]
-            - self.stratigraphy (adds role if needed)
-
-        Rules:
-          - well must exist in self.all_wells (matched by well['name'])
-          - top name is taken from:
-              * if Type == 'Fault':  Name or Horizon
-              * else:                Horizon or Name
-          - role:
-              * if Type == 'Fault'  -> 'fault'
-              * else                -> 'stratigraphy'
-          - depth is MD (float)
-        """
-        # ---- read CSV ----
-        try:
-            with open(path, "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f, delimiter=";")
-                rows = list(reader)
-        except Exception as e:
-            QMessageBox.critical(self, "Load tops CSV", f"Failed to read file:\n{e}")
-            return
-
-        if not rows:
-            QMessageBox.information(self, "Load tops CSV", "No data rows found in CSV.")
-            return
-
-        # ---- index wells by name ----
-        if not hasattr(self, "all_wells") or not self.all_wells:
-            QMessageBox.warning(
-                self,
-                "Load tops CSV",
-                "No wells in project. Please create/import wells before loading tops."
-            )
-            return
-
-        wells_by_name = {}
-        for w in self.all_wells:
-            nm = w.get("name")
-            if nm:
-                wells_by_name[nm] = w
-
-        # ---- ensure we have a stratigraphy dict ----
-        strat = getattr(self, "stratigraphy", None)
-        if strat is None or not isinstance(strat, dict):
-            strat = OrderedDict()
-        else:
-            # preserve existing order
-            strat = OrderedDict(strat)
-
-        unknown_wells = set()
-        skipped_rows = 0
-        added_tops = 0
-        updated_tops = 0
-
-        for row in rows:
-            well_name = (row.get("Well_name") or "").strip()
-            md_str = (row.get("MD") or "").strip()
-            horizon = (row.get("Horizon") or "").strip()
-            name_col = (row.get("Name") or "").strip()
-            type_col = (row.get("Type") or "").strip()
-
-            if not well_name or not md_str:
-                skipped_rows += 1
-                continue
-
-            # parse depth
-            try:
-                depth = float(md_str.replace(",", "."))  # comma or dot decimals
-            except ValueError:
-                skipped_rows += 1
-                continue
-
-            # find well
-            well = wells_by_name.get(well_name)
-            if well is None:
-                unknown_wells.add(well_name)
-                skipped_rows += 1
-                continue
-
-            # determine top name + role
-            # For Faults -> name comes from Name or Horizon
-            # For others -> name from Horizon or Name
-            ttype = type_col.strip()
-            if ttype == "Fault":
-                top_name = name_col or horizon
-                role = "fault"
-            else:
-                top_name = horizon or name_col
-                role = "stratigraphy"
-
-            if not top_name:
-                # can't use an unnamed row
-                skipped_rows += 1
-                continue
-
-            # ---- update stratigraphy meta ----
-            meta = strat.get(top_name, {})
-            if not isinstance(meta, dict):
-                meta = {}
-
-            # keep existing fields, just ensure role exists / updated
-            meta.setdefault("level", "")  # you can refine this later
-            meta.setdefault("color", "#000000")
-            meta.setdefault("hatch", "-")
-            # if no role defined yet, set it; if already set, we do NOT overwrite
-            meta.setdefault("role", role)
-
-            strat[top_name] = meta
-
-            # ---- update well tops ----
-            tops = well.setdefault("tops", {})
-            old_val = tops.get(top_name)
-
-            if isinstance(old_val, dict):
-                old_val["depth"] = depth
-                tops[top_name] = old_val
-                updated_tops += 1
-            elif old_val is not None:
-                # old was a bare number
-                tops[top_name] = {"depth": depth}
-                updated_tops += 1
-            else:
-                tops[top_name] = {"depth": depth}
-                added_tops += 1
-
-        # store stratigraphy back
-        self.stratigraphy = strat
-
-        # ---- update panel ----
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.stratigraphy = self.stratigraphy
-            # keep zoom/flatten; if you want to reset, uncomment:
-            # self.panel._current_depth_window = None
-            # self.panel._flatten_depths = None
-            self.panel.draw_panel()
-
-        # ---- refresh trees ----
-        if hasattr(self, "_populate_well_tree"):
-            self._populate_well_tree()
-        if hasattr(self, "_populate_top_tree"):
-            self._populate_top_tree()
-
-        # ---- summary message ----
-        msg = [
-            f"Added tops:   {added_tops}",
-            f"Updated tops: {updated_tops}",
-            f"Skipped rows: {skipped_rows}",
-        ]
-        if unknown_wells:
-            msg.append(
-                "\nUnknown wells encountered (not in project):\n  "
-                + ", ".join(sorted(unknown_wells))
-            )
-
-        QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
-
-    def _action_import_tops_csv(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import tops from CSV",
-            "",
-            "CSV files (*.csv);;All files (*.*)",
-        )
-        if not path:
-            return
-
-        self._load_tops_from_csv(path)
-
     def _move_well(self, well_name: str, direction: int):
         """
         Move a well left/right in panel order.
@@ -2729,7 +2900,7 @@ class MainWindow(QMainWindow):
                 self._action_load_core_bitmap_to_well(default_well_name=well_name)
 
         # --- case 1: logs under "Logs" folder ---
-        if parent is self.well_logs_folder:
+        if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
             if not log_name:
                 return
@@ -2777,23 +2948,46 @@ class MainWindow(QMainWindow):
             if not track_name:
                 return
 
+            for track in self.all_tracks:
+                if track.get("name") == track_name:
+                    track_cfg = track
+                    break
+
             menu = QMenu(self)
-            act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
-            act_add_log = menu.addAction(f"Add new log to track ...")
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
-            act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
-            act_edit_lithofacies_settings = menu.addAction("Edit lithofacies track settings ...")
+            if track.get("type") == "discrete":
+                #menu = QMenu(self)
+                act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_disc_colors:
+                    self._action_edit_discrete_colors_for_track(track_name)
+            elif track.get("type") == "bitmap":
+                #menu = QMenu(self)
+                act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_add_core_bitmap:
+                    self._action_load_bitmap_into_bitmap_track(track_name)
+            elif track.get("type") == "continuous":
+                #menu = QMenu(self)
+                act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
+                act_add_log = menu.addAction(f"Add new log to track ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit:
+                    self._edit_log_display_settings(track_name)
+                elif chosen == act_add_log:
+                    self._action_add_log_to_track()
+            elif track.get("type") == "lithofacies":
+                #menu = QMenu(self)
+                act_edit_lithofacies_settings = menu.addAction("Edit lithofacies track settings ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_lithofacies_settings:
+                    self._action_edit_lithofacies_settings_for_track(track_name)
             chosen = menu.exec_(global_pos)
-            if chosen == act_edit:
-                self._edit_log_display_settings(track_name)
-            elif chosen == act_add_log:
-                self._action_add_log_to_track()
-            elif chosen == act_delete_track:
+
+            if chosen == act_delete_track:
                 self._action_delete_track()
-            elif chosen == act_edit_disc_colors:
-                self._action_edit_discrete_colors_for_track(track_name)
-            elif chosen == act_edit_lithofacies_settings:
-                self._action_edit_lithofacies_settings_for_track(track_name)
+
+
             return
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
@@ -2817,7 +3011,7 @@ class MainWindow(QMainWindow):
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
-        #print(f"Window item changed: {item.text(0)}")
+        print(f"Window item changed: {item.text(0)}")
 
         win_name = item.data(0, Qt.UserRole)
 
@@ -2831,7 +3025,18 @@ class MainWindow(QMainWindow):
                 else:
                     win.setVisible(False)
 
-    def _on_window_tree_context_menu(self, item, pos=None):
+        win_title = item.data(0, Qt.UserRole)
+        new_title = item.text(0).strip()
+
+        if win_title !=new_title:
+            print("change the name of the window!")
+            for win in self.WindowList:
+                if win.title == win_title:
+                    win.set_title(new_title)
+            self._populate_window_tree()
+
+
+    def _on_window_tree_context_menu(self, pos=None):
         """Show a context menu for the tree."""
         if pos is None:
             return
@@ -2839,9 +3044,30 @@ class MainWindow(QMainWindow):
         item = self.window_tree.itemAt(pos)
         if item is None:
             return
+
         global_pos = self.window_tree.viewport().mapToGlobal(pos)
+
+        if item == self.window_root:
+            menu = QMenu(self)
+            act_add_window = menu.addAction("Add new well section window...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_add_window:
+                #print("Add new window...")
+                self._action_add_well_panel_dock()
+        elif item.parent() == self.window_root:
+            menu = QMenu(self)
+            window_name = item.text(0)
+            act_delete_window = menu.addAction(f"Delete window '{window_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_delete_window:
+                #print("Delete window...")
+                dock = self.get_dock_by_title(item.text(0))
+                self._remove_well_panel_dock(dock)
+                self._populate_window_tree()
+
+
         parent = item.parent()
-        chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
+#        chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
 
     def _dock_layout_snapshot(self) -> dict:
         """
@@ -2943,3 +3169,12 @@ class MainWindow(QMainWindow):
         # self._apply_tab_groups(layout.get("tab_groups", []))
 
         return bool(ok_geom and ok_state)
+
+    def get_dock_by_title(self, title: str):
+        """Return a dock widget by title."""
+        for window in self.WindowList:
+            if window.title == title:
+                return window
+        return None
+
+ 
