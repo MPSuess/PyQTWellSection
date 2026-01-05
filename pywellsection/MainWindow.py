@@ -428,6 +428,7 @@ class MainWindow(QMainWindow):
             self.panel.visible_tracks = window_dict[0]["visible_tracks"]
             self.panel.visible_wells = window_dict[0]["visible_wells"]
             self.WindowList[0].set_title(window_dict[0]["window_title"])
+            self.panel.vertical_scale = window_dict[0].get("vertical_scale", 1.0)
 
             #
 
@@ -1319,6 +1320,7 @@ class MainWindow(QMainWindow):
 
         self.well_tree.blockSignals(False)
         self._rebuild_visible_logs_from_tree()
+        self._rebuild_visible_bitmaps_from_tree()
 
     def _populate_well_track_tree(self):
         """Rebuild tracks subtree from self.tracks, showing track→log assignment."""
@@ -1442,6 +1444,16 @@ class MainWindow(QMainWindow):
         if item is self.continous_logs_folder or p is self.continous_logs_folder:
             #LOG.debug("LOGS FOLDER changed")
             self._rebuild_visible_logs_from_tree()
+            self.panel.draw_panel()
+
+        if item is self.discrete_logs_folder or p is self.discrete_logs_folder:
+            LOG.debug("DISCRETE LOGS FOLDER changed")
+            self._rebuild_visible_discrete_logs_from_tree()
+            self.panel.draw_panel()
+
+        if item is self.bitmaps_folder or p is self.bitmaps_folder:
+            LOG.debug("BITMAPS FOLDER changed")
+            self._rebuild_visible_bitmaps_from_tree()
             self.panel.draw_panel()
 
         # Tracks
@@ -1647,6 +1659,40 @@ class MainWindow(QMainWindow):
             visible_set = visible if visible else set()
         #LOG.debug ("visible logs:", visible)
         self.panel.set_visible_logs(visible)
+
+    def _rebuild_visible_discrete_logs_from_tree(self):
+        root = self.discrete_logs_folder
+        visible = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                nm = it.data(0, Qt.UserRole)
+                if nm:
+                    visible.add(nm)
+        # If everything is checked, you can pass None to mean "no filter"
+        if visible and len(visible) == root.childCount():
+            visible_set = None
+        else:
+            visible_set = visible if visible else set()
+
+        self.panel.set_visible_discrete_logs(visible_set)
+
+    def _rebuild_visible_bitmaps_from_tree(self):
+        root = self.bitmaps_folder
+        visible = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                nm = it.data(0, Qt.UserRole)
+                if nm:
+                    visible.add(nm)
+        # If everything is checked, you can pass None to mean "no filter"
+        if visible and len(visible) == root.childCount():
+            visible_set = visible
+        else:
+            visible_set = visible if visible else set()
+
+        self.panel.set_visible_bitmaps(visible_set)
 
     def _rebuild_visible_tracks_from_tree(self):
         """Collect checked tracks and inform the panel."""
@@ -1936,8 +1982,8 @@ class MainWindow(QMainWindow):
         if dlg.exec_() != QDialog.Accepted:
             return
 
-        gap, tw = dlg.values()
-        self.set_layout_params(gap, tw)
+        gap, tw, vs= dlg.values()
+        self.set_layout_params(gap, tw, vs)
 
     def _action_edit_all_tops(self):
         """Open table dialog to edit/add/delete tops of all wells."""
@@ -2629,6 +2675,10 @@ class MainWindow(QMainWindow):
 
     def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
                              visible_wells=None, panel_settings=None):
+
+        vertical_scale = panel_settings.get("vertical_scale", 1.0)
+        panel_settings["vertical_scale"] = vertical_scale
+
         dock = WellPanelDock(
             parent=self,
             wells=self.all_wells,
@@ -2742,12 +2792,13 @@ class MainWindow(QMainWindow):
             trend = "constant"
         return lithology, trend
 
-    def set_layout_params(self, well_gap_factor: float, track_width: float):
+    def set_layout_params(self, well_gap_factor: float, track_width: float, vertical_scale: float):
         """Update panel layout (gap between wells and track width) and redraw."""
         self.well_gap_factor = max(0.1, float(well_gap_factor))
         self.track_width = max(0.1, float(track_width))
+        self.vertical_scale = vertical_scale
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width}
+                               "track_width": self.track_width, "vertical_scale": self.vertical_scale}
         self.panel.set_panel_settings(self.panel_settings)
         self.panel.draw_panel()
 

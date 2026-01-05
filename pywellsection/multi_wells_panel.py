@@ -94,9 +94,11 @@ def draw_multi_wells_panel_on_figure(
     visible_tops = None,
     visible_logs = None,
     visible_discrete_logs = None,
+    visible_bitmaps = None,
     visible_tracks = None,
     depth_window = None,
     stratigraphy = None,
+    vertical_scale = 1.0,
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -114,8 +116,6 @@ def draw_multi_wells_panel_on_figure(
     #print(f" draw ! visible tops: {visible_tops}")
 
     fig.clf()
-
-
 
     n_wells = len(visible_wells)
 
@@ -197,8 +197,8 @@ def draw_multi_wells_panel_on_figure(
         wspace=0.05,
         left=0.1,
         right=0.90,
-        bottom=0.10,
-        top=0.8,
+        bottom=0.10/vertical_scale,
+        top=0.8/vertical_scale,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -212,8 +212,6 @@ def draw_multi_wells_panel_on_figure(
 
     # ---- 4) Draw wells ----
 
-
-
     for wi, well in enumerate(selected_wells):
 
 
@@ -222,9 +220,6 @@ def draw_multi_wells_panel_on_figure(
 
         offset = offsets[wi]  # TRUE depth offset for this well
 
-        #print(f"well {wi+1}/{n_wells} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
-
-        # formatter to show TRUE depth: depth = plot_value + offset
         if offset != 0.0:
             depth_formatter = FuncFormatter(lambda y, pos, off=offset: f"{(y + off):.2f}")
         else:
@@ -245,7 +240,7 @@ def draw_multi_wells_panel_on_figure(
             base_ax.set_ylabel("Depth (m)", labelpad=8)
             base_ax.tick_params(axis="y", labelleft=True)
             base_ax.xaxis.set_visible(False)
-            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
+            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
 
             if depth_formatter is not None:
                 base_ax.yaxis.set_major_formatter(depth_formatter)
@@ -256,7 +251,7 @@ def draw_multi_wells_panel_on_figure(
             col_idx = wi * (n_tracks + 1) + ti
             base_ax = axes[col_idx]
 
-            LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
+            #LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
 
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
@@ -278,20 +273,14 @@ def draw_multi_wells_panel_on_figure(
             if ti == mid_track:
                 base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
 
-            # If track is hidden: just leave the axis empty (depth axis still there).
-            #if track_hidden:
-                # no logs, no discrete fill
-            #    continue
-
-            # ---- Continuous logs ----
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
             if track.get("type") == "bitmap":
-                _draw_bitmap_track(base_ax,well, track, offset)
+                _draw_bitmap_track(base_ax,well, track, offset, visible_bitmaps)
 
             disc_cfg = track.get("discrete")
             if disc_cfg is not None:
-                _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs=None)
+                _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs)
 
             if track.get("type") == "lithofacies":
                 _draw_lithofacies_track(base_ax,well,track, offset)
@@ -431,7 +420,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         twin_ax.grid(False)
 
-def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs=None):
+def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs = None):
     """
     Render a discrete log track as colored intervals.
 
@@ -452,6 +441,7 @@ def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs=
         If provided, only draw when disc_cfg['log'] is in the set.
     """
     disc_name = disc_cfg["log"]
+
 
     if visible_discrete_logs is not None and disc_name not in visible_discrete_logs:
         return
@@ -677,7 +667,8 @@ def _draw_lithofacies_track(base_ax,well, track, offset = 0.0):
     base_ax.xaxis.set_visible(False)
     base_ax.grid(False)
 
-def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
+def _draw_bitmap_track(base_ax, well, track, offset = 0.0, visible_bitmaps = None):
+    #global bitmap
     import numpy as np
     import matplotlib.image as mpimg
 
@@ -698,9 +689,9 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
     base_ax.set_xticks([])
     base_ax.set_title(track_name, fontsize=5)
 
-    if bitmaps is not None:
+    if bitmaps is not None and visible_bitmaps is not None:
         for bitmap in bitmaps:
-            if bitmap is not None:
+            if bitmap is not None and bitmap in visible_bitmaps:
                 bmp_cfg = bitmaps.get(bitmap, None)
                 bmp_track = bmp_cfg.get("track", None)
 
@@ -728,8 +719,6 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0):
                             # Optional flip (sometimes needed depending on how image is stored)
                             if track_cfg.get("flip_vertical", False):
                                 img = np.flipud(img)
-
-
 
                             # IMPORTANT:
                             # - Use extent to map the image into depth coordinates.
