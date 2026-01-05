@@ -58,6 +58,7 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
         self.redraw_requested = panel_settings["redraw_requested"]
+        self.vertical_scale = panel_settings["vertical_scale"]
 #        self.panel_title = panel_settings["panel_title"]
 #        self.window_name = panel_settings["window_name"]
 
@@ -68,9 +69,9 @@ class WellPanelWidget(QWidget):
         self.visible_tops = None
         self.visible_logs = None
         self.visible_discrete_logs = None
+        self.visible_bitmaps = None
         self.visible_tracks = tracks
         self.visible_wells = set()
-
 
         #self._temp_highlight_top = None
 
@@ -169,6 +170,7 @@ class WellPanelWidget(QWidget):
             visible_logs = self.visible_logs
             visible_discrete_logs = self.visible_discrete_logs
             visible_tracks = self.visible_tracks
+            visible_bitmaps = self.visible_bitmaps
 
             n_wells = len(self.visible_wells)
 
@@ -184,7 +186,7 @@ class WellPanelWidget(QWidget):
 
             total_cols = n_wells * n_tracks + (n_wells - 1)
 
-            self.canvas.setFixedSize(total_cols*100, 800)
+            self.canvas.setFixedSize(total_cols*100, int(800*self.vertical_scale))
 
 #            print(f"in draw panel, stratigraphy: {self.stratigraphy, visible_tops}")
 
@@ -203,9 +205,11 @@ class WellPanelWidget(QWidget):
                 visible_tops = visible_tops,
                 visible_logs = visible_logs,
                 visible_discrete_logs=visible_discrete_logs,
+                visible_bitmaps=visible_bitmaps,
                 visible_tracks = visible_tracks,
                 depth_window=self._current_depth_window,
                 stratigraphy=self.stratigraphy,
+                vertical_scale=self.vertical_scale
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -703,8 +707,8 @@ class WellPanelWidget(QWidget):
         if top_name not in tops:
             return
 
-        #if len(self._flatten_depths) > 0:
-        if self._flatten_depths is not None:
+        if len(self._flatten_depths) > 0:
+        #if self._flatten_depths is not None:
             flatten_depth = self._flatten_depths[wi]
         else:
             flatten_depth = 0
@@ -1208,6 +1212,19 @@ class WellPanelWidget(QWidget):
         self.visible_logs = visible_logs
 #        self.draw_panel()
 
+    def set_visible_discrete_logs(self, visible_discrete_logs):
+        self.visible_discrete_logs = visible_discrete_logs
+
+    def get_visible_discrete_logs(self):
+        return self.visible_discrete_logs
+
+    def set_visible_bitmaps(self, visible_bitmaps):
+        self.visible_bitmaps = visible_bitmaps
+
+    def get_visible_bitmaps(self):
+        return self.visible_bitmaps
+
+
     def get_visible_logs(self):
         return self.visible_logs
 
@@ -1231,6 +1248,11 @@ class WellPanelWidget(QWidget):
         self.well_gap_factor = settings["well_gap_factor"]
         self.track_gap_factor = settings["track_gap_factor"]
         self.track_width = settings["track_width"]
+        self.vertical_scale = settings["vertical_scale"]
+
+    def set_vertical_scale(self, vertical_scale):
+        self.vertical_scale = vertical_scale
+        self.draw_panel()
 
     def set_draw_panel(self, state = True):
         self.panel_settings["redraw_requested"] = state

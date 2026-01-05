@@ -861,7 +861,7 @@ class LayoutSettingsDialog(QDialog):
         layout.addWidget(btns)
 
     def values(self):
-        return float(self.spin_gap.value()), float(self.spin_track.value())
+        return float(self.spin_gap.value()), float(self.spin_track.value()), float(self.spin_scale.value())
 
 # class LogDisplaySettingsDialog(QDialog):
 #     """
