@@ -1715,124 +1715,6 @@ class MainWindow(QMainWindow):
 
         self.panel.set_visible_tracks(visible)
 
-    def _refresh_all_panels_new(self):
-        """
-        Refresh central + docked panels, and remove any stale references to deleted wells.
-
-        This function:
-          - updates panel data refs (wells, tracks, stratigraphy)
-          - cleans per-panel state that can reference wells by name or index
-          - redraws each panel
-
-        Safe to call after:
-          - deleting wells
-          - importing wells/logs/tops
-          - reordering wells
-          - changing tracks/visibility/flattening
-        """
-        wells = getattr(self, "all_wells", []) or []
-        tracks = getattr(self, "tracks", []) or []
-        strat = getattr(self, "stratigraphy", {}) or {}
-
-        existing_names = [w.get("name") for w in wells if w.get("name")]
-        existing_set = set(existing_names)
-
-        def _sanitize_panel(panel):
-            """Remove stale well references from one WellPanelWidget."""
-            if panel is None:
-                return
-
-            # Always point to current project objects
-            panel.wells = wells
-            panel.tracks = tracks
-            panel.stratigraphy = strat
-
-            # ------------- well name filters -------------
-            # visible_wells: set/list of well names (or None)
-            vw = getattr(panel, "visible_wells", None)
-            if vw is not None:
-                if isinstance(vw, set):
-                    panel.visible_wells = {nm for nm in vw if nm in existing_set}
-                elif isinstance(vw, list):
-                    panel.visible_wells = [nm for nm in vw if nm in existing_set]
-                else:
-                    # unknown type -> safest reset
-                    panel.visible_wells = None
-
-            # ------------- per-well flatten offsets -------------
-            # flatten_depths is index-based; after deletion/reorder it can become invalid.
-            # If you store flatten based on well name, adapt here. Otherwise safest reset.
-            if hasattr(panel, "flatten_depths"):
-                fd = getattr(panel, "flatten_depths", None)
-                if fd is not None:
-                    # If it's a list and length mismatches -> reset
-                    if isinstance(fd, list) and len(fd) != len(wells):
-                        panel.flatten_depths = None
-                    # If it's a dict keyed by well name -> filter it
-                    elif isinstance(fd, dict):
-                        panel.flatten_depths = {k: v for k, v in fd.items() if k in existing_set}
-                    # else: leave it
-
-            # ------------- depth window -------------
-            # depth_window should be in true depth coords; keep it if present.
-            # But if there are no wells, clear it.
-            if not wells and hasattr(panel, "depth_window"):
-                panel.depth_window = None
-
-            # ------------- active selections / highlights -------------
-            # These names vary per implementation; we defensively clear common ones.
-            for attr in (
-                    "highlight_top",  # may store (wi, top_name) or similar
-                    "_highlight_top",  # private variants
-                    "_active_pick_context",  # may store {"wi":..., ...}
-                    "_active_pick_ctx",
-                    "_active_top_dialog",  # dialog refs
-            ):
-                if hasattr(panel, attr):
-                    val = getattr(panel, attr)
-                    # If it stores an index, safest: clear
-                    if isinstance(val, dict) and ("wi" in val or "well_index" in val):
-                        setattr(panel, attr, None)
-
-            # ------------- matplotlib event connections -------------
-            # If a pick/drag mode was armed on a deleted well, disconnect to avoid odd behaviour.
-            for cid_attr in ("_bitmap_pick_cid", "_dialog_pick_cid", "_motion_pick_cid"):
-                if hasattr(panel, cid_attr):
-                    cid = getattr(panel, cid_attr)
-                    if cid is not None and hasattr(panel, "canvas"):
-                        try:
-                            panel.canvas.mpl_disconnect(cid)
-                        except Exception:
-                            pass
-                    setattr(panel, cid_attr, None)
-
-            # clear pick context if exists
-            for ctx_attr in ("_bitmap_pick_ctx", "_in_dialog_pick_mode"):
-                if hasattr(panel, ctx_attr):
-                    setattr(panel, ctx_attr, None)
-
-            # ------------- internal axis mappings -------------
-            # These get rebuilt on draw; clear so you don't hit stale mappings.
-            for attr in ("axis_index", "axes", "well_main_axes"):
-                if hasattr(panel, attr):
-                    setattr(panel, attr, {} if attr == "axis_index" else None)
-
-        # central panel
-        if hasattr(self, "panel") and self.panel is not None:
-            _sanitize_panel(self.panel)
-            self.panel.draw_panel()
-
-        # docked panels
-        for dock in list(getattr(self, "_panel_docks", []) or []):
-            if dock is None:
-                continue
-            panel = getattr(dock, "panel", None)
-            if panel is None:
-                continue
-            _sanitize_panel(panel)
-            panel.draw_panel()
-
-
     def add_log_to_track(self, track_name: str, log_name: str,
                          label: str = None, color: str = "black",
                          xscale: str = "linear", direction: str = "normal",
@@ -3326,11 +3208,6 @@ class MainWindow(QMainWindow):
                             visible_wells.append(v)
 
                 dock.panel.visible_wells=visible_wells
-
-
-
-
-
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
