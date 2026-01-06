@@ -1,3 +1,9 @@
+### PyQTWell ... an experimental well section viewer and editor ... .
+### Provides basic functionality to load wells and compose well sections with a user-friendly interface
+### You like to improve the code? just join the developers team :-).
+### This program is licensed according to EUPL1.2
+### M. Peter Süss, University of Tuebingen, Copyright 2025, 2026
+
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
