@@ -3026,3 +3026,206 @@ class LoadBitmapForTrackDialog(QDialog):
 
     def result(self):
         return self._result
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QDialogButtonBox, QMessageBox, QLabel
+)
+from PyQt5.QtCore import Qt
+
+
+class BitmapPlacementDialog(QDialog):
+    """
+    Interactive editor for bitmap positions (top/base depths) for a given bitmap track key.
+    Uses TRUE depth coordinates; picking converts from flattened plot y to true depth.
+    """
+
+    COL_WELL = 0
+    COL_TOP = 1
+    COL_BASE = 2
+    COL_LABEL = 3
+    COL_ALPHA = 4
+    COL_FLIP = 5
+    COL_PATH = 6
+
+    def __init__(self, parent, wells, track_name: str, bitmap_key: str, panel_widget):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit bitmap positions — Track: {track_name}")
+        self.resize(300, 520)
+
+        self.wells = wells
+        self.track_name = track_name
+        self.bitmap_key = "track"
+        self.panel = panel_widget  # active WellPanelWidget (for picking + redraw)
+
+        self._active_pick = None  # {"well_name":..., "which":"top"|"base"}
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            f"Bitmap track key:  {bitmap_key}\n"
+            "Edit TRUE depths (MD). Use Pick Top/Base to click in the plot.",
+            self
+        ))
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(
+#            ["Well", "Top depth", "Base depth", "Label", "Alpha", "Flip", "Path"]
+            ["Well", "Top depth", "Base depth", "Label"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        row_btn = QHBoxLayout()
+        self.btn_refresh = QPushButton("Refresh", self)
+        self.btn_apply = QPushButton("Apply", self)
+        self.btn_pick_top = QPushButton("Pick TOP on plot", self)
+        self.btn_pick_base = QPushButton("Pick BASE on plot", self)
+        row_btn.addWidget(self.btn_refresh)
+        row_btn.addWidget(self.btn_apply)
+        row_btn.addStretch(1)
+        row_btn.addWidget(self.btn_pick_top)
+        row_btn.addWidget(self.btn_pick_base)
+        layout.addLayout(row_btn)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Close, self)
+        btns.rejected.connect(self.close)
+        btns.accepted.connect(self.close)
+        layout.addWidget(btns)
+
+        self.btn_refresh.clicked.connect(self.populate)
+        self.btn_apply.clicked.connect(self.apply_to_model)
+        self.btn_pick_top.clicked.connect(lambda: self.arm_pick("top"))
+        self.btn_pick_base.clicked.connect(lambda: self.arm_pick("base"))
+
+        self.populate()
+
+    # ----------------------------
+    # Build table from model
+    # ----------------------------
+    def populate(self):
+        rows = []
+        for w in self.wells:
+            wname = w.get("name", "")
+            bmps = (w.get("bitmaps") or {}).keys()
+            if not wname or bmps is None:
+                continue
+            else:
+                for bmp in bmps:
+                    bitmap=w.get("bitmaps", {}).get(bmp, {})
+                    rows.append((wname, bitmap, bmp))
+
+        self.table.setRowCount(len(rows))
+
+        for r, (wname, bmp, bmp_name) in enumerate(rows):
+            self._set_item(r, self.COL_WELL, wname, editable=False)
+
+            self._set_item(r, self.COL_TOP,  str(float(bmp.get("top_depth", 0.0))), editable=True)
+            self._set_item(r, self.COL_BASE, str(float(bmp.get("base_depth", 0.0))), editable=True)
+
+            self._set_item(r, self.COL_LABEL, str(bmp_name), editable=False)
+            #self._set_item(r, self.COL_ALPHA, str(float(bmp.get("alpha", 1.0))), editable=True)
+
+            #self._set_item(r, self.COL_FLIP, "1" if bmp.get("flip_vertical", False) else "0", editable=True)
+            #self._set_item(r, self.COL_PATH, str(bmp.get("path", "")), editable=False)
+
+        self.table.resizeColumnsToContents()
+
+    def _set_item(self, row, col, text, editable=True):
+        it = QTableWidgetItem(text)
+        if not editable:
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+        self.table.setItem(row, col, it)
+
+    # ----------------------------
+    # Apply edits back to wells
+    # ----------------------------
+    def apply_to_model(self):
+
+        rows = []
+        bitmap_keys = set()
+        try:
+            for w in self.wells:
+                wname = w.get("name", "")
+                bitmaps_keys = w.get("bitmaps", {}).keys()
+                bmp_cfg = w.get("bitmaps", {})
+                for key in bitmaps_keys: # key is the bitmap track key in this well
+                    new_cfg = w.get("bitmaps", {}).get(key, {})
+                    path_txt = new_cfg.get("path", "")
+                    #new_cfg = bmp_cfg
+                    for r in range(self.table.rowCount()):
+                        #if r == 0: continue
+                        if self.table.item(r, self.COL_LABEL).text() == key and wname == self.table.item(r, self.COL_WELL).text():
+                            top_txt = self.table.item(r, self.COL_TOP).text().strip()
+                            base_txt = self.table.item(r, self.COL_BASE).text().strip()
+                            label_txt = self.table.item(r, self.COL_LABEL).text().strip()
+                            #alpha_txt = self.table.item(r, self.COL_ALPHA).text().strip()
+                            #flip_txt = self.table.item(r, self.COL_FLIP).text().strip()
+                            #path_txt = self.table.item(r, self.COL_PATH).text().strip()
+
+                            top_d = float(top_txt.replace(",", "."))
+                            base_d = float(base_txt.replace(",", "."))
+                            #alpha = float(alpha_txt.replace(",", "."))
+                            #flip = bool(int(flip_txt)) if flip_txt else False
+
+                            bmp_cfg.update({key:{"path":path_txt,"top_depth": top_d, "base_depth": base_d,
+                                            "track":self.track_name}})
+
+
+            # redraw
+            if self.panel is not None:
+                self.panel.draw_panel()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Apply bitmap edits", f"Failed to apply edits:\n{e}")
+
+    # ----------------------------
+    # Picking integration
+    # ----------------------------
+    def arm_pick(self, which: str):
+        """
+        Arm pick mode: user clicks in plot to set TOP or BASE for selected row.
+        """
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.information(self, "Pick", "Select a row (well) first.")
+            return
+
+        wname = self.table.item(row, self.COL_WELL).text().strip()
+        if not wname:
+            return
+
+        self._active_pick = {"well_name": wname, "which": which}
+
+        # Call into panel to arm one-click pick
+        if self.panel is None or not hasattr(self.panel, "arm_bitmap_pick"):
+            QMessageBox.warning(
+                self, "Pick",
+                "Panel does not implement arm_bitmap_pick(). Add the helper below to WellPanelWidget."
+            )
+            return
+
+        self.panel.arm_bitmap_pick(
+            dialog=self,
+            well_name=wname,
+            bitmap_key=self.bitmap_key,
+            which=which,
+        )
+
+    def set_picked_depth(self, depth_true: float):
+        """
+        Called by panel after click. Updates current row cell.
+        """
+        row = self.table.currentRow()
+        if row < 0 or self._active_pick is None:
+            return
+
+        which = self._active_pick.get("which")
+        if which == "top":
+            self.table.item(row, self.COL_TOP).setText(f"{depth_true:.3f}")
+        else:
+            self.table.item(row, self.COL_BASE).setText(f"{depth_true:.3f}")
+
+        # optionally apply immediately and redraw
+        self.apply_to_model()
+        self._active_pick = None

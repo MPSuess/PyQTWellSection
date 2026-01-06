@@ -10,6 +10,7 @@ import numpy as np
 import csv
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from matplotlib.pyplot import vlines
 
 from pywellsection.Qt_Well_Widget import WellPanelWidget, WellPanelDock
 from pywellsection.sample_data import create_dummy_data
@@ -36,7 +37,7 @@ from pywellsection.dialogs import LithofaciesTableDialog
 from pywellsection.dialogs import LoadCoreBitmapDialog
 from pywellsection.dialogs import HelpDialog
 from pywellsection.dialogs import LoadBitmapForTrackDialog
-
+from pywellsection.dialogs import BitmapPlacementDialog
 from pathlib import Path
 from collections import OrderedDict
 
@@ -1586,6 +1587,7 @@ class MainWindow(QMainWindow):
         selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
         # If none selected, you can either show none or all; here: show none
         #self.panel.set_wells(selected)
+
         self.panel.set_visible_wells(checked_names)
 
     def _rebuild_wells_from_tree(self):
@@ -1712,6 +1714,124 @@ class MainWindow(QMainWindow):
             visible_set = visible if visible else None
 
         self.panel.set_visible_tracks(visible)
+
+    def _refresh_all_panels_new(self):
+        """
+        Refresh central + docked panels, and remove any stale references to deleted wells.
+
+        This function:
+          - updates panel data refs (wells, tracks, stratigraphy)
+          - cleans per-panel state that can reference wells by name or index
+          - redraws each panel
+
+        Safe to call after:
+          - deleting wells
+          - importing wells/logs/tops
+          - reordering wells
+          - changing tracks/visibility/flattening
+        """
+        wells = getattr(self, "all_wells", []) or []
+        tracks = getattr(self, "tracks", []) or []
+        strat = getattr(self, "stratigraphy", {}) or {}
+
+        existing_names = [w.get("name") for w in wells if w.get("name")]
+        existing_set = set(existing_names)
+
+        def _sanitize_panel(panel):
+            """Remove stale well references from one WellPanelWidget."""
+            if panel is None:
+                return
+
+            # Always point to current project objects
+            panel.wells = wells
+            panel.tracks = tracks
+            panel.stratigraphy = strat
+
+            # ------------- well name filters -------------
+            # visible_wells: set/list of well names (or None)
+            vw = getattr(panel, "visible_wells", None)
+            if vw is not None:
+                if isinstance(vw, set):
+                    panel.visible_wells = {nm for nm in vw if nm in existing_set}
+                elif isinstance(vw, list):
+                    panel.visible_wells = [nm for nm in vw if nm in existing_set]
+                else:
+                    # unknown type -> safest reset
+                    panel.visible_wells = None
+
+            # ------------- per-well flatten offsets -------------
+            # flatten_depths is index-based; after deletion/reorder it can become invalid.
+            # If you store flatten based on well name, adapt here. Otherwise safest reset.
+            if hasattr(panel, "flatten_depths"):
+                fd = getattr(panel, "flatten_depths", None)
+                if fd is not None:
+                    # If it's a list and length mismatches -> reset
+                    if isinstance(fd, list) and len(fd) != len(wells):
+                        panel.flatten_depths = None
+                    # If it's a dict keyed by well name -> filter it
+                    elif isinstance(fd, dict):
+                        panel.flatten_depths = {k: v for k, v in fd.items() if k in existing_set}
+                    # else: leave it
+
+            # ------------- depth window -------------
+            # depth_window should be in true depth coords; keep it if present.
+            # But if there are no wells, clear it.
+            if not wells and hasattr(panel, "depth_window"):
+                panel.depth_window = None
+
+            # ------------- active selections / highlights -------------
+            # These names vary per implementation; we defensively clear common ones.
+            for attr in (
+                    "highlight_top",  # may store (wi, top_name) or similar
+                    "_highlight_top",  # private variants
+                    "_active_pick_context",  # may store {"wi":..., ...}
+                    "_active_pick_ctx",
+                    "_active_top_dialog",  # dialog refs
+            ):
+                if hasattr(panel, attr):
+                    val = getattr(panel, attr)
+                    # If it stores an index, safest: clear
+                    if isinstance(val, dict) and ("wi" in val or "well_index" in val):
+                        setattr(panel, attr, None)
+
+            # ------------- matplotlib event connections -------------
+            # If a pick/drag mode was armed on a deleted well, disconnect to avoid odd behaviour.
+            for cid_attr in ("_bitmap_pick_cid", "_dialog_pick_cid", "_motion_pick_cid"):
+                if hasattr(panel, cid_attr):
+                    cid = getattr(panel, cid_attr)
+                    if cid is not None and hasattr(panel, "canvas"):
+                        try:
+                            panel.canvas.mpl_disconnect(cid)
+                        except Exception:
+                            pass
+                    setattr(panel, cid_attr, None)
+
+            # clear pick context if exists
+            for ctx_attr in ("_bitmap_pick_ctx", "_in_dialog_pick_mode"):
+                if hasattr(panel, ctx_attr):
+                    setattr(panel, ctx_attr, None)
+
+            # ------------- internal axis mappings -------------
+            # These get rebuilt on draw; clear so you don't hit stale mappings.
+            for attr in ("axis_index", "axes", "well_main_axes"):
+                if hasattr(panel, attr):
+                    setattr(panel, attr, {} if attr == "axis_index" else None)
+
+        # central panel
+        if hasattr(self, "panel") and self.panel is not None:
+            _sanitize_panel(self.panel)
+            self.panel.draw_panel()
+
+        # docked panels
+        for dock in list(getattr(self, "_panel_docks", []) or []):
+            if dock is None:
+                continue
+            panel = getattr(dock, "panel", None)
+            if panel is None:
+                continue
+            _sanitize_panel(panel)
+            panel.draw_panel()
+
 
     def add_log_to_track(self, track_name: str, log_name: str,
                          label: str = None, color: str = "black",
@@ -2539,6 +2659,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_refresh_all_panels"):
             self._refresh_all_panels()
 
+        self._redraw_all_panels()
+
     def _action_load_core_bitmap_to_well(self, default_well_name=None):
         """
         Open dialog and attach core bitmap to selected well:
@@ -2642,6 +2764,31 @@ class MainWindow(QMainWindow):
         dock.destroyed.connect(_remove_dock_safely)
 
         dock.show()
+
+    def _action_edit_bitmap_positions(self, track_name: str):
+        track = next((t for t in self.all_tracks if t.get("name") == track_name), None)
+        if track is None or "bitmap" not in track:
+            QMessageBox.information(self, "Bitmap", "Selected track is not a bitmap track.")
+            return
+
+        # key = (track.get("bitmaps") or {}).get("key")
+        # if not key:
+        #     QMessageBox.warning(self, "Bitmap", "Bitmap track has no 'key'.")
+        #     return
+
+        key = "track"
+
+        # Use the active panel (docked) if you implemented it; otherwise self.panel
+        panel = getattr(self, "active_panel", None) or self.panel
+
+        dlg = BitmapPlacementDialog(
+            parent=self,
+            wells=self.all_wells,
+            track_name=track_name,
+            bitmap_key=key,
+            panel_widget=panel,
+        )
+        dlg.exec_()
 
     def _ensure_bitmap_track_exists(self):
         """
@@ -2902,6 +3049,97 @@ class MainWindow(QMainWindow):
         self._populate_well_tree()
         self.panel.draw_panel()
 
+    from PyQt5.QtWidgets import QMessageBox
+
+    def _delete_well_from_project(self, well_name: str, confirm: bool = True):
+        """
+        Delete a well from the project by name.
+
+        Removes:
+          - the well entry in self.all_wells
+        Keeps:
+          - tracks (project-wide)
+          - stratigraphy (project-wide)
+        Then refreshes trees + all panels.
+
+        Note: correlations/tops stored inside wells are deleted with the well.
+        """
+        if not well_name:
+            return
+
+        wells = getattr(self, "all_wells", None) or []
+        idx = next((i for i, w in enumerate(wells) if w.get("name") == well_name), None)
+
+        if idx is None:
+            QMessageBox.information(self, "Delete well", f"Well '{well_name}' not found.")
+            return
+
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete well",
+                f"Delete well '{well_name}' from the project?\n\n"
+                "This removes the well including its logs, discrete logs, bitmaps and tops.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        # Remove well
+        wells.pop(idx)
+
+        # If you keep selected/active well name somewhere, clear it
+        if getattr(self, "selected_well_name", None) == well_name:
+            self.selected_well_name = None
+
+        # If your panel keeps visibility filters, remove the deleted well from them
+        for p in self._iter_all_panels():
+            # visible_wells may be set/list/None
+            vw = getattr(p, "visible_wells", None)
+            if vw is not None:
+                try:
+                    if isinstance(vw, set):
+                        vw.discard(well_name)
+                    elif isinstance(vw, list):
+                        while well_name in vw:
+                            vw.remove(well_name)
+                except Exception:
+                    pass
+
+            # flatten_depths must match number of wells -> easiest reset
+            if hasattr(p, "flatten_depths") and getattr(p, "flatten_depths") is not None:
+                # safest: unflatten after structural change
+                p.flatten_depths = None
+
+        # Rebuild trees and redraw all panels
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_window_tree"):
+            self._populate_window_tree()
+        if hasattr(self, "_populate_track_tree"):
+            self._populate_track_tree()
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        else:
+            # fallback
+            if hasattr(self, "panel"):
+                self.panel.wells = self.all_wells
+                self.panel.draw_panel()
+        self._redraw_all_panels()
+
+    def _iter_all_panels(self):
+        """
+        Yield central panel + dock panels (if available).
+        """
+        if hasattr(self, "panel") and self.panel is not None:
+            yield self.panel
+        for dock in getattr(self, "_panel_docks", []) or []:
+            if dock and getattr(dock, "panel", None) is not None:
+                yield dock.panel
+
+
     def _on_tree_context_menu(self, pos):
         """
         Show a context menu for logs in the tree:
@@ -2938,6 +3176,7 @@ class MainWindow(QMainWindow):
             act_left = menu.addAction(f"Move well left '{well_name}'...")
             act_right = menu.addAction(f"Move well right '{well_name}'...")
             act_load_bitmap = menu.addAction(f"Load bitmap '{well_name}'...")
+            act_delete_well = menu.addAction(f"Delete well '{well_name}'...")
             chosen = menu.exec_(global_pos)
             well_index = item.data(0, Qt.UserRole)
             if well_index is None:
@@ -2950,19 +3189,30 @@ class MainWindow(QMainWindow):
                 self._move_well(well_name, +1)
             if chosen == act_load_bitmap:
                 self._action_load_core_bitmap_to_well(default_well_name=well_name)
+            if chosen == act_delete_well:
+                self._delete_well_from_project(well_name, confirm = True)
 
         # --- case 1: logs under "Logs" folder ---
         if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
             if not log_name:
                 return
-
             menu = QMenu(self)
             act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
                 self._edit_log_display_settings(log_name)
             return
+        if parent is self.bitmaps_folder:
+            bitmap_name = item.data(0, Qt.UserRole) or item.text(0)
+            if not bitmap_name:
+                return
+            menu = QMenu(self)
+            act_edit = menu.addAction(f"Edit bitmap position'{bitmap_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._action_edit_bitmap_positions(track_name=bitmap_name)
+
 
         if item is self.well_tops_folder:
             menu = QMenu(self)
@@ -3016,9 +3266,13 @@ class MainWindow(QMainWindow):
             elif track.get("type") == "bitmap":
                 #menu = QMenu(self)
                 act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
+                act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_add_core_bitmap:
                     self._action_load_bitmap_into_bitmap_track(track_name)
+                elif chosen == act_edit_bitmap_track:
+                    self._action_edit_bitmap_positions(track_name=track_name)
+
             elif track.get("type") == "continuous":
                 #menu = QMenu(self)
                 act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
@@ -3060,6 +3314,23 @@ class MainWindow(QMainWindow):
                 dock.panel.tracks = self.all_tracks
                 dock.panel.stratigraphy = self.all_stratigraphy
                 dock.panel.panel_settings = self.panel_settings
+                wlist = []
+                for well in dock.panel.wells:
+                    name = well.get("name")
+                    wlist.append(name)
+                visible_wells=[]
+                vw = dock.panel.visible_wells
+                for w in wlist:
+                    for v in vw:
+                        if v == w:
+                            visible_wells.append(v)
+
+                dock.panel.visible_wells=visible_wells
+
+
+
+
+
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
