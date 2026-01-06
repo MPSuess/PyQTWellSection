@@ -80,10 +80,12 @@ class MainWindow(QMainWindow):
 
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
+        self.all_tracks = tracks
+
         self.all_logs = None
         self.all_discrete_logs = None
         self.all_bitmaps = None
-        self.all_tracks = tracks
+
 
         self.well_gap_factor = 3.0
         self.track_gap_factor = 1.0
@@ -346,6 +348,8 @@ class MainWindow(QMainWindow):
             window_dict, wells, tracks, raw_strat, ui_layout, _ = load_project_from_json(path)
 
             self.current_project_path = path
+            self.project_name = Path(path).stem
+            self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
 
             # remove all existing windows
             self.panel = self.WindowList[0].panel
@@ -556,9 +560,13 @@ class MainWindow(QMainWindow):
             self.current_project_path = path
             LOG.debug(f"Project saved as: {self.current_project_path}")
 
+            self.project_name = Path(path).stem
+            self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
+
 
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
+
 
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
