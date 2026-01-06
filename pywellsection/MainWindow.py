@@ -68,7 +68,7 @@ logging.getLogger("parso.cache").setLevel("CRITICAL")
 LOG = logging.getLogger(__name__)
 LOG.setLevel("ERROR")
 
-PROJECT_FILE_VERSION = 1  # bump when you change project schema
+PROJECT_FILE_VERSION = 1.0  # bump when you change project schema
 
 class MainWindow(QMainWindow):
     def __init__(self):
