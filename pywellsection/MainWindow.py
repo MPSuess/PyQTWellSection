@@ -15,6 +15,11 @@ import base64
 import numpy as np
 import csv
 
+import json
+import shutil
+from datetime import datetime
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
 
@@ -63,6 +68,7 @@ logging.getLogger("parso.cache").setLevel("CRITICAL")
 LOG = logging.getLogger(__name__)
 LOG.setLevel("ERROR")
 
+PROJECT_FILE_VERSION = 1  # bump when you change project schema
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -341,7 +347,7 @@ class MainWindow(QMainWindow):
         #try
 
         """Load wells/tracks data from a JSON file (example)."""
-        path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON Files and PyQtWS Projects (*.json *.pwj)")
         if not path:
             return
         try:
@@ -492,7 +498,146 @@ class MainWindow(QMainWindow):
         LOG.debug(f"Saving project as {path}")
         self._project_file_save(path)
 
-    def _project_file_save(self, path=None):
+
+
+    def _project_file_save(self, path = None):
+        """
+        Save project as:
+          - <project_name>.pws              (JSON "project shell" with metadata)
+          - <project_name>.data/data.json   (JSON with the actual project data)
+
+        Example:
+          MyProject.pws
+          MyProject.data/
+              data.json
+        """
+        if not path and self.current_project_path:
+            path = self.current_project_path
+
+        if path is None:
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save project",
+                "",
+                "PyWellSection Project (*.pws);;All files (*.*)"
+            )
+            if not path:
+                return
+
+        # enforce .pws extension
+        if path.lower().endswith(".json"):
+            path = path[:-5] + ".pwj"
+        if not path.lower().endswith(".pwj"):
+            path = path + ".pwj"
+
+        base_dir = os.path.dirname(os.path.abspath(path))
+        project_stem = os.path.splitext(os.path.basename(path))[0]  # _project_name
+        if project_stem.endswith(".json"):
+            project_stem = project_stem[:-5]
+        data_dir_name = f"{project_stem}.pdj"
+        data_dir = os.path.join(base_dir, data_dir_name)
+        data_json_path = os.path.join(data_dir, "PyQtWell.jsn")
+
+        # build project data payload (your actual content)
+
+        wells = getattr(self.panel, "wells", [])
+        LOG.debug(f"Saving {wells[0]}")
+
+        for well in wells:
+            LOG.debug(f"Saving {well["name"]}")
+
+        tracks = getattr(self.panel, "tracks", [])
+        stratigraphy = getattr(self.panel, "stratigraphy", None)
+        extra_metadata = {
+            "app": "pywellsection",
+            "version": "0.1.0",
+        }
+        ui_layout = self._dock_layout_snapshot()
+
+        window_list = self._get_window_list()
+
+
+
+        #
+        # project_data = {
+        #     "wells": getattr(self, "all_wells", []),
+        #     "tracks": getattr(self, "tracks", []),
+        #     "stratigraphy": getattr(self, "stratigraphy", {}),
+        # }
+        #
+        # # Optional: include UI layout if you already implemented it
+        # if hasattr(self, "_dock_layout_snapshot"):
+        #     try:
+        #         project_data["ui_layout"] = self._dock_layout_snapshot()
+        #     except Exception:
+        #         pass
+
+        # Write into a temp dir first (safer than half-written projects)
+        tmp_dir = os.path.join(base_dir, f".{data_dir_name}.tmp")
+        try:
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
+            os.makedirs(tmp_dir, exist_ok=True)
+
+            # 1) write data.json inside tmp data dir
+            tmp_data_json = os.path.join(tmp_dir, "data.json")
+
+            export_project_to_json(tmp_data_json, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
+            #
+            # with open(tmp_data_json, "w", encoding="utf-8") as f:
+            #     json.dump(project_data, f, indent=2)
+
+            # 2) write the .pws "shell" file (metadata pointing to data.json)
+            shell = {
+                "project_file_version": PROJECT_FILE_VERSION,
+                "project_name": project_stem,
+                "created_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "data": {
+                    "directory": data_dir_name,  # relative to .pws location
+                    "file": "data.json",
+                },
+            }
+            tmp_pws = os.path.join(base_dir, f".{project_stem}.pws.tmp")
+            with open(tmp_pws, "w", encoding="utf-8") as f:
+                json.dump(shell, f, indent=2)
+
+            # 3) commit: replace existing data_dir atomically-ish
+            #    - remove old dir
+            if os.path.exists(data_dir):
+                shutil.rmtree(data_dir)
+            os.rename(tmp_dir, data_dir)
+
+            # 4) commit: replace .pws
+            #    On Windows os.replace is safest; on macOS/Linux also fine.
+            os.replace(tmp_pws, path)
+
+            # keep last save path if you want
+            self._last_project_path = path
+
+            self.project_name = Path(path).stem
+            self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
+
+
+        except Exception as e:
+            # cleanup temp files
+            try:
+                if os.path.exists(tmp_dir):
+                    shutil.rmtree(tmp_dir)
+            except Exception:
+                pass
+            try:
+                tmp_pws = os.path.join(base_dir, f".{project_stem}.pws.tmp")
+                if os.path.exists(tmp_pws):
+                    os.remove(tmp_pws)
+            except Exception:
+                pass
+
+            QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
+            return
+
+        QMessageBox.information(self, "Project saved", f"Saved:\n{path}\n\nData:\n{data_json_path}")
+
+    def _project_file_save_old(self, path=None):
 
         if not path and self.current_project_path:
             path = self.current_project_path
@@ -528,30 +673,8 @@ class MainWindow(QMainWindow):
                 "version": "0.1.0",
             }
             ui_layout = self._dock_layout_snapshot()
-            window_list = []
-            window_dict = {}
 
-            for window in self.WindowList:
-                panel = window.panel
-                panel_settings = getattr(window.panel, "panel_settings", None)
-                #print(panel_settings)
-                title = window.title
-                visible = window.get_visible()
-
-                floating = window.isFloating()
-
-                #print(title)
-                if window.type == "WellSection":
-                    visible_tops = getattr(window.panel, "visible_tops", None)
-                    visible_logs = getattr(window.panel, "visible_logs", None)
-                    visible_tracks = getattr(window.panel, "visible_tracks", None)
-                    visible_wells = getattr(window.panel, "visible_wells", None)
-                    window_dict = {"type": "WellSection", "visible": visible, "floating": floating,
-                                   "window_title": title, "visible_tops": visible_tops,
-                                   "visible_logs": visible_logs, "visible_tracks": visible_tracks,
-                                   "visible_wells": visible_wells, "panel_settings": panel_settings}
-                    #print(window_dict)
-                    window_list.append(window_dict)
+            window_list = self._get_window_list()
 
             project = export_project_to_json(path, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
 
@@ -3391,4 +3514,30 @@ class MainWindow(QMainWindow):
                 return window
         return None
 
+    def _get_window_list(self):
+        window_list = []
+        window_dict = {}
+
+        for window in self.WindowList:
+            panel = window.panel
+            panel_settings = getattr(window.panel, "panel_settings", None)
+            # print(panel_settings)
+            title = window.title
+            visible = window.get_visible()
+
+            floating = window.isFloating()
+
+            # print(title)
+            if window.type == "WellSection":
+                visible_tops = getattr(window.panel, "visible_tops", None)
+                visible_logs = getattr(window.panel, "visible_logs", None)
+                visible_tracks = getattr(window.panel, "visible_tracks", None)
+                visible_wells = getattr(window.panel, "visible_wells", None)
+                window_dict = {"type": "WellSection", "visible": visible, "floating": floating,
+                               "window_title": title, "visible_tops": visible_tops,
+                               "visible_logs": visible_logs, "visible_tracks": visible_tracks,
+                               "visible_wells": visible_wells, "panel_settings": panel_settings}
+                # print(window_dict)
+                window_list.append(window_dict)
+        return window_list
  

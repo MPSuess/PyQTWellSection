@@ -16,6 +16,40 @@ from PyQt5.QtWidgets import (
 
 
 def load_project_from_json(path):
+    path = Path(path)
+
+    if path.suffix == ".pwj":
+        #with path.open("r", encoding="utf-8") as f:
+        data_cfg = _load_from_pwj(path)
+        data_path = data_cfg["pwj_metadata"]["data_path"]
+        data_path = Path(data_path)
+    else:
+        data_path = path
+
+    # the output from _load_from_pws is a dict with a "data_path" key
+    # data["_pws"] = {
+    #     "path": pws_path,
+    #     "project_name": shell.get("project_name"),
+    #     "project_file_version": ver,
+    #     "data_path": data_path,
+    # }
+
+    with data_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+
+    wells = data.get("wells", [])
+    tracks = data.get("tracks", [])
+    stratigraphy = data.get("stratigraphy", [])
+    window_dict = data.get("window_dict", {})
+    metadata = data.get("metadata", {})
+    ui_layout = data.get("ui_layout", {})
+
+    return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
+
+
+
+def load_project_from_json_old(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
     path = Path(path)
 
@@ -749,3 +783,195 @@ class LoadCoreBitmapDialog(QDialog):
 
     def result(self):
         return self._result
+
+
+import os
+import json
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
+
+SUPPORTED_PROJECT_FILE_VERSIONS = {1}
+
+
+def load_project_from_json_new(self, path: str | None = None):
+    """
+    Load a project.
+
+    Supported inputs:
+      1) New format: <name>.pws (JSON shell) + <name>.data/data.json (project data)
+      2) Legacy: a single JSON file containing {wells, tracks, stratigraphy, ...}
+
+    After load:
+      - updates self.all_wells / self.tracks / self.stratigraphy
+      - rebuilds trees
+      - refreshes all panels
+    """
+    if path is None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open project",
+            "",
+            "PyWellSection Project (*.pws);;Legacy JSON (*.json);;All files (*.*)"
+        )
+        if not path:
+            return
+
+    try:
+        ext = os.path.splitext(path)[1].lower()
+
+        if ext == ".pws":
+            data = _load_from_pws(self, path)
+        else:
+            # legacy: direct json data
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+        # ---- normalize & compatibility ----
+        wells = data.get("wells", []) or []
+        tracks = data.get("tracks", []) or []
+        stratigraphy = data.get("stratigraphy", {}) or {}
+
+        _normalize_loaded_project(wells, tracks, stratigraphy)
+
+        # ---- assign into app ----
+        self.all_wells = wells
+        self.tracks = tracks
+        self.stratigraphy = stratigraphy
+
+        # optional: restore dock layout if present
+        ui_layout = data.get("ui_layout")
+        if ui_layout and hasattr(self, "_dock_layout_restore"):
+            # Ensure docks exist before restoring, if your workflow does that.
+            # If you recreate docks dynamically, do it before calling restore.
+            try:
+                self._dock_layout_restore(ui_layout)
+            except Exception:
+                pass
+
+        # ---- refresh UI ----
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_track_tree"):
+            self._populate_track_tree()
+        if hasattr(self, "_populate_strat_tree"):
+            self._populate_strat_tree()
+        if hasattr(self, "_populate_window_tree"):
+            self._populate_window_tree()
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        else:
+            # minimal fallback
+            if hasattr(self, "panel") and self.panel:
+                self.panel.wells = self.all_wells
+                self.panel.tracks = self.tracks
+                self.panel.stratigraphy = self.stratigraphy
+                self.panel.draw_panel()
+
+        # remember last opened path
+        self._last_project_path = path
+
+    except UnicodeDecodeError:
+        QMessageBox.critical(
+            self, "Load error",
+            "Failed to open file due to text encoding.\n"
+            "If this is a legacy JSON, ensure it is UTF-8 encoded."
+        )
+    except Exception as e:
+        QMessageBox.critical(self, "Load error", f"Failed to load project:\n{e}")
+
+
+def _load_from_pwj(pwj_path = None):
+    """
+    Load project using the new .pws shell format.
+    Returns the data dict loaded from data.json (plus any shell metadata you want to keep).
+    """
+
+    print (pwj_path)
+
+    with open(pwj_path, "r", encoding="utf-8") as f:
+        shell = json.load(f)
+
+    ver = shell.get("project_file_version", None)
+    if ver not in SUPPORTED_PROJECT_FILE_VERSIONS:
+        raise ValueError(f"Unsupported project_file_version: {ver}")
+
+    base_dir = os.path.dirname(os.path.abspath(pwj_path))
+    data_info = shell.get("data", {}) or {}
+    data_dir = data_info.get("directory")
+    data_file = data_info.get("file", "data.json")
+
+    if not data_dir:
+        raise ValueError("Invalid .pws: missing data.directory")
+
+    data_path = os.path.join(base_dir, data_dir, data_file)
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Project data file not found: {data_path}")
+
+#    with open(data_path, "r", encoding="utf-8") as f:
+#        data = json.load(f)
+
+    data = {"pwj_metadata": {
+        "path": pwj_path,
+        "project_name": shell.get("project_name"),
+        "project_file_version": ver,
+        "data_path": data_path,
+    }}
+
+    # optionally keep shell metadata
+    return data
+
+
+def _normalize_loaded_project(wells: list, tracks: list, stratigraphy: dict):
+    """
+    Compatibility & safety normalization:
+      - ensure dict structures exist
+      - add missing top roles (default: stratigraphy)
+      - ensure wells have expected keys
+    """
+    for w in wells:
+        w.setdefault("logs", {})
+        w.setdefault("discrete_logs", {})
+        w.setdefault("bitmaps", {})
+        w.setdefault("tops", {})
+
+        # ensure core well keys exist (you added these earlier)
+        w.setdefault("reference_depth", 0.0)
+        w.setdefault("total_depth", 0.0)
+        w.setdefault("x", None)
+        w.setdefault("y", None)
+        w.setdefault("reference_type", w.get("reference_type", "KB"))
+
+        # normalize tops roles
+        tops = w.get("tops") or {}
+        for top_name, top_val in list(tops.items()):
+            if isinstance(top_val, dict):
+                # default role if missing
+                top_val.setdefault("role", "stratigraphy")
+                # standardize depth field if needed
+                if "depth" not in top_val and "MD" in top_val:
+                    top_val["depth"] = top_val["MD"]
+            else:
+                # legacy numeric depth -> convert to dict with role
+                try:
+                    tops[top_name] = {"depth": float(top_val), "role": "stratigraphy"}
+                except Exception:
+                    pass
+
+    # Tracks: ensure each has a name and logs list
+    for t in tracks:
+        t.setdefault("name", "Track")
+        t.setdefault("logs", [])
+
+        # normalize bitmap track config
+        if "bitmap" in t and isinstance(t["bitmap"], dict):
+            t["bitmap"].setdefault("key", "core")
+            t["bitmap"].setdefault("label", "Bitmap")
+            t["bitmap"].setdefault("alpha", 1.0)
+            t["bitmap"].setdefault("interpolation", "nearest")
+            t["bitmap"].setdefault("cmap", None)
+            t["bitmap"].setdefault("flip_vertical", False)
+
+    # Stratigraphy is a dict (as you noted); no enforced schema here.
+    if stratigraphy is None:
+        stratigraphy = {}
