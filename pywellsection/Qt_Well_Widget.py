@@ -1258,6 +1258,91 @@ class WellPanelWidget(QWidget):
         self.panel_settings["redraw_requested"] = state
         return state
 
+    def arm_bitmap_pick(self, dialog, well_name: str, bitmap_key: str, which: str):
+        """
+        Arms a one-click pick. On click in the target well area, computes TRUE depth and
+        calls dialog.set_picked_depth(true_depth).
+        """
+
+        # store pick context
+        self._bitmap_pick_ctx = {
+            "dialog": dialog,
+            "well_name": well_name,
+            "bitmap_key": bitmap_key,
+            "which": which,
+        }
+
+        # disconnect previous temporary handler if present
+        if getattr(self, "_bitmap_pick_cid", None) is not None:
+            try:
+                self.canvas.mpl_disconnect(self._bitmap_pick_cid)
+            except Exception:
+                pass
+            self._bitmap_pick_cid = None
+
+        # connect click handler
+        self._bitmap_pick_cid = self.canvas.mpl_connect("button_press_event", self._on_bitmap_pick_click)
+
+    def _on_bitmap_pick_click(self, event):
+        ctx = getattr(self, "_bitmap_pick_ctx", None)
+        if ctx is None:
+            return
+        if event.button != 1 or event.inaxes is None or event.ydata is None:
+            return
+
+        # Determine which well was clicked, using your axis_index mapping:
+        # axis_index[base_ax] -> (wi, ti)
+        ax = event.inaxes
+        if ax not in getattr(self, "axis_index", {}):
+            # if it's a twiny axis or other, map to base axis by overlap (same approach you used for tops)
+            ax_pos = ax.get_position()
+            best_ax = None
+            best_overlap = 0.0
+            for base_ax in self.axis_index.keys():
+                pos = base_ax.get_position()
+                x0 = max(ax_pos.x0, pos.x0);
+                x1 = min(ax_pos.x1, pos.x1)
+                y0 = max(ax_pos.y0, pos.y0);
+                y1 = min(ax_pos.y1, pos.y1)
+                overlap = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_ax = base_ax
+            if best_ax is None or best_overlap == 0.0:
+                return
+            ax = best_ax
+
+        wi, ti = self.axis_index[ax]
+        well = self.wells[wi]
+        if well.get("name") != ctx["well_name"]:
+            # user clicked a different well: ignore
+            return
+
+        y_plot = float(event.ydata)
+
+        # Convert plot depth → TRUE depth using your flatten offset for this well
+        # You likely store flatten_depths or offsets in the widget; adapt as needed.
+        offset = 0.0
+        if getattr(self, "flatten_depths", None) is not None and wi < len(self.flatten_depths):
+            offset = float(self.flatten_depths[wi] or 0.0)
+
+        depth_true = y_plot + offset
+
+        # send to dialog
+        dlg = ctx["dialog"]
+        if dlg is not None and hasattr(dlg, "set_picked_depth"):
+            dlg.set_picked_depth(depth_true)
+
+        # cleanup
+        if getattr(self, "_bitmap_pick_cid", None) is not None:
+            try:
+                self.canvas.mpl_disconnect(self._bitmap_pick_cid)
+            except Exception:
+                pass
+            self._bitmap_pick_cid = None
+        self._bitmap_pick_ctx = None
+
+
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
 
