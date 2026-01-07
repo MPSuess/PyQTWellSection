@@ -3362,6 +3362,11 @@ class MainWindow(QMainWindow):
 
         win_name = item.data(0, Qt.UserRole)
 
+        if win_name is None:
+            return
+
+        print (f"Window item changed: {win_name}")
+
         state = item.checkState(0)
 
         for win in self.WindowList:
@@ -3376,7 +3381,7 @@ class MainWindow(QMainWindow):
         new_title = item.text(0).strip()
 
         if win_title !=new_title:
-            print("change the name of the window!")
+            print(f"change the name of the window!:{win_title}, {new_title}")
             for win in self.WindowList:
                 if win.title == win_title:
                     win.set_title(new_title)
