@@ -118,7 +118,7 @@ class WellPanelWidget(QWidget):
 
         self._flatten_top_name = None
         self._flatten_depths = []
-        self._current_depth_window = None  # (top_true, bottom_true) or None
+        self.current_depth_window = None  # (top_true, bottom_true) or None
 
         self.draw_panel()
         self.enable_top_picking()
@@ -156,11 +156,13 @@ class WellPanelWidget(QWidget):
                     if len(self._flatten_depths) > 0:
                         offset0 = float(self._flatten_depths[0])
 
+
                 top_true = min(y0, y1)
                 bottom_true = max(y0, y1)
                 self.offset0 = offset0
 
-                self._current_depth_window = (top_true, bottom_true)
+                if self.current_depth_window is None:
+                    self.current_depth_window = (top_true, bottom_true)
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
@@ -190,6 +192,9 @@ class WellPanelWidget(QWidget):
 
 #            print(f"in draw panel, stratigraphy: {self.stratigraphy, visible_tops}")
 
+            depth_window = self.get_current_depth_window()
+
+
             self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
                 self.fig,
                 self.wells,
@@ -207,7 +212,7 @@ class WellPanelWidget(QWidget):
                 visible_discrete_logs=visible_discrete_logs,
                 visible_bitmaps=visible_bitmaps,
                 visible_tracks = visible_tracks,
-                depth_window=self._current_depth_window,
+                depth_window=depth_window,
                 stratigraphy=self.stratigraphy,
                 vertical_scale=self.vertical_scale
             )
@@ -1132,7 +1137,7 @@ class WellPanelWidget(QWidget):
         # Store state and redraw
         self._flatten_top_name = top_name
         self._flatten_depths = flatten_depths
-        #self._current_depth_window = None
+        #self.current_depth_window = None
         self.draw_panel()
 
     def _set_offset_for_well(self, wi: int, depth: float):
@@ -1241,7 +1246,7 @@ class WellPanelWidget(QWidget):
         """
         self._flatten_top_name = None
         self._flatten_depths = None
-        #self._current_depth_window = None  # optional: reset zoom as well
+        #self.current_depth_window = None  # optional: reset zoom as well
         self.draw_panel()
         
     def set_panel_settings(self, settings):
@@ -1342,6 +1347,19 @@ class WellPanelWidget(QWidget):
             self._bitmap_pick_cid = None
         self._bitmap_pick_ctx = None
 
+    def get_current_depth_window(self):
+
+        if self.current_depth_window is not None:
+            return self.current_depth_window
+        else:
+            ref_depths = [w["reference_depth"] for w in self.wells]
+            bottoms = [w["reference_depth"] + w["total_depth"] for w in self.wells]
+
+            return ((min(ref_depths), max(bottoms)))
+
+    def set_current_depth_window(self, min_depth, max_depth):
+        self.current_depth_window = (min_depth, max_depth)
+        return self.current_depth_window
 
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
@@ -1429,6 +1447,10 @@ class WellPanelDock(QDockWidget):
         self.title = title
         self.setWindowTitle(title)
         self.setObjectName(title)
+
+
+
+
 
 
 

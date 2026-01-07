@@ -92,7 +92,6 @@ class MainWindow(QMainWindow):
         self.all_discrete_logs = None
         self.all_bitmaps = None
 
-
         self.well_gap_factor = 3.0
         self.track_gap_factor = 1.0
         self.track_width = 1.0
@@ -1084,7 +1083,7 @@ class MainWindow(QMainWindow):
             self.panel.wells = self.all_wells
             self.panel.stratigraphy = self.stratigraphy
             # keep zoom/flatten; if you want to reset, uncomment:
-            # self.panel._current_depth_window = None
+            # self.panel.current_depth_window = None
             # self.panel._flatten_depths = None
             self.panel.draw_panel()
 
@@ -2111,17 +2110,28 @@ class MainWindow(QMainWindow):
         """Open dialog to adjust distance between wells and track width."""
         if not hasattr(self, "panel"):
             return
+        #
+        # if self.panel.current_depth_window is None:
+        #     depth_min = -9999
+        #     depth_max = 9999
+        # else:
+        #     depth_min, depth_max = self.panel.current_depth_window
+
+        depth_min, depth_max = self.panel.get_current_depth_window()
 
         dlg = LayoutSettingsDialog(
             self,
             well_gap_factor=self.panel.well_gap_factor,
             track_width=self.panel.track_width,
             vertical_scale = 1,
+            depth_min = depth_min,
+            depth_max = depth_max
         )
         if dlg.exec_() != QDialog.Accepted:
             return
 
-        gap, tw, vs= dlg.values()
+        gap, tw, vs, depth_min, depth_max= dlg.values()
+        self.panel.set_current_depth_window(depth_min, depth_max)
         self.set_layout_params(gap, tw, vs)
 
     def _action_edit_all_tops(self):
@@ -2387,7 +2397,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep current zoom; if you want to reset, uncomment:
-            # self.panel._current_depth_window = None
+            # self.panel.current_depth_window = None
             # self.panel._flatten_depths = None
             self.panel.draw_panel()
 
@@ -2429,7 +2439,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep zoom/flatten; if you want to reset, uncomment:
-            # self.panel._current_depth_window = None
+            # self.panel.current_depth_window = None
             # self.panel._flatten_depths = None
             self.panel.draw_panel()
 

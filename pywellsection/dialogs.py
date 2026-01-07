@@ -825,16 +825,18 @@ class StratigraphyEditorDialog(QDialog):
         return self._accepted_strat
 
 class LayoutSettingsDialog(QDialog):
-    def __init__(self, parent, well_gap_factor: float, track_width: float, vertical_scale: float):
+    def __init__(self, parent, well_gap_factor: float, track_width: float, vertical_scale: float,
+                 depth_min: float, depth_max:float):
         super().__init__(parent)
         self.setWindowTitle("Layout settings")
-        self.resize(300, 150)
+        self.resize(400, 150)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
         layout.addLayout(form)
 
         self.spin_gap = QDoubleSpinBox(self)
+        self.spin_gap.setFixedWidth(100)
         self.spin_gap.setRange(0.1, 20.0)
         self.spin_gap.setDecimals(2)
         self.spin_gap.setSingleStep(0.1)
@@ -842,6 +844,7 @@ class LayoutSettingsDialog(QDialog):
         form.addRow("Gap between wells:", self.spin_gap)
 
         self.spin_track = QDoubleSpinBox(self)
+        self.spin_track.setFixedWidth(100)
         self.spin_track.setRange(0.1, 10.0)
         self.spin_track.setDecimals(2)
         self.spin_track.setSingleStep(0.1)
@@ -849,6 +852,31 @@ class LayoutSettingsDialog(QDialog):
         form.addRow("Track width:", self.spin_track)
 
         self.spin_scale = QDoubleSpinBox(self)
+        self.spin_scale.setFixedWidth(100)
+        self.spin_scale.setRange(0.1, 1000.0)
+        self.spin_scale.setDecimals(2)
+        self.spin_scale.setSingleStep(0.1)
+        self.spin_scale.setValue(float(vertical_scale))
+        form.addRow("Vertical scale:", self.spin_scale)
+
+        self.spin_min_depth = QDoubleSpinBox(self)
+        self.spin_min_depth.setFixedWidth(100)
+        self.spin_min_depth.setRange(-100000,100000)
+        self.spin_min_depth.setDecimals(2)
+        self.spin_min_depth.setSingleStep(10)
+        self.spin_min_depth.setValue(float(depth_min))
+        form.addRow("Section minimum depth:", self.spin_min_depth)
+
+        self.spin_max_depth = QDoubleSpinBox(self)
+        self.spin_max_depth.setFixedWidth(100)
+        self.spin_max_depth.setRange(-100000,100000)
+        self.spin_max_depth.setDecimals(2)
+        self.spin_max_depth.setSingleStep(10)
+        self.spin_max_depth.setValue(float(depth_max))
+        form.addRow("Section maximum depth:", self.spin_max_depth)
+
+        self.spin_scale = QDoubleSpinBox(self)
+        self.spin_scale.setFixedWidth(100)
         self.spin_scale.setRange(0.1, 1000.0)
         self.spin_scale.setDecimals(2)
         self.spin_scale.setSingleStep(0.1)
@@ -861,7 +889,10 @@ class LayoutSettingsDialog(QDialog):
         layout.addWidget(btns)
 
     def values(self):
-        return float(self.spin_gap.value()), float(self.spin_track.value()), float(self.spin_scale.value())
+        return (float(self.spin_gap.value()), float(self.spin_track.value()),
+                float(self.spin_scale.value()), float(self.spin_min_depth.value()),
+                float(self.spin_max_depth.value()))
+
 
 # class LogDisplaySettingsDialog(QDialog):
 #     """

@@ -169,7 +169,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     if depth_window is not None:
-        #print ("depth_window", depth_window)
+        print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
         if top_depth_window < global_mid_plot < bottom_depth_window:
             global_top_plot = top_depth_window
