@@ -4,6 +4,12 @@
 ### This program is licensed according to EUPL1.2
 ### M. Peter Süss, University of Tuebingen, Copyright 2025, 2026
 
+### TODO: reformulate the code to be more object oriented ... .
+# Move all well functions into a separate class.
+# Move all track functions into a separate class.
+# Move all stratigraphy functions into a separate class.
+# Move all log functions into a separate class. etc ... .
+
 from PyQt5.QtWidgets import (
     QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
@@ -15,10 +21,14 @@ import base64
 import numpy as np
 import csv
 
+
 import json
 import shutil
 from datetime import datetime
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
+from pywellsection.sample_data import Wells # The new class for wells
+
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
@@ -83,6 +93,8 @@ class MainWindow(QMainWindow):
         # The Windows
         ### central widget ----
         wells, tracks, stratigraphy = create_dummy_data()
+
+        wells.test_class()
 
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
@@ -2655,6 +2667,27 @@ class MainWindow(QMainWindow):
         if not res:
             return
 
+        project_path = self.current_project_path
+
+        base_dir = os.path.dirname(os.path.abspath(project_path))
+        project_stem = os.path.splitext(os.path.basename(project_path))[0]  # _project_name
+        if project_stem.endswith(".json"):
+            project_stem = project_stem[:-5]
+        data_dir_name = f"{project_stem}.pdj"
+        data_dir = os.path.join(base_dir, data_dir_name)
+
+        bitmap_name, bitmap_extention = os.path.splitext(res["bitmap_path"])
+
+        new_bitmap_path = os.path.join(data_dir,f"{res['well_name']}_{key}.{bitmap_extention}" )
+
+        bitmap_path = res["path"]
+        bitmap_path = Path(bitmap_path)
+
+        bitmap_copy = shutil.copy2(bitmap_path, data_dir)
+        os.rename(bitmap_copy, new_bitmap_path)
+
+
+
         # Resolve well
         well = None
         for w in self.all_wells:
@@ -2729,10 +2762,31 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Load core bitmap", "Image file does not exist.")
             return
 
+        project_path = self.current_project_path
+
+        base_dir = os.path.dirname(os.path.abspath(project_path))
+        project_stem = os.path.splitext(os.path.basename(project_path))[0]  # _project_name
+        if project_stem.endswith(".json"):
+            project_stem = project_stem[:-5]
+        data_dir_name = f"{project_stem}.pdj"
+        data_dir = os.path.join(base_dir, data_dir_name)
+
+        bitmap_name, bitmap_extention = os.path.splitext(res["path"])
+
+        new_bitmap_path = os.path.join(data_dir,f"{res['well_name']}_{res["key"]}{bitmap_extention}" )
+
+        bitmap_path = res["path"]
+        bitmap_path = Path(bitmap_path)
+
+        bitmap_copy = shutil.copy2(bitmap_path, data_dir)
+        os.rename(bitmap_copy, new_bitmap_path)
+
+
         # attach to well
         bitmaps = target.setdefault("bitmaps", {})
         bitmaps[res["key"]] = {
-            "path": res["path"],
+            "name": res["name"],
+            "path": new_bitmap_path,
             "top_depth": res["top_depth"],
             "base_depth": res["base_depth"],
             "track": res["track"],
@@ -2752,6 +2806,9 @@ class MainWindow(QMainWindow):
         #     self.panel.draw_panel()
 
         # refresh tree (if you show bitmaps there)
+
+        self.all_bitmaps.append(res["key"])
+
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 

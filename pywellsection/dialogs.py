@@ -4,7 +4,8 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
-    QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem
+    QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
+    QPushButton
 )
 from collections import OrderedDict
 
@@ -875,13 +876,6 @@ class LayoutSettingsDialog(QDialog):
         self.spin_max_depth.setValue(float(depth_max))
         form.addRow("Section maximum depth:", self.spin_max_depth)
 
-        self.spin_scale = QDoubleSpinBox(self)
-        self.spin_scale.setFixedWidth(100)
-        self.spin_scale.setRange(0.1, 1000.0)
-        self.spin_scale.setDecimals(2)
-        self.spin_scale.setSingleStep(0.1)
-        self.spin_scale.setValue(float(vertical_scale))
-        form.addRow("Vertical scale:", self.spin_scale)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         btns.accepted.connect(self.accept)
@@ -2766,6 +2760,10 @@ class LoadCoreBitmapDialog(QDialog):
         self.ed_key.setText("cp001")
         form.addRow("Bitmap Id:", self.ed_key)
 
+        self.ed_name = QLineEdit(self)
+        self.ed_name.setText("bitmap")
+        form.addRow("Bitmap Name:", self.ed_name)
+
         # file path + browse
         self.ed_path = QLineEdit(self)
         btn_browse = QPushButton("Browse…", self)
@@ -2839,6 +2837,7 @@ class LoadCoreBitmapDialog(QDialog):
         well_name = self.cmb_well.currentText().strip()
         key = self.ed_key.text().strip() or "core"
         path = self.ed_path.text().strip()
+        name = self.ed_name.text().strip()
 
         if not well_name:
             QMessageBox.warning(self, "Load core bitmap", "Please choose a well.")
@@ -2862,6 +2861,7 @@ class LoadCoreBitmapDialog(QDialog):
 
         self._result = {
             "well_name": well_name,
+            "name": name,
             "key": key,
             "path": path,
             "top_depth": top_d,
@@ -2901,11 +2901,6 @@ class MoveWellDialog(QDialog):
     def position(self):
         return self.spin.value() - 1
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
-    QComboBox, QLineEdit, QPushButton, QFileDialog,
-    QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox, QLabel
-)
 
 class LoadBitmapForTrackDialog(QDialog):
     """
@@ -3058,11 +3053,6 @@ class LoadBitmapForTrackDialog(QDialog):
     def result(self):
         return self._result
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QDialogButtonBox, QMessageBox, QLabel
-)
-from PyQt5.QtCore import Qt
 
 
 class BitmapPlacementDialog(QDialog):
