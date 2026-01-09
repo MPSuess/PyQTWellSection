@@ -188,7 +188,11 @@ class WellPanelWidget(QWidget):
 
             total_cols = n_wells * n_tracks + (n_wells - 1)
 
-            self.canvas.setFixedSize(total_cols*100, int(800*self.vertical_scale))
+            hsize = 100 * total_cols
+            if hsize < 400:
+                hsize = 800
+
+            self.canvas.setFixedSize(hsize, int(2000*self.vertical_scale))
 
 #            print(f"in draw panel, stratigraphy: {self.stratigraphy, visible_tops}")
 
@@ -376,16 +380,18 @@ class WellPanelWidget(QWidget):
             # toolbar.mode is '' when inactive, 'zoom rect' or 'pan/zoom' when active
             return
 
+        mapped = self._map_event_to_well_axes(event)
+        if mapped is None:
+            return
+        wi, ti, ax, depth_plot, depth_true = mapped
+        print (wi, ti, ax, depth_plot, depth_true)
 
         if self._in_dialog_pick_mode:
             return
         if event.button != 1:
             return
 
-        mapped = self._map_event_to_well_axes(event)
-        if mapped is None:
-            return
-        wi, ti, ax, depth_plot, depth_true = mapped
+        if ti-wi <= 0: return 0
 
         well = self.wells[wi]
         if "tops" not in well or not well["tops"]:

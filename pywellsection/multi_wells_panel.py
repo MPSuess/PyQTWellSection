@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
@@ -117,6 +118,9 @@ def draw_multi_wells_panel_on_figure(
 
     fig.clf()
 
+    if visible_wells is None:
+        visible_wells = [w["name"] for w in wells]
+
     n_wells = len(visible_wells)
 
     if n_wells == 0:
@@ -172,17 +176,20 @@ def draw_multi_wells_panel_on_figure(
         print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
         if top_depth_window < global_mid_plot < bottom_depth_window:
-            global_top_plot = top_depth_window
-            global_bottom_plot = bottom_depth_window
+            global_top_plot = top_depth_window + offsets[0]
+            global_bottom_plot = bottom_depth_window + offsets[0]
+            global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 
 
     # ---- 3) Layout: tracks + spacer columns ----
-    total_cols = n_wells * n_tracks + (n_wells - 1)
+    total_cols = n_wells * (n_tracks+1) + (n_wells - 1)
     width_ratios = []
     col_is_spacer = []
 
     for w in range(n_wells):
+        width_ratios.append(track_width)
+        col_is_spacer.append(False)
         for _ in range(n_tracks):
             width_ratios.append(track_width)
             col_is_spacer.append(False)
@@ -197,8 +204,10 @@ def draw_multi_wells_panel_on_figure(
         wspace=0.05,
         left=0.1,
         right=0.90,
+        #bottom=0.10,
+        top= 0.8*vertical_scale,
         bottom=0.10/vertical_scale,
-        top=0.8/vertical_scale,
+        #top=0.8/vertical_scale,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -206,14 +215,13 @@ def draw_multi_wells_panel_on_figure(
     # Turn off spacer axes
     for ax, is_spacer in zip(axes, col_is_spacer):
         if is_spacer:
-            ax.axis("off")
+            ax.axis("on")
 
     well_main_axes = []
 
     # ---- 4) Draw wells ----
 
     for wi, well in enumerate(selected_wells):
-
 
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
@@ -227,9 +235,29 @@ def draw_multi_wells_panel_on_figure(
 
         LOG.debug(f"depth_formatter={depth_formatter}")
 
-        first_track_idx = wi * (n_tracks + 1)
+        first_track_idx = wi * (n_tracks + 2)
+        #main_ax = axes[first_track_idx]
+        #well_main_axes.append(main_ax)
+
+        print (f"wi={wi} first_track_idx={first_track_idx}")
+
+        col_idx = wi * (n_tracks + 2)
+        base_ax = axes[col_idx]
+        base_ax.set_ylim(global_top_plot, global_bottom_plot)
+        print(f"base_ax.ylim={base_ax.get_ylim()}")
+        base_ax.invert_yaxis()
+        base_ax.grid(True, linestyle="--", alpha=0.3)
+        base_ax.set_ylabel("Depth (m)", labelpad=8)
+        base_ax.yaxis.set_minor_locator(AutoMinorLocator())
+        base_ax.tick_params(axis="y", labelright = True, labelleft = False, direction="in", pad=-30)
+        base_ax.tick_params(which="minor", length = 3, labelleft = False, labelright = True, direction="in")
+        base_ax.tick_params(which="major", length = 7)
+        base_ax.xaxis.set_visible(False)
+        base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
+
         main_ax = axes[first_track_idx]
-        well_main_axes.append(main_ax)
+
+        well_main_axes.append(base_ax)
 
         # ---- Case: no tracks, just depth axis ----
         if not filtered_tracks:
@@ -238,7 +266,7 @@ def draw_multi_wells_panel_on_figure(
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
             base_ax.set_ylabel("Depth (m)", labelpad=8)
-            base_ax.tick_params(axis="y", labelleft=True)
+            base_ax.tick_params(axis="y", labelleft=True, direction="in", pad=-10)
             base_ax.xaxis.set_visible(False)
             base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
 
@@ -248,25 +276,23 @@ def draw_multi_wells_panel_on_figure(
 
         # ---- Normal multi-track case ----
         for ti, track in enumerate(filtered_tracks):
-            col_idx = wi * (n_tracks + 1) + ti
+            col_idx = wi * (n_tracks + 2) + ti +1
+            print(f"col_idx={col_idx} wi={wi} ti={ti} n_tracks={n_tracks}")
             base_ax = axes[col_idx]
-
             #LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
-
             # Shared plotting Y-range for all wells
             base_ax.set_ylim(global_top_plot, global_bottom_plot)
-
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
-            if ti == 0:
-                base_ax.set_ylabel("Depth (m)", labelpad=8)
-                base_ax.tick_params(axis="y", labelleft=True)
-                if depth_formatter is not None:
-                    base_ax.yaxis.set_major_formatter(depth_formatter)
-            else:
-                base_ax.tick_params(axis="y", labelleft=False )
-
+            # if ti == 0:
+            #     base_ax.set_ylabel("Depth (m)", labelpad=8)
+            #     base_ax.tick_params(axis="y", labelleft=True)
+            #     if depth_formatter is not None:
+            #         base_ax.yaxis.set_major_formatter(depth_formatter)
+            # else:
+            #
+            base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
             mid_track = n_tracks // 2
@@ -868,12 +894,13 @@ def add_tops_and_correlations(
             top_meta[name] = {"depth": depth, "color": color, "level": level, "style": style}
             well_top_depths[wi][name] = depth
 
-        first_track_idx = wi * (n_tracks + 1)
+        first_track_idx = wi * (n_tracks + 2)
 
         # Draw top lines and within-well fills only on full pass
         if not correlations_only:
             # horizontal top lines in ALL tracks of this well
-            for ti in range(n_tracks):
+            for ti in range(n_tracks+1):
+                if ti == 0: continue
                 col_idx = first_track_idx + ti
                 base_ax = axes[col_idx]
                 for name in top_names:
@@ -969,7 +996,8 @@ def add_tops_and_correlations(
 
         # labels + figure-coordinate y positions
         x_min_main, x_max_main = main_ax.get_xlim()
-        x_label_pos = x_min_main + 0.02 * (x_max_main - x_min_main)
+        x_label_pos = x_min_main - 1.5* (x_max_main - x_min_main)
+        #x_label_pos = xmin_main - 0.5 * (xmax_main - xmin_main)
 
         for name in top_names:
             info = top_meta[name]
@@ -1042,7 +1070,7 @@ def add_tops_and_correlations(
             if w2 != w1 + 1:
                 continue  # only adjacent wells
 
-            spacer_idx = w1 * (n_tracks + 1) + n_tracks
+            spacer_idx = w1 * (n_tracks + 2) + n_tracks +1
             spacer_ax = axes[spacer_idx]
             left = spacer_ax.get_position().x0
             right = spacer_ax.get_position().x1
@@ -1070,7 +1098,7 @@ def add_tops_and_correlations(
         if len(shared_names) < 2:
             continue
 
-        spacer_idx = w1 * (n_tracks + 1) + n_tracks
+        spacer_idx = w1 * (n_tracks + 2) + n_tracks + 1
         spacer_ax = axes[spacer_idx]
         x_left = spacer_ax.get_position().x0
         x_right = spacer_ax.get_position().x1

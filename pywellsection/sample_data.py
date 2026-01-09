@@ -1,4 +1,70 @@
+from symtable import Class
+
 import numpy as np
+from typing import Any, Dict, List, Tuple
+
+
+class Wells(List):
+    def __init__(self):
+        super().__init__()
+
+        self.wells = []
+
+    def add_well(self, well):
+        self.wells.append(well)
+
+    def test_class(self):
+        print("A class for Wells")
+
+class Well(Dict):
+    def __init__(self):
+        super().__init__()
+        self.name = ""
+        self.UWI = ""
+        self.x = 0.0
+        self.y = 0.0
+        self.reference_type = ""
+        self.reference_depth = 0.0
+        self.total_depth = 0.0
+        self.logs = Logs()
+        self.discrete_logs = {}
+        self.bitmaps = {}
+        self.tops = {}
+
+    def test_class(self):
+        print("A class for a Well")
+
+class Logs(Dict):
+    def __init__(self):
+        super().__init__()
+        self.depth = []
+        self.data = []
+
+    def test_class(self):
+        print("A class for Logs")
+
+
+class Track(Dict):
+    def __init__(self):
+        super().__init__()
+        self.name = ""
+        self.logs = []
+
+    def add_log(self, log):
+        self.logs.append(log)
+
+    def test_class(self):
+        print("A class for Tracks")
+
+
+class Stratigraphy(Dict):
+    def __init__(self):
+        super().__init__()
+        self.levels = {}
+        self.colors = {}
+
+
+
 
 def create_dummy_data_all():
     stratigraphy = {
@@ -382,9 +448,11 @@ def create_dummy_data_rand():
 
 
 def create_dummy_data_0():
-    wells = []
+    wells = Wells()
     tracks = []
     stratigraphy = []
+
+    wells.test_class()
     return wells, tracks, stratigraphy
 
 def create_top_only_Data ():
