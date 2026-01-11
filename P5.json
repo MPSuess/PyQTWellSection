@@ -5042,21 +5042,13 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            0,
-            50,
-            100,
-            150,
-            200,
-            250
-          ],
-          "bottom_depths": [
-            50,
-            100,
-            150,
-            200,
-            250,
-            300
+          "depth": [
+            0.0,
+            50.0,
+            100.0,
+            150.0,
+            200.0,
+            250.0
           ],
           "values": [
             "Sandstone",
@@ -5066,6 +5058,50 @@
             "Dolomite",
             "Shale"
           ]
+        },
+        "FACIES3": {
+          "depth": [
+            0.0,
+            50.0,
+            100.0,
+            150.0,
+            200.0,
+            250.0
+          ],
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
+        }
+      },
+      "bitmaps": {
+        "bitmap1": {
+          "path": "core1.png",
+          "top_depth": 200.0,
+          "base_depth": 300.0,
+          "track": "core"
+        },
+        "bitmap2": {
+          "path": "core1.png",
+          "top_depth": 300.0,
+          "base_depth": 400.0,
+          "track": "core2"
+        },
+        "cp077": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 0.0,
+          "base_depth": 100.0,
+          "track": "core"
+        },
+        "cpb777": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 500.0,
+          "base_depth": 600.0,
+          "track": "core"
         }
       },
       "tops": {
@@ -5083,7 +5119,129 @@
           "level": "formation",
           "color": "#000000"
         }
-      }
+      },
+      "facies_intervals": [
+        {
+          "well": "Well A",
+          "id": 1,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "cu",
+          "environment": "Distributary Mouth Bar",
+          "rel_top": 0.0,
+          "rel_base": 20.0
+        },
+        {
+          "well": "Well A",
+          "id": 2,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "cu",
+          "environment": "Distributary Mouth Bar",
+          "rel_top": 20.0,
+          "rel_base": 22.0
+        },
+        {
+          "well": "Well A",
+          "id": 3,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "constant",
+          "environment": "Inner Marine Shelf",
+          "rel_top": 22.0,
+          "rel_base": 23.1
+        },
+        {
+          "well": "Well A",
+          "id": 4,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 24.0,
+          "rel_base": 26.5
+        },
+        {
+          "well": "Well A",
+          "id": 5,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 27.0,
+          "rel_base": 35.0
+        },
+        {
+          "well": "Well A",
+          "id": 6,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "fu",
+          "environment": "Bay",
+          "rel_top": 37.0,
+          "rel_base": 48.0
+        },
+        {
+          "well": "Well A",
+          "id": 7,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Bay",
+          "rel_top": 50.0,
+          "rel_base": 52.0
+        },
+        {
+          "well": "Well A",
+          "id": 8,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "fu",
+          "environment": "Distributary Channel",
+          "rel_top": 58.0,
+          "rel_base": 60.0
+        },
+        {
+          "well": "Well A",
+          "id": 9,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "constant",
+          "environment": "Distributary Channel",
+          "rel_top": 60.0,
+          "rel_base": 66.0
+        },
+        {
+          "well": "Well A",
+          "id": 10,
+          "litho_trend": "M",
+          "lithology": "M",
+          "trend": "fu",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 66.0,
+          "rel_base": 68.0
+        },
+        {
+          "well": "Well A",
+          "id": 11,
+          "litho_trend": "SS",
+          "lithology": "SS",
+          "trend": "constant",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 69.0,
+          "rel_base": 83.0
+        },
+        {
+          "well": "Well A",
+          "id": 12,
+          "litho_trend": "SSa",
+          "lithology": "SSa",
+          "trend": "fu",
+          "environment": "Estuarine Bay\u2013Lagoon",
+          "rel_top": 83.0,
+          "rel_base": 100.0
+        }
+      ]
     },
     {
       "name": "Well B",
@@ -8115,21 +8273,31 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            500,
-            550,
-            600,
-            650,
-            700,
-            750
+          "depth": [
+            500.0,
+            550.0,
+            600.0,
+            650.0,
+            700.0,
+            750.0
           ],
-          "bottom_depths": [
-            550,
-            600,
-            650,
-            700,
-            750,
-            800
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
+        },
+        "FACIES3": {
+          "depth": [
+            500.0,
+            550.0,
+            600.0,
+            650.0,
+            700.0,
+            750.0
           ],
           "values": [
             "Sandstone",
@@ -8154,6 +8322,15 @@
         "Sequence 1": {
           "depth": 900,
           "level": "sequence"
+        }
+      },
+      "facies_intervals": [],
+      "bitmaps": {
+        "cp001": {
+          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
+          "top_depth": 500.0,
+          "base_depth": 600.0,
+          "track": "core"
         }
       }
     },
@@ -11187,21 +11364,31 @@
       },
       "discrete_logs": {
         "FACIES": {
-          "top_depths": [
-            1000,
-            1050,
-            1100,
-            1150,
-            1200,
-            1250
+          "depth": [
+            1000.0,
+            1050.0,
+            1100.0,
+            1150.0,
+            1200.0,
+            1250.0
           ],
-          "bottom_depths": [
-            1050,
-            1100,
-            1150,
-            1200,
-            1250,
-            1300
+          "values": [
+            "Sandstone",
+            "Shale",
+            "Limestone",
+            "Shale",
+            "Dolomite",
+            "Shale"
+          ]
+        },
+        "FACIES3": {
+          "depth": [
+            1000.0,
+            1050.0,
+            1100.0,
+            1150.0,
+            1200.0,
+            1250.0
           ],
           "values": [
             "Sandstone",
@@ -11232,15 +11419,44 @@
           "level": "formation",
           "color": "#000000"
         }
-      }
+      },
+      "facies_intervals": []
     }
   ],
   "tracks": [
     {
-            "name": "LithoFacies","type": "lithofacies"
+      "name": "LithoFacies",
+      "type": "lithofacies",
+      "config": {
+        "hardness_scale": 2,
+        "spline": {
+          "smooth": 1,
+          "num_samples": 25
+        }
+      },
+      "hatch_map": {
+        "Distributary Mouth Bar": "/",
+        "Distributary Channel": ".\\",
+        "Bay": ".-.",
+        "Inner Marine Shelf": "-",
+        "Estuarine Bay\u2013Lagoon": "-x"
+      },
+      "color_map": {
+        "Distributary Mouth Bar": "orange",
+        "Distributary Channel": "yellow",
+        "Bay": "blue",
+        "Inner Marine Shelf": "grey",
+        "Estuarine Bay\u2013Lagoon": "green"
+      },
+      "litho_hardness": {
+        "SS": 10.0,
+        "SSa": 5.0,
+        "M": 1.0
+      }
     },
     {
-      "name": "GR-CAL","type": "continuous",
+      "name": "GR-CAL",
+      "type": "continuous",
       "logs": [
         {
           "log": "GR",
@@ -11251,7 +11467,11 @@
             150
           ],
           "xscale": "linear",
-          "direction": "normal"
+          "direction": "normal",
+          "render": "points",
+          "marker": ".",
+          "markersize": 2.0,
+          "alpha": 0.9
         },
         {
           "log": "CAL",
@@ -11267,7 +11487,8 @@
       ]
     },
     {
-      "name": "RT-RHOB", "type": "continuous",
+      "name": "RT-RHOB",
+      "type": "continuous",
       "logs": [
         {
           "log": "RT",
@@ -11283,7 +11504,8 @@
       ]
     },
     {
-      "name": "RHOB-PHI", "type": "continuous",
+      "name": "RHOB-PHI",
+      "type": "continuous",
       "logs": [
         {
           "log": "RHOB",
@@ -11310,7 +11532,8 @@
       ]
     },
     {
-      "name": "Facies", "type": "discrete",
+      "name": "Facies",
+      "type": "discrete",
       "discrete": {
         "log": "FACIES",
         "label": "Facies",
@@ -11322,34 +11545,180 @@
         },
         "default_color": "#dddddd"
       }
+    },
+    {
+      "name": "core",
+      "type": "bitmap",
+      "bitmap": {
+        "alpha": 1.0,
+        "cmap": "None",
+        "interpolation": "nearest",
+        "flip_vertical": "True",
+        "label": "Core photo"
+      }
+    },
+    {
+      "name": "f3",
+      "logs": [],
+      "type": "discrete",
+      "discrete": {
+        "log": "FACIES3",
+        "label": "FX3",
+        "color_map": {
+          "Dolomite": "#ff5c22",
+          "Limestone": "#5efcff",
+          "Sandstone": "#feff15",
+          "Shale": "#aa7942"
+        },
+        "default_color": "#e45c53",
+        "missing": "-999"
+      }
     }
   ],
   "stratigraphy": {
     "Upper Formation A": {
       "level": "sequence",
-      "color": "#ff0000"
+      "color": "#ff0000",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Formation A": {
       "level": "formation",
-      "color": "#ffcc00"
+      "color": "#ffcc00",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Sequence 1": {
-      "level": "sequence"
+      "level": "sequence",
+      "color": "#000fff",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Member A1": {
-      "level": "member"
+      "level": "member",
+      "color": "#000fff",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Carboniferous": {
       "level": "formation",
-      "color": "#000000"
+      "color": "#000000",
+      "hatch": "-",
+      "role": "stratigraphy"
     },
     "Lower Formation A": {
       "level": "sequence",
-      "color": "#0000ff"
+      "color": "#0000ff",
+      "hatch": "-",
+      "role": "stratigraphy"
     }
   },
   "metadata": {
     "app": "pywellsection",
     "version": "0.1.0"
+  },
+  "window_dict": [
+    {
+      "type": "WellSection",
+      "visible": true,
+      "floating": false,
+      "window_title": "Well Section NNW-SSE",
+      "visible_tops": [
+        "Carboniferous",
+        "Lower Formation A",
+        "Formation A",
+        "Sequence 1",
+        "Member A1",
+        "Upper Formation A"
+      ],
+      "visible_logs": [
+        "RT",
+        "PHI",
+        "GR",
+        "RHOB",
+        "CAL"
+      ],
+      "visible_tracks": [
+        "core",
+        "GR-CAL",
+        "Facies",
+        "RHOB-PHI",
+        "f3",
+        "RT-RHOB",
+        "LithoFacies"
+      ],
+      "visible_wells": [
+        "Well C",
+        "Well B",
+        "Well A"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
+      }
+    },
+    {
+      "type": "WellSection",
+      "visible": true,
+      "floating": false,
+      "window_title": "Section N-S",
+      "visible_tops": [
+        "Sequence 1"
+      ],
+      "visible_logs": [],
+      "visible_tracks": [],
+      "visible_wells": [
+        "Well A",
+        "Well B"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
+      }
+    },
+    {
+      "type": "WellSection",
+      "visible": true,
+      "floating": false,
+      "window_title": "Well Section E-W",
+      "visible_tops": null,
+      "visible_logs": [
+        "GR"
+      ],
+      "visible_tracks": [
+        "GR-CAL"
+      ],
+      "visible_wells": [
+        "Well B"
+      ],
+      "panel_settings": {
+        "well_gap_factor": 3.0,
+        "track_gap_factor": 1.0,
+        "track_width": 1.0,
+        "redraw_requested": true,
+        "panel_title": "Well_Section_1"
+      }
+    }
+  ],
+  "ui_layout": {
+    "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAP3AAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAEXAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABGAAAAt8AAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAHPAAABtQAAAKsA////+gAAAAEBAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAF8A////AAAAAAAAA2wAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "tab_groups": [
+      [
+        "Console",
+        "Commands",
+        "Log"
+      ],
+      [
+        "Windows",
+        "Input"
+      ]
+    ]
   }
 }

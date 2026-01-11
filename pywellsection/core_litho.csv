@@ -1,0 +1,13 @@
+Well,ID,Litho,Trend,Environment,Rel_Top,Rel_Base
+Well A, 1, SS,cu,"Distributary Mouth Bar", 0, 20.0
+Well A, 2, SSa,cu,"Distributary Mouth Bar", 20, 22
+Well A, 3, M,,"Inner Marine Shelf", 22.0, 23.1
+Well A, 4, SSa,fu,"Distributary Channel", 24, 26.5
+Well A, 5, SS,fu,"Distributary Channel", 27, 35
+Well A, 6, M,fu,"Bay", 37, 48
+Well A, 7, SSa,fu,"Bay", 50, 52
+Well A, 8, SS,fu,"Distributary Channel", 58, 60
+Well A, 9, SS,,"Distributary Channel", 60, 66
+Well A, 10, M,fu,"Estuarine Bay–Lagoon", 66, 68
+Well A, 11, SS,,"Estuarine Bay–Lagoon", 69, 83
+Well A, 12, SSa,fu,"Estuarine Bay–Lagoon", 83, 100

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>File Import Formats — Help</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.35; margin: 14px; }
+    h1 { font-size: 18px; margin: 0 0 10px 0; }
+    h2 { font-size: 14px; margin: 14px 0 6px 0; }
+    h3 { font-size: 12px; margin: 10px 0 4px 0; }
+    p { margin: 6px 0; }
+    ul { margin: 6px 0 6px 18px; }
+    code, pre { font-family: Consolas, "Courier New", monospace; font-size: 11px; }
+    pre { background: #f6f6f6; padding: 8px; border: 1px solid #ddd; border-radius: 4px; overflow-x: auto; }
+    .note { background: #fff8e1; border: 1px solid #f0d98c; padding: 8px; border-radius: 4px; margin: 8px 0; }
+    .section { margin-bottom: 10px; }
+    .footer { margin-top: 16px; padding-top: 10px; border-top: 1px solid #ddd; color: #555; }
+  </style>
+</head>
+
+<body>
+  <h1>File Import Formats — Help</h1>
+
+  <div class="section">
+    <p>
+      This application supports importing well-related data from several common file formats.
+      Each import type is described below, including required columns and how the data is interpreted.
+    </p>
+  </div>
+
+  <h2>1. Petrel Well Head Files (<code>*.txt</code>, <code>*.dat</code>)</h2>
+  <p><b>Purpose:</b> Import well header information (location, reference datum, total depth).</p>
+  <p><b>Typical content:</b></p>
+  <ul>
+    <li>Text file with a <code>BEGIN HEADER … END HEADER</code> section</li>
+    <li>One data row per well</li>
+  </ul>
+  <p><b>Key fields used:</b></p>
+  <ul>
+    <li>Well name</li>
+    <li>Surface X / Surface Y</li>
+    <li>Reference datum name (e.g. KB, RT, DF)</li>
+    <li>Reference datum value</li>
+    <li>Total Depth (MD)</li>
+  </ul>
+  <div class="note">
+    <b>Encoding:</b> Files are often not UTF-8. Latin-1 / Windows-1252 is supported automatically.
+  </div>
+  <p><b>Result:</b> Creates new wells if they do not exist, updates existing wells by name. No logs or tops are created.</p>
+
+  <h2>2. LAS Files (<code>*.las</code>)</h2>
+  <p><b>Purpose:</b> Import continuous well logs.</p>
+  <p><b>Supported:</b></p>
+  <ul>
+    <li>LAS 2.0 / LAS 3.0</li>
+    <li>Depth-indexed curves</li>
+  </ul>
+  <p><b>Workflow:</b></p>
+  <ol>
+    <li>Select LAS file</li>
+    <li>Choose: assign logs to an existing well, or create a new well from LAS header</li>
+    <li>Select which curves to import</li>
+  </ol>
+  <p><b>Depth handling:</b> Depth is assumed to be measured depth. Logs are stored as continuous logs (<code>well["logs"]</code>).</p>
+  <p><b>Result:</b> Adds curves to <code>well["logs"]</code>. Does not modify stratigraphy or tops.</p>
+
+  <h2>3. Discrete Well Logs (<code>*.csv</code>)</h2>
+  <p><b>Purpose:</b> Import discrete interval-style logs (facies codes, lithology codes, flags).</p>
+  <p><b>Required columns:</b></p>
+  <pre>Well
+Depth
+Value</pre>
+  <p>Equivalent naming may be supported (case-insensitive).</p>
+  <p><b>Conventions:</b></p>
+  <ul>
+    <li>Only <b>top depth</b> is stored per value</li>
+    <li>Value <code>-999</code> indicates <b>no discrete value below</b></li>
+    <li>This matches continuous-log-style depth sampling</li>
+  </ul>
+  <p><b>Result:</b> Stored in <code>well["discrete_logs"]</code>. Can be displayed in discrete tracks.</p>
+
+  <h2>4. Stratigraphic Tops / Horizons (<code>*.csv</code>)</h2>
+  <p><b>Purpose:</b> Import well tops, horizons, faults, or unconformities.</p>
+  <p><b>Required columns:</b></p>
+  <pre>Well_name
+MD
+Name
+Type</pre>
+  <p><b>Type values:</b></p>
+  <ul>
+    <li><code>Base</code>, <code>Top</code>, <code>Unconformity</code>, <code>Fault</code>, <code>IntraFormational</code>, <code>TD</code></li>
+  </ul>
+  <p><b>Role handling:</b> If no role is given, <code>role = "stratigraphy"</code> is assumed. Faults and non-stratigraphic markers are supported.</p>
+  <p><b>Result:</b> Tops are added to <code>well["tops"]</code>. Ordering is validated against the stratigraphic column.</p>
+
+  <h2>5. Lithofacies / Environment Intervals (<code>*.csv</code>)</h2>
+  <p><b>Purpose:</b> Import lithofacies intervals with trends and depositional environment.</p>
+  <p><b>Required columns:</b></p>
+  <pre>Well
+ID
+LithoTrend
+Environment
+Rel_Top
+Rel_Base</pre>
+
+  <p><b>LithoTrend format:</b></p>
+  <pre>&lt;lithology&gt;, &lt;trend&gt;</pre>
+  <p><b>Examples:</b></p>
+  <ul>
+    <li><code>SS, cu</code> → Sandstone, coarsening upward</li>
+    <li><code>M, fu</code> → Mudstone, fining upward</li>
+    <li><code>SS</code> → Constant trend</li>
+  </ul>
+  <p><b>Trend codes:</b></p>
+  <ul>
+    <li><code>cu</code> → coarsening upward</li>
+    <li><code>fu</code> → fining upward</li>
+    <li>(no code) → constant</li>
+  </ul>
+  <p><b>Depth handling:</b></p>
+  <ul>
+    <li><code>Rel_Top</code> and <code>Rel_Base</code> are relative (0–1)</li>
+    <li>Converted internally to true depth using the well depth range</li>
+  </ul>
+  <p><b>Result:</b> Stored in <code>well["facies_intervals"]</code>. Displayed in facies tracks with color + hatch encoding.</p>
+
+  <h2>6. Bitmap / Core Images (<code>*.bmp</code>, <code>*.png</code>, <code>*.jpg</code>, <code>*.tif</code>)</h2>
+  <p><b>Purpose:</b> Display core photos or image logs aligned to depth.</p>
+  <p><b>Workflow:</b></p>
+  <ol>
+    <li>Load image via dialog</li>
+    <li>Select well</li>
+    <li>Define top and base depth</li>
+    <li>Assign bitmap key (e.g. <code>core</code>)</li>
+  </ol>
+  <p><b>Notes:</b></p>
+  <ul>
+    <li>One bitmap track can display different images per well</li>
+    <li>Flattening is fully supported</li>
+  </ul>
+  <p><b>Result:</b> Stored in <code>well["bitmaps"]</code>. Displayed in bitmap tracks.</p>
+
+  <h2>7. Project Files (<code>*.json</code>)</h2>
+  <p><b>Purpose:</b> Save / restore full project state.</p>
+  <p><b>Contains:</b></p>
+  <ul>
+    <li>Wells and well order</li>
+    <li>Logs (continuous, discrete)</li>
+    <li>Stratigraphy and tops</li>
+    <li>Tracks and display settings</li>
+    <li>Flattening state and visibility filters</li>
+  </ul>
+  <p><b>Compatibility:</b> Missing fields are filled with defaults on load. Backward compatible with earlier versions.</p>
+
+  <h2>General Notes</h2>
+  <ul>
+    <li>All depth values are assumed to be measured depth</li>
+    <li>Units are preserved as given in the source files</li>
+    <li>Import operations are non-destructive: existing data is preserved unless explicitly overwritten</li>
+  </ul>
+
+  <div class="footer">
+    <p><b>Licensing:</b> European Union Public Licence (EUPL) v1.2</p>
+    <p>© M. Peter Süss</p>
+  </div>
+</body>
+</html>
