@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
     QPushButton
 )
+
 from collections import OrderedDict
 
 from PyQt5.QtGui import QColor
@@ -2901,7 +2902,6 @@ class MoveWellDialog(QDialog):
     def position(self):
         return self.spin.value() - 1
 
-
 class LoadBitmapForTrackDialog(QDialog):
     """
     Load an image and assign it to a well for a specific bitmap track key.
@@ -3052,8 +3052,6 @@ class LoadBitmapForTrackDialog(QDialog):
 
     def result(self):
         return self._result
-
-
 
 class BitmapPlacementDialog(QDialog):
     """

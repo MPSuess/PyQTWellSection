@@ -11623,64 +11623,33 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": {
-        "Upper Formation A": {
-          "level": "sequence",
-          "color": "#ff0000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Formation A": {
-          "level": "formation",
-          "color": "#ffcc00",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Sequence 1": {
-          "level": "sequence",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Member A1": {
-          "level": "member",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Carboniferous": {
-          "level": "formation",
-          "color": "#000000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Lower Formation A": {
-          "level": "sequence",
-          "color": "#0000ff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        }
-      },
+      "visible_tops": [
+        "Formation A",
+        "Sequence 1",
+        "Member A1",
+        "Lower Formation A",
+        "Carboniferous"
+      ],
       "visible_logs": [
         "PHI",
-        "RHOB",
         "RT",
+        "RHOB",
         "GR",
         "CAL"
       ],
       "visible_tracks": [
-        "RHOB-PHI",
+        "RT-RHOB",
         "Facies",
         "core",
         "f3",
         "GR-CAL",
-        "RT-RHOB",
-        "LithoFacies"
+        "LithoFacies",
+        "RHOB-PHI"
       ],
       "visible_wells": [
-        "Well A",
         "Well B",
-        "Well C"
+        "Well C",
+        "Well A"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
@@ -11737,8 +11706,8 @@
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAP3AAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAEXAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABGAAAAt8AAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAHPAAABtQAAAKsA////+gAAAAEBAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAF8A////AAAAAAAAA2wAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "geometry_b64": "AdnQywADAAAAAANfAAABcgAACiIAAAUiAAADXwAAAY4AAAoiAAAFIgAAAAAAAAAACgAAAANfAAABjgAACiIAAAUi",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAXaAAADffwCAAAAAfwAAAAYAAADfQAAASQA/////AEAAAAC/AAAAAAAAACvAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAAsAAABSoAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAMEAAAArgD////8AAADHQAAAHgAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAAA6QAAA338AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG/AAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAHYAAABvQAAAKsA////+gAAAAEBAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAF8A////AAAAAAAAA30AAAAEAAAABAAAAAgAAAAI/AAAAAA=",
     "tab_groups": [
       [
         "Console",

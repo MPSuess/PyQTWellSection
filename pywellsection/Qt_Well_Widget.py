@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QDockWidget
 )
 
-from PyQt5.QtCore import Qt, pyqtSignal, QEvent
+from PyQt5.QtCore import Qt, pyqtSignal, QEvent, QSize
 
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
@@ -39,9 +39,12 @@ LOG.setLevel("DEBUG")
 import numpy as np
 
 
+#from mpl_interactions import panhandler
+
 class WellPanelWidget(QWidget):
     def __init__(self, wells, tracks, stratigraphy, panel_settings, panel_title = None, parent=None):
         super().__init__(parent)
+
         self.wells = wells
         self.well = None
         self.tracks = tracks
@@ -49,6 +52,9 @@ class WellPanelWidget(QWidget):
         self.n_tracks = len(tracks)
         self.stratigraphy = stratigraphy
         self.logs = None
+        self.depth_window = None
+
+        self._scroll_cid = None
 
         self.panel_settings = panel_settings
 
@@ -58,7 +64,11 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
         self.redraw_requested = panel_settings["redraw_requested"]
-        self.vertical_scale = panel_settings["vertical_scale"]
+
+        if not panel_settings.get("vertical_scale", 0):
+            self.vertical_scale = 1.0
+        else:
+            self.vertical_scale = panel_settings["vertical_scale"]
 #        self.panel_title = panel_settings["panel_title"]
 #        self.window_name = panel_settings["window_name"]
 
@@ -78,12 +88,24 @@ class WellPanelWidget(QWidget):
         self.fig = Figure(figsize=(12, 6), dpi=100)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setFixedSize(400, 800)
+        self._px_per_track = 100
+        self._px_per_well = 100
+        self._px_per_well_gap = 10
+        self._px_per_depth_track = 100
+        self._min_canvas_width = 600
+
+        self.enable_track_mouse_scrolling()
+        self.depth_window = None
 
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidget(self.canvas)
+
         self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setWidget(self.canvas)
 
         self.toolbar = NavigationToolbar(self.canvas, self)
+
 
         layout = QVBoxLayout()
         layout.addWidget(self.toolbar)
@@ -186,15 +208,7 @@ class WellPanelWidget(QWidget):
             else:
                 n_tracks = len(filtered_tracks)
 
-            total_cols = n_wells * n_tracks + (n_wells - 1)
-
-            hsize = 100 * total_cols
-            if hsize < 400:
-                hsize = 800
-
-            self.canvas.setFixedSize(hsize, int(2000*self.vertical_scale))
-
-#            print(f"in draw panel, stratigraphy: {self.stratigraphy, visible_tops}")
+            self.update_canvas_size_from_layout()
 
             depth_window = self.get_current_depth_window()
 
@@ -223,7 +237,6 @@ class WellPanelWidget(QWidget):
             self._connect_ylim_sync()
             self._build_axis_index()
 
-            #draw_multi_wells_panel_on_figure(self.fig,self.wells,self.tracks)
             self.canvas.draw()
 
     def update_panel(self,tracks, wells, stratigraphy, panel_settings):
@@ -384,7 +397,7 @@ class WellPanelWidget(QWidget):
         if mapped is None:
             return
         wi, ti, ax, depth_plot, depth_true = mapped
-        print (wi, ti, ax, depth_plot, depth_true)
+        print (event.button, wi, ti, ax, depth_plot, depth_true)
 
         if self._in_dialog_pick_mode:
             return
@@ -1367,6 +1380,267 @@ class WellPanelWidget(QWidget):
         self.current_depth_window = (min_depth, max_depth)
         return self.current_depth_window
 
+    def zoom_in_out(self, event):
+        print (event.angleDelta().y() / 120)
+        if event.angleDelta().y() > 0:
+            self.well_main_axes[0].yaxis.pan(0.05)
+        else:
+            self.well_main_axes[0].yaxis.pan(0.05)
+
+        #self.draw_panel()
+
+    def change_canvas_size (self, event):
+        self.fig_set_size(event.width(), event.height())
+
+    def fig_set_size(self, width, height):
+        print (width, height)
+
+    def update_canvas_size_from_layout(self):
+        """
+        Height follows the widget/scroll viewport height.
+        Width depends on number of wells and visible tracks.
+        """
+        #if 1:
+        #    return
+
+        dpi = float(self.fig.get_dpi() or 100.0)
+
+        n_wells = len(self.visible_wells) if self.wells else 0
+
+        # visible tracks filtering (if you use it)
+        tracks = self.tracks or []
+        visible_tracks = getattr(self, "visible_tracks", None)
+        if visible_tracks is not None:
+            tracks = [t for t in tracks if t.get("name") in visible_tracks]
+
+        n_tracks = len(tracks) if tracks else 1  # ensure at least 1 track to compute width
+
+        total_cols = n_wells * (n_tracks + 1) + (n_wells - 1)
+
+        # compute width in pixels: tracks + gaps
+        if n_wells <= 0:
+            width_px = self._min_canvas_width
+        else:
+            tracks_px = n_wells * n_tracks * self._px_per_track
+            depth_track_px = n_wells * self._px_per_depth_track
+            gaps_px = (n_wells - 1) * self._px_per_well_gap
+            width_px = max(self._min_canvas_width, tracks_px + gaps_px + depth_track_px)
+
+        # height in pixels: follow scroll viewport height (or this widget height)
+        viewport_h = self.scroll_area.viewport().height() if hasattr(self, "scroll") else self.height()
+        height_px = max(200, int(viewport_h))
+
+        # set canvas widget size (controls scrollbars)
+        self.canvas.setFixedSize(QSize(int(width_px), int(height_px)))
+
+        # set matplotlib figure size in inches to match pixel size
+        self.fig.set_size_inches(width_px / dpi, height_px / dpi, forward=True)
+
+    def enable_track_mouse_scrolling(self):
+        """Enable mouse-wheel scrolling inside tracks (pan/zoom depth window)."""
+        if getattr(self, "_scroll_cid", None) is not None:
+            return
+        self._scroll_cid = self.canvas.mpl_connect("scroll_event", self.on_scroll)
+
+    def draw_idle(self):
+        self.canvas.draw_idle()
+
+    def on_scroll(self, event):
+
+        print("start on_scroll")
+
+        key = (event.modifiers or "")
+        ctrl = ("control" in key) or ("ctrl" in key)
+
+        print("ctrl, event_modifier", ctrl,  event.modifiers)
+
+
+
+        # Do not interfere with toolbar pan/zoom modes
+        tb = getattr(self, "toolbar", None)  # if you attached NavigationToolbar2QT to self.toolbar
+        if event.inaxes is None or event.ydata is None:
+            if tb is not None and getattr(tb, "mode", ""):
+                # mode is e.g. "pan/zoom" or "zoom rect"
+                return
+
+            # Do not interfere with your picking modes
+            if getattr(self, "_in_dialog_pick_mode", False):
+                return
+            if getattr(self, "_bitmap_pick_ctx", None) is not None:
+                return
+            return
+
+
+        ax = event.inaxes
+        if ax is None:
+            return
+        # Fake a mouse button for drag_pan
+
+
+        button = 1 # left mouse button
+        if ctrl:
+            button = 3  # left mouse button scroll
+
+        # Scroll direction controls pan direction
+        dx = 0
+        dy = 20 if event.step > 0 else -20
+
+        # Initialize pan
+        ax.start_pan(event.x, event.y, button)
+
+        # Apply pan movement
+        ax.drag_pan(button, key, event.x + dx, event.y + dy)
+
+        # Finish pan
+        ax.end_pan()
+
+        self.draw_idle()
+
+
+
+    def _on_track_scroll(self, event):
+        """
+        Mouse wheel over a track:
+          - Wheel: pan depth window up/down
+          - Ctrl+wheel: zoom depth window in/out around cursor
+        """
+        # Must be inside axes
+
+
+
+
+        #if ctrl:
+
+        # Do not interfere with toolbar pan/zoom modes
+        tb = getattr(self, "toolbar", None)  # if you attached NavigationToolbar2QT to self.toolbar
+
+        if event.inaxes is None or event.ydata is None:
+            if tb is not None and getattr(tb, "mode", ""):
+                # mode is e.g. "pan/zoom" or "zoom rect"
+                return
+
+            # Do not interfere with your picking modes
+            if getattr(self, "_in_dialog_pick_mode", False):
+                return
+            if getattr(self, "_bitmap_pick_ctx", None) is not None:
+                return
+            return
+
+
+
+        # Map axis (twiny etc.) -> base axis you indexed
+        ax = event.inaxes
+        if ax not in getattr(self, "axis_index", {}):
+            ax_pos = ax.get_position()
+            best_ax = None
+            best_overlap = 0.0
+            for base_ax in self.axis_index.keys():
+                pos = base_ax.get_position()
+                x0 = max(ax_pos.x0, pos.x0)
+                x1 = min(ax_pos.x1, pos.x1)
+                y0 = max(ax_pos.y0, pos.y0)
+                y1 = min(ax_pos.y1, pos.y1)
+                overlap = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_ax = base_ax
+            if best_ax is None or best_overlap == 0.0:
+                return
+            ax = best_ax
+
+        wi, ti = self.axis_index[ax]
+
+        # Convert plot y (possibly flattened) -> TRUE depth
+        offset = 0.0
+        fd = getattr(self, "_flatten_depths", None)
+        if fd is not None and wi < len(fd):
+            offset = float(fd[wi] or 0.0)
+        y_true = float(event.ydata) + offset
+
+        # Determine physical bounds across wells (TRUE depth)
+        wells = self.wells or []
+        if not wells:
+            return
+        ref_depths = [w["reference_depth"] for w in wells]
+        bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
+        default_top_phys = min(ref_depths)
+        default_bottom_phys = max(bottoms)
+        #if default_bottom_phys <= default_top_phys:
+        #    return
+
+        # Current window
+        if self.depth_window is None:
+            top_true, bot_true = default_top_phys, default_bottom_phys
+        else:
+            top_true, bot_true = self.depth_window
+            top_true, bot_true = (min(top_true, bot_true), max(top_true, bot_true))
+
+        win = bot_true - top_true
+        if win <= 0:
+            win = default_bottom_phys - default_top_phys
+
+        # Matplotlib scroll step: event.step usually +1 / -1 per notch
+        step = getattr(event, "step", 0) or 0
+        if step == 0:
+            # some backends use button='up'/'down'
+            if getattr(event, "button", None) == "up":
+                step = 1
+            elif getattr(event, "button", None) == "down":
+                step = -1
+            else:
+                return
+
+        # Modifier: Ctrl to zoom, else pan
+        key = (event.key or "").lower()
+        ctrl = ("control" in key) or ("ctrl" in key)
+
+        if ctrl:
+            # Zoom around cursor y_true:
+            # step>0 => zoom in (smaller window), step<0 => zoom out
+            zoom_factor = 0.85 if step > 0 else 1.15
+            new_win = max(1e-6, win * zoom_factor)
+
+            # Keep cursor position fixed fractionally within the window
+            frac = 0.5
+            if win > 1e-9:
+                frac = (y_true - top_true) / win
+                frac = max(0.0, min(1.0, frac))
+
+            new_top = y_true - frac * new_win
+            new_bot = new_top + new_win
+        else:
+            # Pan window: step>0 typically wheel up => shallower (move up)
+            pan_frac = 0.10  # 10% of window per notch
+            delta = -step * win * pan_frac
+            new_top = top_true + delta
+            new_bot = bot_true + delta
+
+        # Clamp to physical extent (TRUE depth)
+#        if new_bot - new_top > (default_bottom_phys - default_top_phys):
+#            new_top, new_bot = default_top_phys, default_bottom_phys
+
+        if new_top < default_top_phys:
+            new_top = default_top_phys
+            new_bot = new_top + (new_bot - new_top)
+        if new_bot > default_bottom_phys:
+            new_bot = default_bottom_phys
+            new_top = new_bot - (new_bot - new_top)
+
+        # Safety re-clamp with fixed window size
+        new_top = max(default_top_phys, new_top)
+        new_bot = min(default_bottom_phys, new_bot)
+        if new_bot <= new_top:
+            return
+
+        # Store and redraw
+
+        self.depth_window = (float(new_top), float(new_bot))
+        self.current_depth_window = (float(new_top), float(new_bot))
+
+        print(f"depth window: {self.depth_window}")
+
+        self.draw_panel()
+
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
 
@@ -1409,6 +1683,12 @@ class WellPanelDock(QDockWidget):
         if obj is self:
             if event.type() in (QEvent.MouseButtonPress, QEvent.FocusIn):
                 self.activated.emit(self)
+            #if event.type() == event.Wheel:
+            #    print("scrolling")
+                #self.panel._on_track_scroll(event)
+            if event.type() == QEvent.Resize:
+                print("resizing")
+                self.panel.update_canvas_size_from_layout()
 #            if event.type() == QEvent.topLevelChanged:
 #                self.set_tabify(self)
         return super().eventFilter(obj, event)
