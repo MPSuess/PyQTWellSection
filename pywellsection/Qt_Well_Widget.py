@@ -397,7 +397,7 @@ class WellPanelWidget(QWidget):
         if mapped is None:
             return
         wi, ti, ax, depth_plot, depth_true = mapped
-        print (event.button, wi, ti, ax, depth_plot, depth_true)
+        #print (event.button, wi, ti, ax, depth_plot, depth_true)
 
         if self._in_dialog_pick_mode:
             return
@@ -1381,7 +1381,7 @@ class WellPanelWidget(QWidget):
         return self.current_depth_window
 
     def zoom_in_out(self, event):
-        print (event.angleDelta().y() / 120)
+        #print (event.angleDelta().y() / 120)
         if event.angleDelta().y() > 0:
             self.well_main_axes[0].yaxis.pan(0.05)
         else:
@@ -1447,12 +1447,12 @@ class WellPanelWidget(QWidget):
 
     def on_scroll(self, event):
 
-        print("start on_scroll")
+        #print("start on_scroll")
 
         key = (event.modifiers or "")
         ctrl = ("control" in key) or ("ctrl" in key)
 
-        print("ctrl, event_modifier", ctrl,  event.modifiers)
+        #print("ctrl, event_modifier", ctrl,  event.modifiers)
 
 
 
@@ -1497,149 +1497,149 @@ class WellPanelWidget(QWidget):
         self.draw_idle()
 
 
-
-    def _on_track_scroll(self, event):
-        """
-        Mouse wheel over a track:
-          - Wheel: pan depth window up/down
-          - Ctrl+wheel: zoom depth window in/out around cursor
-        """
-        # Must be inside axes
-
-
-
-
-        #if ctrl:
-
-        # Do not interfere with toolbar pan/zoom modes
-        tb = getattr(self, "toolbar", None)  # if you attached NavigationToolbar2QT to self.toolbar
-
-        if event.inaxes is None or event.ydata is None:
-            if tb is not None and getattr(tb, "mode", ""):
-                # mode is e.g. "pan/zoom" or "zoom rect"
-                return
-
-            # Do not interfere with your picking modes
-            if getattr(self, "_in_dialog_pick_mode", False):
-                return
-            if getattr(self, "_bitmap_pick_ctx", None) is not None:
-                return
-            return
-
-
-
-        # Map axis (twiny etc.) -> base axis you indexed
-        ax = event.inaxes
-        if ax not in getattr(self, "axis_index", {}):
-            ax_pos = ax.get_position()
-            best_ax = None
-            best_overlap = 0.0
-            for base_ax in self.axis_index.keys():
-                pos = base_ax.get_position()
-                x0 = max(ax_pos.x0, pos.x0)
-                x1 = min(ax_pos.x1, pos.x1)
-                y0 = max(ax_pos.y0, pos.y0)
-                y1 = min(ax_pos.y1, pos.y1)
-                overlap = max(0.0, x1 - x0) * max(0.0, y1 - y0)
-                if overlap > best_overlap:
-                    best_overlap = overlap
-                    best_ax = base_ax
-            if best_ax is None or best_overlap == 0.0:
-                return
-            ax = best_ax
-
-        wi, ti = self.axis_index[ax]
-
-        # Convert plot y (possibly flattened) -> TRUE depth
-        offset = 0.0
-        fd = getattr(self, "_flatten_depths", None)
-        if fd is not None and wi < len(fd):
-            offset = float(fd[wi] or 0.0)
-        y_true = float(event.ydata) + offset
-
-        # Determine physical bounds across wells (TRUE depth)
-        wells = self.wells or []
-        if not wells:
-            return
-        ref_depths = [w["reference_depth"] for w in wells]
-        bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
-        default_top_phys = min(ref_depths)
-        default_bottom_phys = max(bottoms)
-        #if default_bottom_phys <= default_top_phys:
-        #    return
-
-        # Current window
-        if self.depth_window is None:
-            top_true, bot_true = default_top_phys, default_bottom_phys
-        else:
-            top_true, bot_true = self.depth_window
-            top_true, bot_true = (min(top_true, bot_true), max(top_true, bot_true))
-
-        win = bot_true - top_true
-        if win <= 0:
-            win = default_bottom_phys - default_top_phys
-
-        # Matplotlib scroll step: event.step usually +1 / -1 per notch
-        step = getattr(event, "step", 0) or 0
-        if step == 0:
-            # some backends use button='up'/'down'
-            if getattr(event, "button", None) == "up":
-                step = 1
-            elif getattr(event, "button", None) == "down":
-                step = -1
-            else:
-                return
-
-        # Modifier: Ctrl to zoom, else pan
-        key = (event.key or "").lower()
-        ctrl = ("control" in key) or ("ctrl" in key)
-
-        if ctrl:
-            # Zoom around cursor y_true:
-            # step>0 => zoom in (smaller window), step<0 => zoom out
-            zoom_factor = 0.85 if step > 0 else 1.15
-            new_win = max(1e-6, win * zoom_factor)
-
-            # Keep cursor position fixed fractionally within the window
-            frac = 0.5
-            if win > 1e-9:
-                frac = (y_true - top_true) / win
-                frac = max(0.0, min(1.0, frac))
-
-            new_top = y_true - frac * new_win
-            new_bot = new_top + new_win
-        else:
-            # Pan window: step>0 typically wheel up => shallower (move up)
-            pan_frac = 0.10  # 10% of window per notch
-            delta = -step * win * pan_frac
-            new_top = top_true + delta
-            new_bot = bot_true + delta
-
-        # Clamp to physical extent (TRUE depth)
-#        if new_bot - new_top > (default_bottom_phys - default_top_phys):
-#            new_top, new_bot = default_top_phys, default_bottom_phys
-
-        if new_top < default_top_phys:
-            new_top = default_top_phys
-            new_bot = new_top + (new_bot - new_top)
-        if new_bot > default_bottom_phys:
-            new_bot = default_bottom_phys
-            new_top = new_bot - (new_bot - new_top)
-
-        # Safety re-clamp with fixed window size
-        new_top = max(default_top_phys, new_top)
-        new_bot = min(default_bottom_phys, new_bot)
-        if new_bot <= new_top:
-            return
-
-        # Store and redraw
-
-        self.depth_window = (float(new_top), float(new_bot))
-        self.current_depth_window = (float(new_top), float(new_bot))
-
-        print(f"depth window: {self.depth_window}")
-
-        self.draw_panel()
+#
+#     def _on_track_scroll(self, event):
+#         """
+#         Mouse wheel over a track:
+#           - Wheel: pan depth window up/down
+#           - Ctrl+wheel: zoom depth window in/out around cursor
+#         """
+#         # Must be inside axes
+#
+#
+#
+#
+#         #if ctrl:
+#
+#         # Do not interfere with toolbar pan/zoom modes
+#         tb = getattr(self, "toolbar", None)  # if you attached NavigationToolbar2QT to self.toolbar
+#
+#         if event.inaxes is None or event.ydata is None:
+#             if tb is not None and getattr(tb, "mode", ""):
+#                 # mode is e.g. "pan/zoom" or "zoom rect"
+#                 return
+#
+#             # Do not interfere with your picking modes
+#             if getattr(self, "_in_dialog_pick_mode", False):
+#                 return
+#             if getattr(self, "_bitmap_pick_ctx", None) is not None:
+#                 return
+#             return
+#
+#
+#
+#         # Map axis (twiny etc.) -> base axis you indexed
+#         ax = event.inaxes
+#         if ax not in getattr(self, "axis_index", {}):
+#             ax_pos = ax.get_position()
+#             best_ax = None
+#             best_overlap = 0.0
+#             for base_ax in self.axis_index.keys():
+#                 pos = base_ax.get_position()
+#                 x0 = max(ax_pos.x0, pos.x0)
+#                 x1 = min(ax_pos.x1, pos.x1)
+#                 y0 = max(ax_pos.y0, pos.y0)
+#                 y1 = min(ax_pos.y1, pos.y1)
+#                 overlap = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+#                 if overlap > best_overlap:
+#                     best_overlap = overlap
+#                     best_ax = base_ax
+#             if best_ax is None or best_overlap == 0.0:
+#                 return
+#             ax = best_ax
+#
+#         wi, ti = self.axis_index[ax]
+#
+#         # Convert plot y (possibly flattened) -> TRUE depth
+#         offset = 0.0
+#         fd = getattr(self, "_flatten_depths", None)
+#         if fd is not None and wi < len(fd):
+#             offset = float(fd[wi] or 0.0)
+#         y_true = float(event.ydata) + offset
+#
+#         # Determine physical bounds across wells (TRUE depth)
+#         wells = self.wells or []
+#         if not wells:
+#             return
+#         ref_depths = [w["reference_depth"] for w in wells]
+#         bottoms = [w["reference_depth"] + w["total_depth"] for w in wells]
+#         default_top_phys = min(ref_depths)
+#         default_bottom_phys = max(bottoms)
+#         #if default_bottom_phys <= default_top_phys:
+#         #    return
+#
+#         # Current window
+#         if self.depth_window is None:
+#             top_true, bot_true = default_top_phys, default_bottom_phys
+#         else:
+#             top_true, bot_true = self.depth_window
+#             top_true, bot_true = (min(top_true, bot_true), max(top_true, bot_true))
+#
+#         win = bot_true - top_true
+#         if win <= 0:
+#             win = default_bottom_phys - default_top_phys
+#
+#         # Matplotlib scroll step: event.step usually +1 / -1 per notch
+#         step = getattr(event, "step", 0) or 0
+#         if step == 0:
+#             # some backends use button='up'/'down'
+#             if getattr(event, "button", None) == "up":
+#                 step = 1
+#             elif getattr(event, "button", None) == "down":
+#                 step = -1
+#             else:
+#                 return
+#
+#         # Modifier: Ctrl to zoom, else pan
+#         key = (event.key or "").lower()
+#         ctrl = ("control" in key) or ("ctrl" in key)
+#
+#         if ctrl:
+#             # Zoom around cursor y_true:
+#             # step>0 => zoom in (smaller window), step<0 => zoom out
+#             zoom_factor = 0.85 if step > 0 else 1.15
+#             new_win = max(1e-6, win * zoom_factor)
+#
+#             # Keep cursor position fixed fractionally within the window
+#             frac = 0.5
+#             if win > 1e-9:
+#                 frac = (y_true - top_true) / win
+#                 frac = max(0.0, min(1.0, frac))
+#
+#             new_top = y_true - frac * new_win
+#             new_bot = new_top + new_win
+#         else:
+#             # Pan window: step>0 typically wheel up => shallower (move up)
+#             pan_frac = 0.10  # 10% of window per notch
+#             delta = -step * win * pan_frac
+#             new_top = top_true + delta
+#             new_bot = bot_true + delta
+#
+#         # Clamp to physical extent (TRUE depth)
+# #        if new_bot - new_top > (default_bottom_phys - default_top_phys):
+# #            new_top, new_bot = default_top_phys, default_bottom_phys
+#
+#         if new_top < default_top_phys:
+#             new_top = default_top_phys
+#             new_bot = new_top + (new_bot - new_top)
+#         if new_bot > default_bottom_phys:
+#             new_bot = default_bottom_phys
+#             new_top = new_bot - (new_bot - new_top)
+#
+#         # Safety re-clamp with fixed window size
+#         new_top = max(default_top_phys, new_top)
+#         new_bot = min(default_bottom_phys, new_bot)
+#         if new_bot <= new_top:
+#             return
+#
+#         # Store and redraw
+#
+#         self.depth_window = (float(new_top), float(new_bot))
+#         self.current_depth_window = (float(new_top), float(new_bot))
+#
+#         print(f"depth window: {self.depth_window}")
+#
+#         self.draw_panel()
 
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
@@ -1687,7 +1687,7 @@ class WellPanelDock(QDockWidget):
             #    print("scrolling")
                 #self.panel._on_track_scroll(event)
             if event.type() == QEvent.Resize:
-                print("resizing")
+                #print("resizing")
                 self.panel.update_canvas_size_from_layout()
 #            if event.type() == QEvent.topLevelChanged:
 #                self.set_tabify(self)
