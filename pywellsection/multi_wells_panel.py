@@ -99,7 +99,7 @@ def draw_multi_wells_panel_on_figure(
     visible_tracks = None,
     depth_window = None,
     stratigraphy = None,
-    vertical_scale = 1.0,
+    vertical_scale = 1.0
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -160,25 +160,31 @@ def draw_multi_wells_panel_on_figure(
         else:
             offsets.append(0.0)
 
-    top_plot_candidates = []
-    bottom_plot_candidates = []
-    for off in offsets:
-        top_plot_candidates.append(top_phys - off)
-        bottom_plot_candidates.append(bottom_phys - off)
-
-    # global plotting limits that include ALL wells after shifting
-    global_top_plot = min(top_plot_candidates) + offsets[0]
-    global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
-    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
+    global_top_plot = 99999.0
+    global_bottom_plot = -99999.0
+    gobal_mid_plot = 0.0
 
 
     if depth_window is not None:
         print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
+        global_mid_plot = (top_depth_window + bottom_depth_window) / 2
         if top_depth_window < global_mid_plot < bottom_depth_window:
             global_top_plot = top_depth_window + offsets[0]
             global_bottom_plot = bottom_depth_window + offsets[0]
-            global_mid_plot = (global_top_plot + global_bottom_plot) / 2
+    else:
+        top_plot_candidates = []
+        bottom_plot_candidates = []
+        for off in offsets:
+            top_plot_candidates.append(top_phys - off)
+            bottom_plot_candidates.append(bottom_phys - off)
+
+        # global plotting limits that include ALL wells after shifting
+        global_top_plot = min(top_plot_candidates) + offsets[0]
+        global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
+        global_mid_plot = (global_top_plot + global_bottom_plot) / 2
+
+#    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 
 
@@ -188,7 +194,7 @@ def draw_multi_wells_panel_on_figure(
     col_is_spacer = []
 
     for w in range(n_wells):
-        width_ratios.append(track_width)
+        width_ratios.append(track_width/2)
         col_is_spacer.append(False)
         for _ in range(n_tracks):
             width_ratios.append(track_width)
@@ -215,7 +221,10 @@ def draw_multi_wells_panel_on_figure(
     # Turn off spacer axes
     for ax, is_spacer in zip(axes, col_is_spacer):
         if is_spacer:
-            ax.axis("on")
+            ax.axis("off")
+
+            ax.set_ylim(global_top_plot, global_bottom_plot)
+            ax.invert_yaxis()
 
     well_main_axes = []
 
@@ -236,8 +245,7 @@ def draw_multi_wells_panel_on_figure(
         LOG.debug(f"depth_formatter={depth_formatter}")
 
         first_track_idx = wi * (n_tracks + 2)
-        #main_ax = axes[first_track_idx]
-        #well_main_axes.append(main_ax)
+
 
         print (f"wi={wi} first_track_idx={first_track_idx}")
 
@@ -249,11 +257,11 @@ def draw_multi_wells_panel_on_figure(
         base_ax.grid(True, linestyle="--", alpha=0.3)
         base_ax.set_ylabel("Depth (m)", labelpad=8)
         base_ax.yaxis.set_minor_locator(AutoMinorLocator())
-        base_ax.tick_params(axis="y", labelright = True, labelleft = False, direction="in", pad=-30)
+        base_ax.tick_params(axis="y", labelright = True, labelleft = False, direction="in", pad=-20, labelsize=6)
         base_ax.tick_params(which="minor", length = 3, labelleft = False, labelright = True, direction="in")
         base_ax.tick_params(which="major", length = 7)
         base_ax.xaxis.set_visible(False)
-        base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
+        #base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
 
         main_ax = axes[first_track_idx]
 
@@ -981,6 +989,7 @@ def add_tops_and_correlations(
                 open_top = deepest_formation
                 open_bottom = min(deepest_formation + thickness, depth_max)
                 if open_bottom > open_top:
+
                     for ti in range(n_tracks):
                         col_idx = first_track_idx + ti
                         base_ax = axes[col_idx]
@@ -1046,6 +1055,7 @@ def add_tops_and_correlations(
             px, py = main_ax.transData.transform((x_min_main, depth))
             _, y_fig = fig.transFigure.inverted().transform((px, py))
             well_top_yfig[wi][name] = y_fig
+            well_top_depths[wi][name] = depth
 
             if name not in tops_by_name:
                 tops_by_name[name] = {
@@ -1053,39 +1063,67 @@ def add_tops_and_correlations(
                     "level": info["level"],
                     "style": info["style"],
                     "entries": [],
+                    "depth": [],
                 }
+            #tops_by_name[name]["entries"].append((wi, y_fig))
             tops_by_name[name]["entries"].append((wi, y_fig))
+            tops_by_name[name]["depth"].append((wi, depth))
 
     # ---- pass 2: correlation lines in spacers ----
     for name, info in tops_by_name.items():
         color = info["color"]
         style = info["style"]
         entries = info["entries"]
+        depth = info["depth"]
         if len(entries) < 2:
             continue
 
         entries_sorted = sorted(entries, key=lambda t: t[0])
+        depth_sorted = sorted(depth, key=lambda t: t[0])
 
-        for (w1, y1), (w2, y2) in zip(entries_sorted[:-1], entries_sorted[1:]):
-            if w2 != w1 + 1:
-                continue  # only adjacent wells
+        # previous_depth = None
+        # previous_color = None
+        # previous_style = None
 
-            spacer_idx = w1 * (n_tracks + 2) + n_tracks +1
+        for (w1, depth1), (w2, depth2) in zip(depth_sorted[:-1], depth_sorted[1:]):
+            if w2 !=w1 +1:
+                continue
+            spacer_idx = w1 * (n_tracks + 2) + n_tracks + 1
             spacer_ax = axes[spacer_idx]
-            left = spacer_ax.get_position().x0
-            right = spacer_ax.get_position().x1
+            spacer_ax.plot((0,1),(depth1,depth2), color=color, linewidth=style["line_width"], linestyle=style["line_style"], zorder=1.5)
+            # if previous_depth is not None:
+            #     spacer_ax.fill_between((0,1), (depth1,depth2), previous_depth,  color=previous_color,
+            #                            alpha=previous_style["alpha"], hatch = previous_style["hatch"],zorder=1.4)
+            # previous_depth = (depth1,depth2)
+            # previous_color = color
+            # previous_style = style
 
-            line = Line2D(
-                [left, right],
-                [y1, y2],
-                transform=fig.transFigure,
-                color=color,
-                linewidth=style["line_width"],
-                linestyle=style["line_style"],
-                alpha=0.9,
-            )
-            fig.add_artist(line)
-            corr_artists.append(line)
+
+        # for (w1, y1), (w2, y2) in zip(entries_sorted[:-1], entries_sorted[1:]):
+        #     if w2 != w1 + 1:
+        #         continue  # only adjacent wells
+        #
+        #     spacer_idx = w1 * (n_tracks + 2) + n_tracks +1
+        #     spacer_ax = axes[spacer_idx]
+        #     left = spacer_ax.get_position().x0
+        #     right = spacer_ax.get_position().x1
+        #
+        #     line = Line2D(
+        #         [left, right],
+        #         [y1, y2],
+        #         transform=fig.transFigure,
+        #         color=color,
+        #         linewidth=style["line_width"],
+        #         linestyle=style["line_style"],
+        #         alpha=0.9,
+        #     )
+        #     fig.add_artist(line)
+        #     corr_artists.append(line)
+        #
+        #     x_min_spacer, x_max_spacer = spacer_ax.get_xlim()
+
+
+
 
     # ---- pass 3: spacer fills between wells ----
     for w1 in range(n_wells - 1):
@@ -1119,23 +1157,31 @@ def add_tops_and_correlations(
             y2_left = well_top_yfig[w1][name_lower]
             y2_right = well_top_yfig[w2][name_lower]
 
-            poly = patches.Polygon(
-                [
-                    (x_left, y1_left),
-                    (x_right, y1_right),
-                    (x_right, y2_right),
-                    (x_left, y2_left),
-                ],
-                closed=True,
-                transform=fig.transFigure,
-                facecolor=color,
-                alpha=style["alpha"],
-                edgecolor="none",
-                hatch=style["hatch"],
-                zorder=0.2,
-            )
-            fig.add_artist(poly)
-            corr_artists.append(poly)
+            depth1_left = well_top_depths[w1][name_upper]
+            depth1_right = well_top_depths[w2][name_upper]
+            depth2_left = well_top_depths[w1][name_lower]
+            depth2_right = well_top_depths[w2][name_lower]
+
+            spacer_ax.fill_between([0, 1], [depth1_left, depth1_right], [depth2_left, depth2_right],
+                                    color=color, alpha=style["alpha"], hatch=style["hatch"], zorder=0.1)
+
+            # poly = patches.Polygon(
+            #     [
+            #         (x_left, y1_left),
+            #         (x_right, y1_right),
+            #         (x_right, y2_right),
+            #         (x_left, y2_left),
+            #     ],
+            #     closed=True,
+            #     transform=fig.transFigure,
+            #     facecolor=color,
+            #     alpha=style["alpha"],
+            #     edgecolor="none",
+            #     hatch=style["hatch"],
+            #     zorder=0.2,
+            # )
+            # fig.add_artist(poly)
+            # corr_artists.append(poly)
 
     return corr_artists
 
