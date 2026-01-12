@@ -463,6 +463,7 @@ class MainWindow(QMainWindow):
                                 bitmap_cfg["path"] = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
                                 self.all_bitmaps.append(bitmap)
                                 well[bitmap] = bitmap_cfg
+                                print (bitmap_cfg)
 
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
             self.panel.visible_tops = window_dict[0]["visible_tops"]
