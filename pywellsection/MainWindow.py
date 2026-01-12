@@ -615,8 +615,12 @@ class MainWindow(QMainWindow):
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
             if os.path.exists(data_dir):
-                shutil.rmtree(data_dir)
-            os.rename(tmp_dir, data_dir)
+                #shutil.rmtree(data_dir)
+                shutil.copy2(tmp_data_json, data_dir)
+#            os.rename(tmp_dir, data_dir)
+            os.remove(tmp_data_json)
+            os.removedirs(tmp_dir)
+
 
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
@@ -3238,8 +3242,15 @@ class MainWindow(QMainWindow):
 
         global_pos = self.well_tree.viewport().mapToGlobal(pos)
         parent = item.parent()
+        data = item.data(0, Qt.UserRole)
+        parent_data = parent.data(0, Qt.UserRole) if parent else None
 
-        # --- Wells folder or well items: show "Add new well..." ---
+        print (data)
+        print (parent_data)
+
+
+
+
         if item is self.well_root_item:
             menu = QMenu(self)
 
@@ -3278,6 +3289,23 @@ class MainWindow(QMainWindow):
             if chosen == act_delete_well:
                 self._delete_well_from_project(well_name, confirm = True)
 
+        if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
+            menu = QMenu(self)
+            _, well_name, bitmap_key = data
+            act_del = menu.addAction(f"Delete bitmap from well {well_name}")
+            chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
+            if chosen == act_del:
+                if well_name and bitmap_key:
+                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=True)
+                elif not well_name:
+                    for well in self.all_wells:
+                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
+            return
+
+
+
+
+
         # --- case 1: logs under "Logs" folder ---
         if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
@@ -3295,9 +3323,16 @@ class MainWindow(QMainWindow):
                 return
             menu = QMenu(self)
             act_edit = menu.addAction(f"Edit bitmap position'{bitmap_name}'...")
+            act_del = menu.addAction("Delete bitmap…")
+
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
                 self._action_edit_bitmap_positions(track_name=bitmap_name)
+            if chosen == act_del:
+                for well in self.all_wells:
+                    self._delete_bitmap_from_well(well.get("name"), bitmap_name, confirm=True)
+
+
 
 
         if item is self.well_tops_folder:
@@ -3353,12 +3388,14 @@ class MainWindow(QMainWindow):
                 #menu = QMenu(self)
                 act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
                 act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
+                act_delete_all = menu.addAction("Delete all bitmaps for this track…")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_add_core_bitmap:
                     self._action_load_bitmap_into_bitmap_track(track_name)
                 elif chosen == act_edit_bitmap_track:
                     self._action_edit_bitmap_positions(track_name=track_name)
-
+                elif chosen == act_delete_all:
+                    self._delete_bitmaps_for_bitmap_track(track_name, confirm=True)
             elif track.get("type") == "continuous":
                 #menu = QMenu(self)
                 act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
@@ -3612,4 +3649,105 @@ class MainWindow(QMainWindow):
                 # print(window_dict)
                 window_list.append(window_dict)
         return window_list
- 
+
+    from PyQt5.QtWidgets import QMessageBox
+
+    def _delete_bitmap_from_well(self, well_name: str, bitmap_key: str, confirm: bool = True):
+        """
+        Delete a bitmap with given key from a single well.
+        """
+        if not well_name or not bitmap_key:
+            return
+
+        well = next((w for w in getattr(self, "all_wells", []) if w.get("name") == well_name), None)
+        if well is None:
+            QMessageBox.information(self, "Delete bitmap", f"Well '{well_name}' not found.")
+            return
+
+        bm = (well.get("bitmaps") or {})
+        if bitmap_key not in bm:
+            QMessageBox.information(self, "Delete bitmap", f"No bitmap '{bitmap_key}' in well '{well_name}'.")
+            return
+
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete bitmap",
+                f"Delete bitmap '{bitmap_key}' from well '{well_name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        try:
+            del bm[bitmap_key]
+            # clean empty container
+            if not bm:
+                well.pop("bitmaps", None)
+        except Exception as e:
+            QMessageBox.critical(self, "Delete bitmap", f"Failed to delete bitmap:\n{e}")
+            return
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _delete_bitmap_key_from_all_wells(self, bitmap_key: str, confirm: bool = True):
+        """
+        Delete a bitmap key from ALL wells (useful for 'delete track images').
+        """
+        if not bitmap_key:
+            return
+
+        wells = getattr(self, "all_wells", []) or []
+        hits = []
+        for w in wells:
+            bm = (w.get("bitmaps") or {})
+            if bitmap_key in bm:
+                hits.append(w.get("name", "<unnamed>"))
+
+        if not hits:
+            QMessageBox.information(self, "Delete bitmaps", f"No wells contain bitmap '{bitmap_key}'.")
+            return
+
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete bitmaps",
+                f"Delete bitmap '{bitmap_key}' from {len(hits)} well(s)?\n\n"
+                + "\n".join(hits[:15]) + ("\n…" if len(hits) > 15 else ""),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        for w in wells:
+            bm = (w.get("bitmaps") or {})
+            if bitmap_key in bm:
+                del bm[bitmap_key]
+                if not bm:
+                    w.pop("bitmaps", None)
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _delete_bitmaps_for_bitmap_track(self, track_name: str, confirm: bool = True):
+        """
+        Resolve bitmap key from bitmap track and delete it from all wells.
+        """
+        track = next((t for t in getattr(self, "tracks", []) if t.get("name") == track_name), None)
+        if track is None or "bitmap" not in track:
+            QMessageBox.information(self, "Delete bitmaps", "Selected track is not a bitmap track.")
+            return
+
+        key = (track.get("bitmap") or {}).get("key")
+        if not key:
+            QMessageBox.warning(self, "Delete bitmaps", "Bitmap track has no bitmap key.")
+            return
+
+        self._delete_bitmap_key_from_all_wells(key, confirm=confirm)
