@@ -450,6 +450,16 @@ class MainWindow(QMainWindow):
                         if bitmap is not None:
                             self.all_bitmaps.append(bitmap)
 
+                # if bitmaps:
+                #     for bitmap in bitmaps:
+                #         if bitmap is not None:
+                #             bitmap_cfg = bitmas[bitmap]
+                #             bmp_full_path = bitmap_cfg.get("path", None)
+                #             if bmp_full_path:
+                #                 bmp_full_path = os.path.splitext(bmp_full_path)[0] + ".bmp"
+                #                 bitmap["path"] = os.path.join(os.path.dirname(path), bmp_full_path)
+                #                 self.all_bitmaps.append(bitmap)
+
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
             self.panel.visible_tops = window_dict[0]["visible_tops"]
             self.panel.visible_logs = window_dict[0]["visible_logs"]
