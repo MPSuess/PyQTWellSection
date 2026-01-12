@@ -456,8 +456,11 @@ class MainWindow(QMainWindow):
                             bitmap_cfg = bitmaps[bitmap]
                             bmp_full_path = bitmap_cfg.get("path", None)
                             if bmp_full_path:
-                                path, fname = os.path.split(bmp_full_path)
-                                bitmap_cfg["path"] = str(os.path.join(path, fname))
+                                fpath, fname = os.path.split(bmp_full_path)
+                                p_path, pname = os.path.split(path)
+                                rel_path = os.path.relpath(fpath, start=path)
+                                bmp_project_path = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
+                                bitmap_cfg["path"] = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
                                 self.all_bitmaps.append(bitmap)
                                 well[bitmap] = bitmap_cfg
 
