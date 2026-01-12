@@ -5231,6 +5231,20 @@
           "base_depth": 300.0,
           "track": "core"
         }
+      },
+      "cp001": {
+        "name": "bitmap",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
+        "top_depth": 0.0,
+        "base_depth": 100.0,
+        "track": "core"
+      },
+      "cp002": {
+        "name": "bitmap2",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
+        "top_depth": 100.0,
+        "base_depth": 300.0,
+        "track": "core"
       }
     },
     {
@@ -11605,34 +11619,62 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": [
-        "Member A1",
-        "Lower Formation A",
-        "Sequence 1",
-        "Carboniferous",
-        "Formation A",
-        "Upper Formation A"
-      ],
+      "visible_tops": {
+        "Upper Formation A": {
+          "level": "sequence",
+          "color": "#ff0000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Formation A": {
+          "level": "formation",
+          "color": "#ffcc00",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Sequence 1": {
+          "level": "sequence",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Member A1": {
+          "level": "member",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Carboniferous": {
+          "level": "formation",
+          "color": "#000000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Lower Formation A": {
+          "level": "sequence",
+          "color": "#0000ff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        }
+      },
       "visible_logs": [
-        "RT",
-        "PHI",
-        "RHOB",
         "GR",
-        "CAL"
+        "CAL",
+        "RHOB",
+        "RT",
+        "PHI"
       ],
       "visible_tracks": [
         "Facies",
-        "RT-RHOB",
         "core",
         "LithoFacies",
         "GR-CAL",
+        "f3",
         "RHOB-PHI",
-        "f3"
+        "RT-RHOB"
       ],
       "visible_wells": [
-        "Well B",
-        "Well A",
-        "Well C"
+        "Well A"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
