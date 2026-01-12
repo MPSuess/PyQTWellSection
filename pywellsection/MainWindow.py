@@ -537,6 +537,10 @@ class MainWindow(QMainWindow):
           MyProject.data/
               data.json
         """
+
+        if self.current_project_path:
+            old_path = self.current_project_path
+
         if not path and self.current_project_path:
             path = self.current_project_path
 
@@ -630,22 +634,32 @@ class MainWindow(QMainWindow):
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
             if os.path.exists(data_dir):
-                #shutil.rmtree(data_dir)
                 shutil.copy2(tmp_data_json, data_dir)
-#            os.rename(tmp_dir, data_dir)
-            os.remove(tmp_data_json)
-            os.removedirs(tmp_dir)
+            elif os.path.exists(old_path):
+                o_path, ofname = os.path.split(old_path)
+                oproject_stem = os.path.splitext(ofname)[0]
+                o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
+                #os.makedirs(data_dir, exist_ok=True)
+                shutil.copytree(o_data_path, data_dir)
+                shutil.copy2(tmp_data_json, data_dir)
+                os.remove(tmp_data_json)
+                os.removedirs(tmp_dir)
+
+
+            else:
+                os.rename(tmp_dir, data_dir)
 
 
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
             os.replace(tmp_pws, path)
 
-            # keep last save path if you want
-            self._last_project_path = path
+            # keep last saved path if you want
+            self._last_project_path = old_path
 
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
+
 
 
         except Exception as e:
