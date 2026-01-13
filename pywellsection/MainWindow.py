@@ -4,6 +4,7 @@
 ### This program is licensed according to EUPL1.2
 ### M. Peter Süss, University of Tuebingen, Copyright 2025, 2026
 ### v 12.04
+from os import removedirs
 
 ### TODO: reformulate the code to be more object oriented ... .
 # Move all well functions into a separate class.
@@ -60,6 +61,7 @@ from pywellsection.dialogs import LoadCoreBitmapDialog
 from pywellsection.dialogs import HelpDialog
 from pywellsection.dialogs import LoadBitmapForTrackDialog
 from pywellsection.dialogs import BitmapPlacementDialog
+from pywellsection.dialogs import TrackSettingsDialog
 from pathlib import Path
 from collections import OrderedDict
 
@@ -539,6 +541,8 @@ class MainWindow(QMainWindow):
               data.json
         """
 
+        old_path = None
+
         if self.current_project_path:
             old_path = self.current_project_path
 
@@ -572,6 +576,9 @@ class MainWindow(QMainWindow):
         # build project data payload (your actual content)
 
         wells = getattr(self.panel, "wells", [])
+        if len(wells) == 0:
+            LOG.debug("Project was not saved: no wells to save")
+            return
         LOG.debug(f"Saving {wells[0]}")
 
         for well in wells:
@@ -634,20 +641,27 @@ class MainWindow(QMainWindow):
 
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
-            if os.path.exists(data_dir):
-                shutil.copy2(tmp_data_json, data_dir)
-            elif os.path.exists(old_path):
-                o_path, ofname = os.path.split(old_path)
-                oproject_stem = os.path.splitext(ofname)[0]
-                o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
-                #os.makedirs(data_dir, exist_ok=True)
-                shutil.copytree(o_data_path, data_dir)
-                shutil.copy2(tmp_data_json, data_dir)
-                os.remove(tmp_data_json)
-                os.removedirs(tmp_dir)
+            if os.path.exists(data_dir) and old_path: # simple save ... .
+                if old_path == path: # simple save ... .
+                # just copy the new data.json into the existing data_dir
+                    shutil.copy2(tmp_data_json, data_dir)
+                    os.remove(tmp_data_json)
+                    os.removedirs(tmp_dir)
+                else: # .. save existing project under new name ...
+                        o_path, ofname = os.path.split(old_path)
+                        oproject_stem = os.path.splitext(ofname)[0]
+                        o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
+                        #os.makedirs(data_dir, exist_ok=True)
+                        if os.path.exists(data_dir): # a previous project was saved under this name
+                            shutil.rmtree(data_dir)
+                        shutil.copytree(o_data_path, data_dir)
+                        shutil.copy2(tmp_data_json, data_dir)
+                        os.remove(tmp_data_json)
+                        os.removedirs(tmp_dir)
 
-
-            else:
+            else: # a new project from scratch
+                if os.path.exists(data_dir): # a previous project was saved under this name
+                    shutil.rmtree(data_dir)
                 os.rename(tmp_dir, data_dir)
 
 
@@ -657,6 +671,7 @@ class MainWindow(QMainWindow):
 
             # keep last saved path if you want
             self._last_project_path = old_path
+            self.current_project_path = path
 
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
@@ -3267,6 +3282,7 @@ class MainWindow(QMainWindow):
           - logs under each track in the 'Tracks' folder
         """
         item = self.well_tree.itemAt(pos)
+        menu = QMenu(self)
         if item is None:
             return
 
@@ -3282,7 +3298,7 @@ class MainWindow(QMainWindow):
 
 
         if item is self.well_root_item:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_add_well = menu.addAction("Add new well...")
             act_edit_all_wells = menu.addAction("Edit all well settings ...")
@@ -3296,7 +3312,7 @@ class MainWindow(QMainWindow):
             return
 
         if parent is self.well_root_item:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             well_name = item.text(0)
             act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
@@ -3320,7 +3336,7 @@ class MainWindow(QMainWindow):
                 self._delete_well_from_project(well_name, confirm = True)
 
         if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
-            menu = QMenu(self)
+            #menu = QMenu(self)
             _, well_name, bitmap_key = data
             act_del = menu.addAction(f"Delete bitmap from well {well_name}")
             chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
@@ -3332,16 +3348,12 @@ class MainWindow(QMainWindow):
                         self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
             return
 
-
-
-
-
         # --- case 1: logs under "Logs" folder ---
         if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
             if not log_name:
                 return
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
@@ -3351,7 +3363,7 @@ class MainWindow(QMainWindow):
             bitmap_name = item.data(0, Qt.UserRole) or item.text(0)
             if not bitmap_name:
                 return
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_edit = menu.addAction(f"Edit bitmap position'{bitmap_name}'...")
             act_del = menu.addAction("Delete bitmap…")
 
@@ -3366,7 +3378,7 @@ class MainWindow(QMainWindow):
 
 
         if item is self.well_tops_folder:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_edit_stratigraphy = menu.addAction("Edit well tops ...")
             chosen = menu.exec_(global_pos)
@@ -3381,7 +3393,7 @@ class MainWindow(QMainWindow):
             if not track_name:
                 return
 
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_add_track = menu.addAction("Add new track...")
             act_add_disc_track = menu.addAction("Add new discrete track...")
@@ -3406,7 +3418,7 @@ class MainWindow(QMainWindow):
                     track_cfg = track
                     break
 
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             if track.get("type") == "discrete":
                 #menu = QMenu(self)
@@ -3432,7 +3444,9 @@ class MainWindow(QMainWindow):
                 act_add_log = menu.addAction(f"Add new log to track ...")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_edit:
-                    self._edit_log_display_settings(track_name)
+                    #self._edit_log_display_settings(track_name)
+                    self._action_edit_track_settings(track_name)
+                    menu.close()
                 elif chosen == act_add_log:
                     self._action_add_log_to_track()
             elif track.get("type") == "lithofacies":
@@ -3441,11 +3455,10 @@ class MainWindow(QMainWindow):
                 chosen = menu.exec_(global_pos)
                 if chosen == act_edit_lithofacies_settings:
                     self._action_edit_lithofacies_settings_for_track(track_name)
-            chosen = menu.exec_(global_pos)
 
+            chosen = menu.exec_(global_pos)
             if chosen == act_delete_track:
                 self._action_delete_track()
-
 
             return
 
@@ -3514,6 +3527,9 @@ class MainWindow(QMainWindow):
 
     def _on_window_tree_context_menu(self, pos=None):
         """Show a context menu for the tree."""
+
+        menu = QMenu(self)
+
         if pos is None:
             return
 
@@ -3524,14 +3540,14 @@ class MainWindow(QMainWindow):
         global_pos = self.window_tree.viewport().mapToGlobal(pos)
 
         if item == self.window_root:
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_add_window = menu.addAction("Add new well section window...")
             chosen = menu.exec_(global_pos)
             if chosen == act_add_window:
                 #print("Add new window...")
                 self._action_add_well_panel_dock()
         elif item.parent() == self.window_root:
-            menu = QMenu(self)
+            #menu = QMenu(self)
             window_name = item.text(0)
             act_delete_window = menu.addAction(f"Delete window '{window_name}'...")
             chosen = menu.exec_(global_pos)
@@ -3781,3 +3797,26 @@ class MainWindow(QMainWindow):
             return
 
         self._delete_bitmap_key_from_all_wells(key, confirm=confirm)
+
+    def _available_log_names(self) -> list[str]:
+        names = set()
+        for w in getattr(self, "all_wells", []) or []:
+            for ln in (w.get("logs", {}) or {}).keys():
+                names.add(ln)
+        return sorted(names)
+
+    def _action_edit_track_settings(self, track_name: str):
+        track = next((t for t in self.all_tracks if t.get("name") == track_name), None)
+        if track is None:
+            return
+
+        dlg = TrackSettingsDialog(self, track, available_logs=self._available_log_names())
+        if dlg.exec_() == QDialog.Accepted:
+            self.panel_settings["redraw_requested"]=False
+            # redraw / refresh
+            if hasattr(self, "_refresh_all_panels"):
+                self._refresh_all_panels()
+            if hasattr(self, "_populate_track_tree"):
+                self._populate_well_track_tree()
+            self.panel_settings["redraw_requested"] = True
+            self.panel.draw_panel()
