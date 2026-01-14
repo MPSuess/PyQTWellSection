@@ -5,9 +5,13 @@ from PyQt5.QtWidgets import (
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
-    QPushButton, QWidget, QListWidget
+    QPushButton, QWidget, QListWidget, QGroupBox,
 )
-
+# from PyQt5.QtWidgets import (
+#     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+#     QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit,
+#     QPlainTextEdit, QCheckBox, QSpinBox, QGroupBox, QFormLayout
+# )
 import numpy as np
 
 from matplotlib.figure import Figure
@@ -28,6 +32,11 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import QSize
 
 import os
+
+import pandas as pd
+
+
+
 
 class HelpDialog(QDialog):
     def __init__(self, parent=None, html: str = "", title: str = ""):
@@ -901,80 +910,6 @@ class LayoutSettingsDialog(QDialog):
                 float(self.spin_max_depth.value()))
 
 
-# class LogDisplaySettingsDialog(QDialog):
-#     """
-#     Dialog to edit display settings for a log mnemonic:
-#       - color
-#       - xscale: linear/log
-#       - direction: normal/reverse
-#       - xlim: min/max or blank for auto
-#     """
-#     def __init__(self, parent, log_name: str,
-#                  color: str, xscale: str, direction: str, xlim):
-#         super().__init__(parent)
-#         self.setWindowTitle(f"Display settings – {log_name}")
-#         self.resize(320, 200)
-#
-#         layout = QVBoxLayout(self)
-#         form = QFormLayout()
-#         layout.addLayout(form)
-#
-#         self.ed_color = QLineEdit(color or "", self)
-#         form.addRow("Color:", self.ed_color)
-#
-#         self.cmb_xscale = QComboBox(self)
-#         self.cmb_xscale.addItems(["linear", "log"])
-#         idx = self.cmb_xscale.findText(xscale or "linear")
-#         if idx < 0:
-#             idx = 0
-#         self.cmb_xscale.setCurrentIndex(idx)
-#         form.addRow("X scale:", self.cmb_xscale)
-#
-#         self.cmb_dir = QComboBox(self)
-#         self.cmb_dir.addItems(["normal", "reverse"])
-#         idx = self.cmb_dir.findText(direction or "normal")
-#         if idx < 0:
-#             idx = 0
-#         self.cmb_dir.setCurrentIndex(idx)
-#         form.addRow("Direction:", self.cmb_dir)
-#
-#         # xlim: two line edits, blank = auto
-#         xmin_txt = ""
-#         xmax_txt = ""
-#         if xlim is not None and len(xlim) == 2:
-#             try:
-#                 xmin_txt = str(xlim[0])
-#                 xmax_txt = str(xlim[1])
-#             except Exception:
-#                 pass
-#
-#         self.ed_xmin = QLineEdit(xmin_txt, self)
-#         self.ed_xmax = QLineEdit(xmax_txt, self)
-#         form.addRow("X min (blank = auto):", self.ed_xmin)
-#         form.addRow("X max (blank = auto):", self.ed_xmax)
-#
-#         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-#         btns.accepted.connect(self.accept)
-#         btns.rejected.connect(self.reject)
-#         layout.addWidget(btns)
-#
-#     def values(self):
-#         color = self.ed_color.text().strip() or None
-#         xscale = self.cmb_xscale.currentText()
-#         direction = self.cmb_dir.currentText()
-#
-#         xmin_txt = self.ed_xmin.text().strip()
-#         xmax_txt = self.ed_xmax.text().strip()
-#
-#         if xmin_txt and xmax_txt:
-#             try:
-#                 xlim = (float(xmin_txt), float(xmax_txt))
-#             except ValueError:
-#                 xlim = None
-#         else:
-#             xlim = None
-#
-#         return color, xscale, direction, xlim
 
 class LogDisplaySettingsDialog(QDialog):
     """
@@ -3527,9 +3462,6 @@ class FillEditDialog(QDialog):
             f"border: 1px solid #666; background-color: {c.name()};"
         )
 
-
-
-
 class TrackSettingsDialog(QDialog):
     """
     Edit a single track dict including 'fills'.
@@ -3653,3 +3585,666 @@ class TrackSettingsDialog(QDialog):
         if name:
             self.track["name"] = name
         self.accept()
+
+import numpy as np
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit
+)
+from PyQt5.QtCore import Qt
+
+
+class EditWellLogTableDialog_old(QDialog):
+    """
+    Edit one continuous well log (depth, value) in a table.
+    - two editable columns: Depth, Value
+    - add/remove rows
+    - sort by depth
+    - filter (simple substring match on either column)
+    """
+
+    def __init__(self, parent, well_name: str, log_name: str, depth, data):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit Log: {log_name} • {well_name}")
+        self.resize(760, 560)
+
+        self._well_name = well_name
+        self._log_name = log_name
+
+        depth = [] if depth is None else list(depth)
+        data = [] if data is None else list(data)
+        n = min(len(depth), len(data))
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit depth/value pairs. Use 'Sort by depth' before OK if you changed ordering.\n"
+            "Rows with non-numeric values will be rejected on OK.",
+            self
+        ))
+
+        # Filter row
+        row_filter = QHBoxLayout()
+        row_filter.addWidget(QLabel("Filter:", self))
+        self.ed_filter = QLineEdit(self)
+        self.ed_filter.setPlaceholderText("type to filter rows…")
+        row_filter.addWidget(self.ed_filter, 1)
+
+        self.btn_clear_filter = QPushButton("Clear", self)
+        row_filter.addWidget(self.btn_clear_filter)
+        layout.addLayout(row_filter)
+
+        # Table
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Depth", "Value"])
+        self.table.setRowCount(n)
+        for i in range(n):
+            self._set_cell(i, 0, depth[i])
+            self._set_cell(i, 1, data[i])
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table, 1)
+
+        # Buttons
+        row_btns = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected", self)
+        self.btn_sort = QPushButton("Sort by depth", self)
+        row_btns.addWidget(self.btn_add)
+        row_btns.addWidget(self.btn_del)
+        row_btns.addStretch(1)
+        row_btns.addWidget(self.btn_sort)
+        layout.addLayout(row_btns)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # connections
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+        self.btn_sort.clicked.connect(self._sort_by_depth)
+        self.ed_filter.textChanged.connect(self._apply_filter)
+        self.btn_clear_filter.clicked.connect(lambda: self.ed_filter.setText(""))
+
+        self._apply_filter()
+
+        self._result_depth = None
+        self._result_data = None
+
+    def _set_cell(self, r: int, c: int, v):
+        it = QTableWidgetItem("" if v is None else str(v))
+        it.setFlags(it.flags() | Qt.ItemIsEditable)
+        self.table.setItem(r, c, it)
+
+    def _add_row(self):
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        self._set_cell(r, 0, "")
+        self._set_cell(r, 1, "")
+        self.table.setCurrentCell(r, 0)
+
+    def _delete_selected_rows(self):
+        rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        for r in rows:
+            self.table.removeRow(r)
+
+    def _sort_by_depth(self):
+        # Read all numeric rows
+        rows = []
+        for r in range(self.table.rowCount()):
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+            if not d_txt and not v_txt:
+                continue
+            try:
+                d = float(d_txt.replace(",", "."))
+                v = float(v_txt.replace(",", "."))
+                rows.append((d, v))
+            except Exception:
+                # keep non-numeric rows at end unsorted
+                rows.append((np.nan, np.nan))
+
+        # Sort numeric first, preserve NaNs last
+        rows_num = [(d, v) for d, v in rows if np.isfinite(d) and np.isfinite(v)]
+        rows_nan = [(d, v) for d, v in rows if not (np.isfinite(d) and np.isfinite(v))]
+        rows_num.sort(key=lambda t: t[0])
+        rows_sorted = rows_num + rows_nan
+
+        # Refill table
+        self.table.setRowCount(len(rows_sorted))
+        for i, (d, v) in enumerate(rows_sorted):
+            self._set_cell(i, 0, "" if not np.isfinite(d) else d)
+            self._set_cell(i, 1, "" if not np.isfinite(v) else v)
+
+        self.table.resizeColumnsToContents()
+        self._apply_filter()
+
+    def _apply_filter(self):
+        s = (self.ed_filter.text() or "").strip().lower()
+        for r in range(self.table.rowCount()):
+            if not s:
+                self.table.setRowHidden(r, False)
+                continue
+            d = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").lower()
+            v = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()
+            self.table.setRowHidden(r, (s not in d and s not in v))
+
+    def _on_ok(self):
+        depth = []
+        data = []
+
+        for r in range(self.table.rowCount()):
+            # include hidden rows too: user can filter but still wants full dataset
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+
+            # allow skipping blank rows
+            if not d_txt and not v_txt:
+                continue
+
+            try:
+                d = float(d_txt.replace(",", "."))
+                v = float(v_txt.replace(",", "."))
+            except Exception:
+                QMessageBox.warning(
+                    self, "Invalid value",
+                    f"Row {r+1} contains non-numeric Depth/Value:\n"
+                    f"Depth='{d_txt}', Value='{v_txt}'"
+                )
+                return
+
+            depth.append(d)
+            data.append(v)
+
+        if len(depth) == 0:
+            res = QMessageBox.question(
+                self, "Empty log",
+                "This will result in an empty log. Continue?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        self._result_depth = depth
+        self._result_data = data
+        self.accept()
+
+    def result_arrays(self):
+        """Return (depth, data) as lists after OK, else (None, None)."""
+        return self._result_depth, self._result_data
+
+
+
+
+class EditWellLogTableDialog(QDialog):
+    """
+    Extended editor for one continuous well log (depth, value).
+
+    Added features:
+      - Basic stats (min/max/mean/count)
+      - Replace blanks/NULLs with -999 (either depth, value, or both)
+      - Replace a numeric value with another (e.g. -999 -> NaN like handling)
+      - Paste from clipboard (2-column: depth,value) with delimiter auto-detect
+      - Resample to uniform step (linear interpolation), optional depth range
+    """
+
+    COL_DEPTH = 0
+    COL_VALUE = 1
+
+    def __init__(self, parent, well_name: str, log_name: str, depth, data):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit Log: {log_name} • {well_name}")
+        self.resize(980, 680)
+
+        self._well_name = well_name
+        self._log_name = log_name
+
+        depth = [] if depth is None else list(depth)
+        data = [] if data is None else list(data)
+        n = min(len(depth), len(data))
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit depth/value pairs. Hidden rows (filter) are still included on OK.\n"
+            "Tips: Paste from clipboard, sort by depth, resample to step. Non-numeric rows are rejected on OK.",
+            self
+        ))
+
+        # --- filter + stats row ---
+        row_top = QHBoxLayout()
+        row_top.addWidget(QLabel("Filter:", self))
+        self.ed_filter = QLineEdit(self)
+        self.ed_filter.setPlaceholderText("type to filter rows…")
+        row_top.addWidget(self.ed_filter, 1)
+        self.btn_clear_filter = QPushButton("Clear", self)
+        row_top.addWidget(self.btn_clear_filter)
+
+        self.lbl_stats = QLabel("", self)
+        self.lbl_stats.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        row_top.addWidget(self.lbl_stats, 0)
+
+        layout.addLayout(row_top)
+
+        # --- table ---
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Depth", "Value"])
+        self.table.setRowCount(n)
+        for i in range(n):
+            self._set_cell(i, self.COL_DEPTH, depth[i])
+            self._set_cell(i, self.COL_VALUE, data[i])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table, 1)
+
+        # --- action buttons row ---
+        row_btns = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected", self)
+        self.btn_sort = QPushButton("Sort by depth", self)
+        self.btn_paste = QPushButton("Paste (Depth,Value)", self)
+
+        row_btns.addWidget(self.btn_add)
+        row_btns.addWidget(self.btn_del)
+        row_btns.addWidget(self.btn_sort)
+        row_btns.addWidget(self.btn_paste)
+        row_btns.addStretch(1)
+        layout.addLayout(row_btns)
+
+        # --- tools area: Replace / Resample ---
+        tools_row = QHBoxLayout()
+
+        # Replace NULL/blanks
+        grp_null = QGroupBox("NULL / blank handling", self)
+        gnl = QVBoxLayout(grp_null)
+        self.chk_blank_to_null = QCheckBox("Replace blanks/NULL with -999 (Value column)", self)
+        self.chk_blank_to_null.setChecked(False)
+        gnl.addWidget(self.chk_blank_to_null)
+
+        self.chk_depth_blank_to_null = QCheckBox("Replace blanks/NULL with -999 (Depth column)", self)
+        self.chk_depth_blank_to_null.setChecked(False)
+        gnl.addWidget(self.chk_depth_blank_to_null)
+
+        tools_row.addWidget(grp_null, 1)
+
+        # Replace numeric
+        grp_rep = QGroupBox("Replace numeric value", self)
+        grl = QFormLayout(grp_rep)
+        self.ed_rep_from = QLineEdit(self)
+        self.ed_rep_from.setPlaceholderText("from (e.g. -999)")
+        self.ed_rep_to = QLineEdit(self)
+        self.ed_rep_to.setPlaceholderText("to (e.g. 0)")
+        grl.addRow("Replace:", self.ed_rep_from)
+        grl.addRow("With:", self.ed_rep_to)
+        self.btn_apply_replace = QPushButton("Apply replace (Value)", self)
+        grl.addRow(self.btn_apply_replace)
+        tools_row.addWidget(grp_rep, 1)
+
+        # Resample
+        grp_rs = QGroupBox("Resample", self)
+        rsl = QFormLayout(grp_rs)
+        self.ed_step = QLineEdit(self)
+        self.ed_step.setPlaceholderText("step (e.g. 0.1524)")
+        self.ed_rs_top = QLineEdit(self)
+        self.ed_rs_top.setPlaceholderText("optional top depth")
+        self.ed_rs_base = QLineEdit(self)
+        self.ed_rs_base.setPlaceholderText("optional base depth")
+        rsl.addRow("Step:", self.ed_step)
+        rsl.addRow("Top:", self.ed_rs_top)
+        rsl.addRow("Base:", self.ed_rs_base)
+        self.btn_resample = QPushButton("Resample (linear)", self)
+        rsl.addRow(self.btn_resample)
+        tools_row.addWidget(grp_rs, 1)
+
+        layout.addLayout(tools_row)
+
+        # --- OK/Cancel ---
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # connections
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+        self.btn_sort.clicked.connect(self._sort_by_depth)
+        self.btn_paste.clicked.connect(self._paste_from_clipboard)
+
+        self.ed_filter.textChanged.connect(self._apply_filter)
+        self.btn_clear_filter.clicked.connect(lambda: self.ed_filter.setText(""))
+
+        self.chk_blank_to_null.stateChanged.connect(self._apply_null_replacement_if_checked)
+        self.chk_depth_blank_to_null.stateChanged.connect(self._apply_null_replacement_if_checked)
+
+        self.btn_apply_replace.clicked.connect(self._apply_replace_value)
+        self.btn_resample.clicked.connect(self._resample)
+
+        self.table.itemChanged.connect(lambda *_: self._update_stats())
+
+        self._result_depth = None
+        self._result_data = None
+
+        self._apply_filter()
+        self._update_stats()
+
+    # ---------------- table utils ----------------
+    def _set_cell(self, r: int, c: int, v):
+        it = QTableWidgetItem("" if v is None else str(v))
+        it.setFlags(it.flags() | Qt.ItemIsEditable)
+        self.table.setItem(r, c, it)
+
+    def _add_row(self):
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        self._set_cell(r, self.COL_DEPTH, "")
+        self._set_cell(r, self.COL_VALUE, "")
+        self.table.setCurrentCell(r, 0)
+        self._apply_filter()
+        self._update_stats()
+
+    def _delete_selected_rows(self):
+        rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        for r in rows:
+            self.table.removeRow(r)
+        self._apply_filter()
+        self._update_stats()
+
+    def _apply_filter(self):
+        s = (self.ed_filter.text() or "").strip().lower()
+        for r in range(self.table.rowCount()):
+            if not s:
+                self.table.setRowHidden(r, False)
+                continue
+            d = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").lower()
+            v = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()
+            self.table.setRowHidden(r, (s not in d and s not in v))
+
+    def _read_all_rows_numeric(self, allow_blank_rows=True):
+        """
+        Read all rows and return arrays (depth, value) as float, excluding fully blank rows.
+        Raises ValueError for non-numeric content.
+        """
+        depth = []
+        value = []
+        for r in range(self.table.rowCount()):
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+
+            if allow_blank_rows and (not d_txt and not v_txt):
+                continue
+
+            d = float(d_txt.replace(",", "."))
+            v = float(v_txt.replace(",", "."))
+            depth.append(d)
+            value.append(v)
+
+        return np.asarray(depth, dtype=float), np.asarray(value, dtype=float)
+
+    def _sort_by_depth(self):
+        rows = []
+        for r in range(self.table.rowCount()):
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+            if not d_txt and not v_txt:
+                continue
+            try:
+                d = float(d_txt.replace(",", "."))
+                v = float(v_txt.replace(",", "."))
+                rows.append((d, v))
+            except Exception:
+                rows.append((np.nan, np.nan))
+
+        rows_num = [(d, v) for d, v in rows if np.isfinite(d) and np.isfinite(v)]
+        rows_nan = [(d, v) for d, v in rows if not (np.isfinite(d) and np.isfinite(v))]
+        rows_num.sort(key=lambda t: t[0])
+        rows_sorted = rows_num + rows_nan
+
+        self.table.blockSignals(True)
+        self.table.setRowCount(len(rows_sorted))
+        for i, (d, v) in enumerate(rows_sorted):
+            self._set_cell(i, 0, "" if not np.isfinite(d) else d)
+            self._set_cell(i, 1, "" if not np.isfinite(v) else v)
+        self.table.blockSignals(False)
+
+        self.table.resizeColumnsToContents()
+        self._apply_filter()
+        self._update_stats()
+
+    # ---------------- stats ----------------
+    def _update_stats(self):
+        # compute stats on numeric rows only
+        vals = []
+        depths = []
+        for r in range(self.table.rowCount()):
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+            if not d_txt or not v_txt:
+                continue
+            try:
+                d = float(d_txt.replace(",", "."))
+                v = float(v_txt.replace(",", "."))
+                depths.append(d)
+                vals.append(v)
+            except Exception:
+                pass
+
+        if not vals:
+            self.lbl_stats.setText("count=0")
+            return
+
+        arr = np.asarray(vals, dtype=float)
+        self.lbl_stats.setText(
+            f"count={len(arr)}  min={np.nanmin(arr):.3g}  max={np.nanmax(arr):.3g}  mean={np.nanmean(arr):.3g}"
+        )
+
+    # ---------------- NULL replacement ----------------
+    def _apply_null_replacement_if_checked(self):
+        # apply to existing blanks/NULL tokens immediately
+        null_tokens = {"null", "nan", "none", "nil", "na", "n/a", "-"}
+        self.table.blockSignals(True)
+
+        if self.chk_blank_to_null.isChecked():
+            for r in range(self.table.rowCount()):
+                it = self.table.item(r, self.COL_VALUE)
+                txt = (it.text() if it else "").strip()
+                if (not txt) or (txt.lower() in null_tokens):
+                    self._set_cell(r, self.COL_VALUE, "-999")
+
+        if self.chk_depth_blank_to_null.isChecked():
+            for r in range(self.table.rowCount()):
+                it = self.table.item(r, self.COL_DEPTH)
+                txt = (it.text() if it else "").strip()
+                if (not txt) or (txt.lower() in null_tokens):
+                    self._set_cell(r, self.COL_DEPTH, "-999")
+
+        self.table.blockSignals(False)
+        self._update_stats()
+
+    # ---------------- replace numeric ----------------
+    def _apply_replace_value(self):
+        frm = (self.ed_rep_from.text() or "").strip()
+        to = (self.ed_rep_to.text() or "").strip()
+        if not frm or not to:
+            QMessageBox.information(self, "Replace", "Provide both 'from' and 'to' values.")
+            return
+        try:
+            v_from = float(frm.replace(",", "."))
+            v_to = float(to.replace(",", "."))
+        except Exception:
+            QMessageBox.warning(self, "Replace", "From/To must be numeric.")
+            return
+
+        self.table.blockSignals(True)
+        for r in range(self.table.rowCount()):
+            it = self.table.item(r, self.COL_VALUE)
+            if it is None:
+                continue
+            txt = it.text().strip()
+            if not txt:
+                continue
+            try:
+                v = float(txt.replace(",", "."))
+            except Exception:
+                continue
+            if v == v_from:
+                self._set_cell(r, self.COL_VALUE, str(v_to))
+        self.table.blockSignals(False)
+        self._update_stats()
+
+    # ---------------- paste ----------------
+    def _paste_from_clipboard(self):
+        cb = self.parent().clipboard() if hasattr(self.parent(), "clipboard") else None
+        if cb is None:
+            from PyQt5.QtWidgets import QApplication
+            cb = QApplication.clipboard()
+
+        text = cb.text()
+        if not text.strip():
+            QMessageBox.information(self, "Paste", "Clipboard is empty.")
+            return
+
+        # Try to parse 2 columns with pandas, delimiter auto-detect
+        try:
+            # normalize decimal comma -> dot is ambiguous; keep as is for now, we convert later
+            df = pd.read_csv(
+                pd.compat.StringIO(text),
+                sep=None,
+                engine="python",
+                header=None,
+                comment="#"
+            )
+        except Exception:
+            # fallback: whitespace split
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            rows = []
+            for ln in lines:
+                parts = ln.replace("\t", " ").split()
+                if len(parts) >= 2:
+                    rows.append(parts[:2])
+            df = pd.DataFrame(rows)
+
+        if df.shape[1] < 2:
+            QMessageBox.warning(self, "Paste", "Need at least 2 columns: Depth and Value.")
+            return
+
+        depth_col = df.iloc[:, 0].astype(str).tolist()
+        val_col = df.iloc[:, 1].astype(str).tolist()
+
+        start_row = self.table.rowCount()
+        self.table.blockSignals(True)
+        self.table.setRowCount(start_row + len(depth_col))
+        for i, (d, v) in enumerate(zip(depth_col, val_col)):
+            self._set_cell(start_row + i, self.COL_DEPTH, d)
+            self._set_cell(start_row + i, self.COL_VALUE, v)
+        self.table.blockSignals(False)
+
+        self._apply_filter()
+        self._update_stats()
+
+    # ---------------- resample ----------------
+    def _resample(self):
+        step_txt = (self.ed_step.text() or "").strip()
+        if not step_txt:
+            QMessageBox.information(self, "Resample", "Provide a step value.")
+            return
+        try:
+            step = float(step_txt.replace(",", "."))
+            if step <= 0:
+                raise ValueError()
+        except Exception:
+            QMessageBox.warning(self, "Resample", "Step must be a positive number.")
+            return
+
+        # Read numeric arrays
+        try:
+            d, v = self._read_all_rows_numeric(allow_blank_rows=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Resample", f"Cannot resample: non-numeric row exists.\n{e}")
+            return
+
+        if d.size < 2:
+            QMessageBox.information(self, "Resample", "Need at least 2 samples to resample.")
+            return
+
+        # Sort by depth
+        order = np.argsort(d)
+        d = d[order]
+        v = v[order]
+
+        # Optional range
+        top_txt = (self.ed_rs_top.text() or "").strip()
+        base_txt = (self.ed_rs_base.text() or "").strip()
+        top = d[0] if not top_txt else float(top_txt.replace(",", "."))
+        base = d[-1] if not base_txt else float(base_txt.replace(",", "."))
+        if base <= top:
+            QMessageBox.warning(self, "Resample", "Base must be greater than Top.")
+            return
+
+        new_d = np.arange(top, base + 0.5 * step, step)
+        new_v = np.interp(new_d, d, v)
+
+        # Replace table content
+        self.table.blockSignals(True)
+        self.table.setRowCount(len(new_d))
+        for i in range(len(new_d)):
+            self._set_cell(i, self.COL_DEPTH, f"{new_d[i]:.6f}")
+            self._set_cell(i, self.COL_VALUE, f"{new_v[i]:.6f}")
+        self.table.blockSignals(False)
+
+        self._apply_filter()
+        self._update_stats()
+
+    # ---------------- OK ----------------
+    def _on_ok(self):
+        # Apply blank->-999 if requested
+        self._apply_null_replacement_if_checked()
+
+        depth = []
+        data = []
+
+        for r in range(self.table.rowCount()):
+            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
+
+            if not d_txt and not v_txt:
+                continue
+
+            try:
+                d = float(d_txt.replace(",", "."))
+                v = float(v_txt.replace(",", "."))
+            except Exception:
+                QMessageBox.warning(
+                    self, "Invalid value",
+                    f"Row {r+1} contains non-numeric Depth/Value:\n"
+                    f"Depth='{d_txt}', Value='{v_txt}'"
+                )
+                return
+
+            depth.append(d)
+            data.append(v)
+
+        if len(depth) == 0:
+            res = QMessageBox.question(
+                self, "Empty log",
+                "This will result in an empty log. Continue?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        self._result_depth = depth
+        self._result_data = data
+        self.accept()
+
+    def result_arrays(self):
+        return self._result_depth, self._result_data

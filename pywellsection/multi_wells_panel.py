@@ -392,6 +392,13 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         depth = log_def["depth"]
         data = log_def["data"]
 
+
+
+        mask = [x > 0 for x in depth]
+
+
+
+
         # plotting depth: flattened if offset != 0
         depth_plot = [x - offset for x in depth]
 
@@ -427,6 +434,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             m = (x >= xmin) & (x <= xmax)
             x = x[m]
             y = y[m]
+
+        mask = [t > 0 for t in x]
+
 
         # --- plot ---
         if render in ("points", "scatter", "markers"):
