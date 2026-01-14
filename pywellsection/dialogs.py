@@ -5,8 +5,18 @@ from PyQt5.QtWidgets import (
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
-    QPushButton
+    QPushButton, QWidget, QListWidget
 )
+
+import numpy as np
+
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from PyQt5.QtGui import QPixmap, QImage, QIcon
+
+import matplotlib.cm as cm
+
+from matplotlib import colormaps
 
 from collections import OrderedDict
 
@@ -15,6 +25,8 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
 
 from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QSize
+
 import os
 
 class HelpDialog(QDialog):
@@ -1043,7 +1055,7 @@ class LogDisplaySettingsDialog(QDialog):
 
         # ---- Render mode (NEW) ----
         self.cmb_render = QComboBox(self)
-        self.cmb_render.addItems(["line", "points"])
+        self.cmb_render.addItems(["line", "points", "color"])
         self.cmb_render.setCurrentText(self._cfg_in.get("render", "line"))
         form.addRow("Render:", self.cmb_render)
 
@@ -1100,6 +1112,36 @@ class LogDisplaySettingsDialog(QDialog):
         self.spin_z.setRange(-100, 100)
         self.spin_z.setValue(int(self._cfg_in.get("zorder", 2)))
         form.addRow("Z-order:", self.spin_z)
+
+        #--- Colormap selection - --
+
+        # self.cmb_colorscale = QComboBox(self)
+        # self.cmb_colorscale.addItem("")  # means no colormap
+        # self.cmb_colorscale.addItems(list(colormaps))
+        # self.cmb_colorscale.setCurrentText(self._cfg_in.get("colorscale", ""))
+
+        #form.addRow("Color scale (optional):", self.cmb_colorscale)
+
+        self.cmb_cmap = self.build_colormap_combo(self._cfg_in.get("colorscale", ""))
+        form.addRow("Color scale:", self.cmb_cmap)
+
+        # --- Range ---
+        range_box = QHBoxLayout()
+        self.spin_vmin = QDoubleSpinBox(self)
+        self.spin_vmax = QDoubleSpinBox(self)
+        self.spin_vmin.setDecimals(2)
+        self.spin_vmax.setDecimals(2)
+        self.spin_vmin.setRange(-1e6, 1e6)
+        self.spin_vmax.setRange(-1e6, 1e6)
+        vmin, vmax = (self._cfg_in.get("colorrange", [np.nan, np.nan]) if self._cfg_in.get("colorrange") else [np.nan, np.nan])
+        if np.isfinite(vmin): self.spin_vmin.setValue(vmin)
+        if np.isfinite(vmax): self.spin_vmax.setValue(vmax)
+        range_box.addWidget(QLabel("Min:"))
+        range_box.addWidget(self.spin_vmin)
+        range_box.addWidget(QLabel("Max:"))
+        range_box.addWidget(self.spin_vmax)
+
+        form.addRow("Color range:", range_box)
 
         # OK/Cancel
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
@@ -1181,12 +1223,58 @@ class LogDisplaySettingsDialog(QDialog):
             out["marker"] = (self.ed_marker.text().strip() or ".")
             out["markersize"] = float(self.spin_ms.value())
 
+        #cs = self.cmb_colorscale.currentText().strip()
+        cs = self.cmb_cmap.currentText().strip()
+        out["colorscale"] = cs
+        out["colorrange"] = [self.spin_vmin.value(), self.spin_vmax.value()]
+
         self._result = out
         self.accept()
 
     def result_config(self) -> dict | None:
         return self._result
 
+    def colormap_icon(self, cmap_name: str, width=120, height=18) -> QIcon:
+        """
+        Create a horizontal colorbar icon for a matplotlib colormap.
+        """
+        fig = Figure(figsize=(width / 100, height / 100), dpi=100)
+        canvas = FigureCanvasAgg(fig)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_axis_off()
+
+        gradient = np.linspace(0, 1, 256).reshape(1, -1)
+        ax.imshow(gradient, aspect="auto", cmap=cm.get_cmap(cmap_name))
+
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        img = QImage(buf, buf.shape[1], buf.shape[0], QImage.Format_RGBA8888)
+        pix = QPixmap.fromImage(img).scaled(width, height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        return QIcon(pix)
+
+    def build_colormap_combo(self, current=None) -> QComboBox:
+        cmb = QComboBox()
+        cmb.setIconSize(QSize(120, 18))
+        cmb.setMinimumWidth(160)
+
+        # "None" option (classic single-color)
+        cmb.addItem("None")
+        cmb.setItemData(0, None)
+
+        #cmaps = sorted(m for m in cm.cmap_d if not m.endswith("_r"))
+        cmaps = list(colormaps)
+
+        for name in cmaps:
+            icon = self.colormap_icon(name)
+            cmb.addItem(icon, name)
+            cmb.setItemData(cmb.count() - 1, name)
+
+        if current:
+            idx = cmb.findText(current)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+
+        return cmb
 
 class AllTopsTableDialog(QDialog):
     """
@@ -3248,3 +3336,320 @@ class BitmapPlacementDialog(QDialog):
         # optionally apply immediately and redraw
         self.apply_to_model()
         self._active_pick = None
+
+
+class FillEditDialog(QDialog):
+    """
+    Edit one fill rule dict.
+
+    Supported types:
+      - to_value:    log + value + where
+      - to_minmax:   log + side(min/max)
+      - between_logs:left/right + where
+    """
+    def __init__(self, parent, available_logs, fill_dict=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Fill")
+        self.resize(420, 260)
+
+        self.selected_color = "#cccccc"
+
+        self.available_logs = list(available_logs)
+        self._fill = dict(fill_dict or {})
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_type = QComboBox(self)
+        self.cmb_type.addItems(["to_value", "to_minmax", "between_logs"])
+        self.cmb_type.setCurrentText(self._fill.get("type", "to_value"))
+        form.addRow("Type:", self.cmb_type)
+
+        self.cmb_log = QComboBox(self)
+        self.cmb_log.addItems(self.available_logs)
+        self.cmb_log.setCurrentText(self._fill.get("log", self.available_logs[0] if self.available_logs else ""))
+        form.addRow("Log:", self.cmb_log)
+
+        self.spin_value = QDoubleSpinBox(self)
+        self.spin_value.setDecimals(6)
+        self.spin_value.setRange(-1e12, 1e12)
+        self.spin_value.setValue(float(self._fill.get("value", 0.0)))
+        form.addRow("Value:", self.spin_value)
+
+        self.cmb_where_val = QComboBox(self)
+        self.cmb_where_val.addItems(["greater", "less"])
+        self.cmb_where_val.setCurrentText(self._fill.get("where", "greater"))
+        form.addRow("Where (to_value):", self.cmb_where_val)
+
+        self.cmb_side = QComboBox(self)
+        self.cmb_side.addItems(["min", "max"])
+        self.cmb_side.setCurrentText(self._fill.get("side", "min"))
+        form.addRow("Side (to_minmax):", self.cmb_side)
+
+        self.cmb_left = QComboBox(self)
+        self.cmb_left.addItems(self.available_logs)
+        self.cmb_left.setCurrentText(self._fill.get("log_left", self.available_logs[0] if self.available_logs else ""))
+        form.addRow("Left log:", self.cmb_left)
+
+        self.cmb_right = QComboBox(self)
+        self.cmb_right.addItems(self.available_logs)
+        self.cmb_right.setCurrentText(self._fill.get("log_right", self.available_logs[0] if self.available_logs else ""))
+        form.addRow("Right log:", self.cmb_right)
+
+        self.cmb_where_between = QComboBox(self)
+        self.cmb_where_between.addItems(["all", "left_greater", "right_greater"])
+        self.cmb_where_between.setCurrentText(self._fill.get("where", "all"))
+        form.addRow("Where (between):", self.cmb_where_between)
+
+        # Facecolor with picker + preview
+        #self.ed_face = QLineEdit(self)
+        #self.ed_face.setText(self._fill.get("facecolor", "#cccccc"))
+
+        self.cmb_face = QComboBox(self)
+        face_select = ["color"] + self.available_logs
+        self.cmb_face.addItems(face_select)
+
+        self.btn_pick_face = QPushButton("Pick…", self)
+
+        self.lbl_swatch = QLabel(self)
+        self.lbl_swatch.setFixedSize(26, 18)
+        self.lbl_swatch.setStyleSheet("border: 1px solid #666;")
+        self._update_swatch(self.selected_color)
+
+        row_face = QHBoxLayout()
+        row_face.addWidget(self.cmb_face)
+        row_face.addWidget(self.btn_pick_face)
+        row_face.addWidget(self.lbl_swatch)
+
+        wrap = QWidget(self)
+        wrap.setLayout(row_face)
+        form.addRow("Facecolor:", wrap)
+
+        self.btn_pick_face.clicked.connect(self._pick_facecolor)
+        #self.ed_face.textChanged.connect(lambda _: self._update_swatch(self.ed_face.text().strip()))
+
+        self.ed_hatch = QLineEdit(self)
+        self.ed_hatch.setText("" if self._fill.get("hatch") is None else str(self._fill.get("hatch")))
+        form.addRow("Hatch (optional):", self.ed_hatch)
+
+        self.spin_alpha = QDoubleSpinBox(self)
+        self.spin_alpha.setDecimals(2)
+        self.spin_alpha.setRange(0.0, 1.0)
+        self.spin_alpha.setValue(float(self._fill.get("alpha", 0.35)))
+        form.addRow("Alpha:", self.spin_alpha)
+
+        self.spin_z = QDoubleSpinBox(self)
+        self.spin_z.setDecimals(2)
+        self.spin_z.setRange(-10.0, 10.0)
+        self.spin_z.setValue(float(self._fill.get("zorder", 0.6)))
+        form.addRow("Z-order:", self.spin_z)
+
+        self.lbl_hint = QLabel("", self)
+        self.lbl_hint.setWordWrap(True)
+        layout.addWidget(self.lbl_hint)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.cmb_type.currentTextChanged.connect(self._update_visibility)
+        self._update_visibility(self.cmb_type.currentText())
+
+    def _update_visibility(self, t):
+        t = (t or "").strip().lower()
+        is_to_value = (t == "to_value")
+        is_to_minmax = (t == "to_minmax")
+        is_between = (t == "between_logs")
+
+        self.cmb_log.setEnabled(is_to_value or is_to_minmax)
+        self.spin_value.setEnabled(is_to_value)
+        self.cmb_where_val.setEnabled(is_to_value)
+        self.cmb_side.setEnabled(is_to_minmax)
+
+        self.cmb_left.setEnabled(is_between)
+        self.cmb_right.setEnabled(is_between)
+        self.cmb_where_between.setEnabled(is_between)
+
+        if is_to_minmax:
+            self.lbl_hint.setText("to_minmax fills between the curve and its displayed x-limit (min/max) for this track.")
+        else:
+            self.lbl_hint.setText("")
+
+    def fill_dict(self) -> dict:
+        t = self.cmb_type.currentText().strip()
+
+        d = {
+            "type": t,
+            "facecolor": self.selected_color or "#cccccc",
+            "facetype": self.cmb_face.currentText(),
+            "alpha": float(self.spin_alpha.value()),
+            "hatch": (self.ed_hatch.text().strip() or None),
+            "zorder": float(self.spin_z.value()),
+        }
+
+        if t == "to_value":
+            d.update({
+                "log": self.cmb_log.currentText().strip(),
+                "value": float(self.spin_value.value()),
+                "where": self.cmb_where_val.currentText().strip(),
+            })
+        elif t == "to_minmax":
+            d.update({
+                "log": self.cmb_log.currentText().strip(),
+                "side": self.cmb_side.currentText().strip(),  # min/max
+            })
+        else:  # between_logs
+            d.update({
+                "log_left": self.cmb_left.currentText().strip(),
+                "log_right": self.cmb_right.currentText().strip(),
+                "where": self.cmb_where_between.currentText().strip(),
+            })
+
+        return d
+
+    def _pick_facecolor(self):
+        #initial = QColor(self.ed_face.text().strip() or "#cccccc")
+        initial = QColor(self.selected_color)
+        col = QColorDialog.getColor(initial, self, "Select fill color")
+        if not col.isValid():
+            return
+        #self.ed_face.setText(col.name())  # "#RRGGBB"
+        self.selected_color = col.name()
+        self._update_swatch(self.selected_color)
+
+    def _update_swatch(self, color_text: str):
+        c = QColor(color_text) if color_text else QColor("#cccccc")
+        if not c.isValid():
+            c = QColor("#cccccc")
+        self.lbl_swatch.setStyleSheet(
+            f"border: 1px solid #666; background-color: {c.name()};"
+        )
+
+
+
+
+class TrackSettingsDialog(QDialog):
+    """
+    Edit a single track dict including 'fills'.
+    """
+    def __init__(self, parent, track: dict, available_logs):
+        super().__init__(parent)
+        self.setWindowTitle("Track Settings")
+        self.resize(640, 420)
+
+        self.track = track
+        self.available_logs = list(available_logs)
+
+        layout = QVBoxLayout(self)
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.ed_name = QLineEdit(self)
+        self.ed_name.setText(track.get("name", "Track"))
+        form.addRow("Track name:", self.ed_name)
+
+        # --- fills list ---
+        self.list_fills = QListWidget(self)
+        layout.addWidget(self.list_fills)
+
+        btn_row = QHBoxLayout()
+        self.btn_add = QPushButton("Add…", self)
+        self.btn_edit = QPushButton("Edit…", self)
+        self.btn_del = QPushButton("Delete", self)
+        self.btn_up = QPushButton("Up", self)
+        self.btn_down = QPushButton("Down", self)
+        btn_row.addWidget(self.btn_add)
+        btn_row.addWidget(self.btn_edit)
+        btn_row.addWidget(self.btn_del)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.btn_up)
+        btn_row.addWidget(self.btn_down)
+        layout.addLayout(btn_row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        layout.addWidget(btns)
+
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+
+        self.btn_add.clicked.connect(self._add_fill)
+        self.btn_edit.clicked.connect(self._edit_fill)
+        self.btn_del.clicked.connect(self._delete_fill)
+        self.btn_up.clicked.connect(lambda: self._move_fill(-1))
+        self.btn_down.clicked.connect(lambda: self._move_fill(+1))
+
+        self._refresh_fill_list()
+
+    def _refresh_fill_list(self):
+        self.list_fills.clear()
+        fills = self.track.get("fills", []) or []
+        for f in fills:
+            self.list_fills.addItem(self._fill_to_text(f))
+
+    def _fill_to_text(self, f: dict) -> str:
+        t = (f.get("type") or "").lower()
+        if t == "to_value":
+            return f"to_value: {f.get('log')} vs {f.get('value')} ({f.get('where','greater')})"
+        if t == "to_minmax":
+            return f"to_minmax: {f.get('log')} → {f.get('side','min')}"
+        if t == "between_logs":
+            return f"between: {f.get('log_left')} ↔ {f.get('log_right')} ({f.get('where','all')})"
+        return f"fill: {t}"
+
+    def _add_fill(self):
+        if not self.available_logs:
+            QMessageBox.information(self, "Fills", "No logs available for fills.")
+            return
+        dlg = FillEditDialog(self, self.available_logs, fill_dict=None)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        self.track.setdefault("fills", []).append(dlg.fill_dict())
+        self._refresh_fill_list()
+
+    def _edit_fill(self):
+        row = self.list_fills.currentRow()
+        if row < 0:
+            return
+        fills = self.track.get("fills", []) or []
+        if row >= len(fills):
+            return
+        dlg = FillEditDialog(self, self.available_logs, fill_dict=fills[row])
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        fills[row] = dlg.fill_dict()
+        self.track["fills"] = fills
+        self._refresh_fill_list()
+        self.list_fills.setCurrentRow(row)
+
+    def _delete_fill(self):
+        row = self.list_fills.currentRow()
+        if row < 0:
+            return
+        fills = self.track.get("fills", []) or []
+        if row >= len(fills):
+            return
+        del fills[row]
+        self.track["fills"] = fills
+        self._refresh_fill_list()
+
+    def _move_fill(self, delta: int):
+        row = self.list_fills.currentRow()
+        if row < 0:
+            return
+        fills = self.track.get("fills", []) or []
+        new_row = row + delta
+        if new_row < 0 or new_row >= len(fills):
+            return
+        fills[row], fills[new_row] = fills[new_row], fills[row]
+        self.track["fills"] = fills
+        self._refresh_fill_list()
+        self.list_fills.setCurrentRow(new_row)
+
+    def _on_ok(self):
+        name = self.ed_name.text().strip()
+        if name:
+            self.track["name"] = name
+        self.accept()
