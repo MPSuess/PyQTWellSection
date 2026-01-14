@@ -62,6 +62,7 @@ from pywellsection.dialogs import HelpDialog
 from pywellsection.dialogs import LoadBitmapForTrackDialog
 from pywellsection.dialogs import BitmapPlacementDialog
 from pywellsection.dialogs import TrackSettingsDialog
+from pywellsection.dialogs import EditWellLogTableDialog
 from pathlib import Path
 from collections import OrderedDict
 
@@ -1294,7 +1295,7 @@ class MainWindow(QMainWindow):
                         | Qt.ItemIsEnabled
                     )
                     # store mnemonic for possible future actions
-                    log_item.setData(0, Qt.UserRole, log_name)
+                    log_item.setData(0, Qt.UserRole, ("well_log",well_name , log_name))
                     parent_for_logs.addChild(log_item)
 
             # --- lithofacies ---
@@ -3280,11 +3281,8 @@ class MainWindow(QMainWindow):
         data = item.data(0, Qt.UserRole)
         parent_data = parent.data(0, Qt.UserRole) if parent else None
 
-        print (data)
-        print (parent_data)
-
-
-
+        print (item, data)
+        print (parent, parent_data)
 
         if item is self.well_root_item:
             #menu = QMenu(self)
@@ -3337,6 +3335,16 @@ class MainWindow(QMainWindow):
                         self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
             return
 
+        if isinstance(data, tuple) and len(data) == 3 and data[0] == "well_log":
+            _, well_name, log_name = data
+
+            act_edit = menu.addAction("Edit log data (table)…")
+            chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
+            if chosen == act_edit:
+                self._edit_well_log_table(well_name, log_name)
+            return
+
+
         # --- case 1: logs under "Logs" folder ---
         if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
@@ -3362,9 +3370,6 @@ class MainWindow(QMainWindow):
             if chosen == act_del:
                 for well in self.all_wells:
                     self._delete_bitmap_from_well(well.get("name"), bitmap_name, confirm=True)
-
-
-
 
         if item is self.well_tops_folder:
             #menu = QMenu(self)
@@ -3450,6 +3455,9 @@ class MainWindow(QMainWindow):
                 self._action_delete_track()
 
             return
+
+
+
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
 
@@ -3806,3 +3814,40 @@ class MainWindow(QMainWindow):
                 self._populate_well_track_tree()
             self.panel_settings["redraw_requested"] = True
             self.panel.draw_panel()
+
+    def _edit_well_log_table(self, well_name: str, log_name: str):
+        wells = getattr(self, "all_wells", []) or []
+        well = next((w for w in wells if w.get("name") == well_name), None)
+        if well is None:
+            QMessageBox.warning(self, "Edit log", f"Well '{well_name}' not found.")
+            return
+
+        logs = well.get("logs", {}) or {}
+        log_def = logs.get(log_name)
+        if log_def is None:
+            QMessageBox.warning(self, "Edit log", f"Log '{log_name}' not found in well '{well_name}'.")
+            return
+
+        depth = log_def.get("depth", [])
+        data = log_def.get("data", [])
+
+        dlg = EditWellLogTableDialog(self, well_name, log_name, depth, data)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_depth, new_data = dlg.result_arrays()
+        if new_depth is None:
+            return
+
+        # Update model
+        log_def["depth"] = new_depth
+        log_def["data"] = new_data
+        logs[log_name] = log_def
+        well["logs"] = logs
+
+        # Redraw + rebuild tree if you show log stats/availability
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
