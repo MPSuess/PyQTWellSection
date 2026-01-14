@@ -301,19 +301,13 @@ def draw_multi_wells_panel_on_figure(
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
-            # if ti == 0:
-            #     base_ax.set_ylabel("Depth (m)", labelpad=8)
-            #     base_ax.tick_params(axis="y", labelleft=True)
-            #     if depth_formatter is not None:
-            #         base_ax.yaxis.set_major_formatter(depth_formatter)
-            # else:
-            #
+
             base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
-            mid_track = (n_tracks+1) // 2
+            mid_track = (n_tracks) // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), y=10, pad=5, fontsize=10)
+                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
 
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
@@ -1025,7 +1019,7 @@ def add_tops_and_correlations(
                 y0, y1 = main_ax.get_ylim()
                 depth_max = max(y0, y1)
                 depth_range = abs(y0 - y1) or 1.0
-                thickness = depth_range * 0.01
+                thickness = depth_range * 0.001
                 open_top = deepest_formation
                 open_bottom = min(deepest_formation + thickness, depth_max)
                 if open_bottom > open_top:
