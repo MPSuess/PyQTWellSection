@@ -1732,6 +1732,7 @@ class WellPanelDock(QDockWidget):
     def set_title(self, title):
         self.title = title
         self.setWindowTitle(title)
+        self.panel.panel_title = title
         self.setObjectName(title)
 
 
