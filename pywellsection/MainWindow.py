@@ -216,6 +216,11 @@ class MainWindow(QMainWindow):
         # --- File menu ---
         file_menu = menubar.addMenu("&File")
 
+        act_new = QAction("New project…", self)
+        act_new.setShortcut("Ctrl+N")
+        act_new.triggered.connect(lambda: self._new_project(confirm=True))
+        file_menu.addAction(act_new)
+
         act_open = QAction("Open project...", self)
         act_open.setShortcut("Ctrl+O")
         act_open.triggered.connect(self._project_file_open)
@@ -1426,6 +1431,9 @@ class MainWindow(QMainWindow):
         # delete all logs under the folder and rebuild from scratch
         ### Remember current selection by name
         ### First continous Logs
+
+        print ("_populate_well_log_tree")
+
         self.well_tree.blockSignals(True)
         prev_selected = set()
         ### Start with populating the continous logs tree ###
@@ -1438,24 +1446,23 @@ class MainWindow(QMainWindow):
         root.takeChildren()
 
         log_names = set()
-        if self.all_logs is None:
-            return
-        for log in self.all_logs:
-            name = log
-            if name:
-                log_names.add(name)
-        for name in sorted(log_names):
-            it = QTreeWidgetItem([name])
-            it.setFlags(
-                it.flags()
-                | Qt.ItemIsUserCheckable
-                | Qt.ItemIsSelectable
-                | Qt.ItemIsEnabled
-            )
-            it.setData(0, Qt.UserRole, name)
-            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
-            it.setCheckState(0, state)
-            root.addChild(it)
+        if self.all_logs:
+            for log in self.all_logs:
+                name = log
+                if name:
+                    log_names.add(name)
+            for name in sorted(log_names):
+                it = QTreeWidgetItem([name])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                it.setData(0, Qt.UserRole, name)
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                root.addChild(it)
 
         ### Second discrete Logs ###
         prev_selected = set()
@@ -1493,7 +1500,6 @@ class MainWindow(QMainWindow):
             if it.checkState(0) == Qt.Checked:
                 prev_selected.add(it.data(0, Qt.UserRole))
         root.takeChildren()
-
         bmp_names = set()
         if self.all_bitmaps:
             for bmp in self.all_bitmaps:
@@ -1512,7 +1518,6 @@ class MainWindow(QMainWindow):
                 state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
                 it.setCheckState(0, state)
                 root.addChild(it)
-
 
         self.well_tree.blockSignals(False)
         self._rebuild_visible_logs_from_tree()
@@ -3810,7 +3815,7 @@ class MainWindow(QMainWindow):
             # redraw / refresh
             if hasattr(self, "_refresh_all_panels"):
                 self._refresh_all_panels()
-            if hasattr(self, "_populate_track_tree"):
+            if hasattr(self, "_populate_well_track_tree"):
                 self._populate_well_track_tree()
             self.panel_settings["redraw_requested"] = True
             self.panel.draw_panel()
@@ -3851,3 +3856,159 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
+    def _new_project(self, confirm: bool = True):
+        """
+        Reset the application state for a new project:
+          - clears all data (wells/tracks/stratigraphy)
+          - closes/removes all extra panel docks
+          - resets central panel state/filters
+          - rebuilds trees and redraws
+
+        Call this from File → New project...
+        """
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "New project",
+                "Start a new project?\n\n"
+                "This will clear wells, logs, tops, tracks, bitmaps and close all panel windows.\n"
+                "Unsaved changes will be lost.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        # ---- 1) clear core project data ----
+        wells, tracks, stratigraphy = create_dummy_data()
+
+        wells.test_class()
+
+        self.all_wells = wells
+        self.all_stratigraphy = stratigraphy
+        self.all_tracks = tracks
+
+        self.all_logs = None
+        self.all_discrete_logs = None
+        self.all_bitmaps = None
+
+        self.well_gap_factor = 3.0
+        self.track_gap_factor = 1.0
+        self.track_width = 1.0
+        self.vertical_scale = 2.0
+
+        window_name = "Well Section 1"
+
+        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+                               "vertical_scale": self.vertical_scale
+                               }
+
+        # Optional: clear any additional project-level state
+        for attr in (
+            "_last_project_path",
+            "_project_path",
+            "_project_name",
+        ):
+            if hasattr(self, attr):
+                setattr(self, attr, None)
+
+        # ---- 2) close/remove all docked panels ----
+        # Keep central panel; remove all dock panels
+        for dock in list(getattr(self, "WindowList", []) or []):
+            try:
+                self.removeDockWidget(dock)
+            except Exception:
+                pass
+            try:
+                dock.setParent(None)
+                dock.deleteLater()
+            except Exception:
+                pass
+
+        self.WindowList = []
+
+        self.dock = WellPanelDock(
+            parent=self,
+            wells=self.all_wells,
+            tracks=self.all_tracks,
+            stratigraphy=self.all_stratigraphy,
+            panel_settings=self.panel_settings
+        )
+        self.dock.activated.connect(self._on_panel_activated)
+
+        # self.tabifiedDockWidgetActivated.connect(self.window_activate)
+
+        self.dock.panel.active_panel = True
+        self.panel = self.dock.panel
+
+        self.WindowList = []
+
+        self.active_window = self.dock
+
+        self.WindowList.append(self.active_window)
+
+
+
+        # ---- 3) reset central panel view state/filters ----
+        if hasattr(self, "panel") and self.panel is not None:
+            p = self.panel
+            p.wells = self.all_wells
+            p.tracks = self.all_tracks
+            p.stratigraphy = self.all_stratigraphy
+
+            # clear common per-panel state
+            for attr, default in (
+                ("visible_wells", None),
+                ("visible_tracks", None),
+                ("visible_logs", None),
+                ("visible_bitmaps", None),
+                ("visible_discrete_logs", None),
+                ("visible_tops", None),
+                ("flatten_depths", None),
+                ("depth_window", None),
+                ("highlight_top", None),
+                ("_active_pick_context", None),
+                ("_bitmap_pick_ctx", None),
+                ("_in_dialog_pick_mode", False),
+            ):
+                if hasattr(p, attr):
+                    setattr(p, attr, default)
+
+            # disconnect any lingering mpl event connections (optional safety)
+            for cid_attr in ("_dialog_pick_cid", "_motion_pick_cid", "_bitmap_pick_cid", "_scroll_cid"):
+                if hasattr(p, cid_attr):
+                    cid = getattr(p, cid_attr)
+                    if cid is not None and hasattr(p, "canvas"):
+                        try:
+                            p.canvas.mpl_disconnect(cid)
+                        except Exception:
+                            pass
+                    setattr(p, cid_attr, None)
+
+            # re-enable desired event handlers if you use them
+            if hasattr(p, "enable_track_mouse_scrolling"):
+                p.enable_track_mouse_scrolling()
+
+            # redraw (empty)
+            if hasattr(p, "draw_panel"):
+                p.draw_panel()
+
+        # ---- 4) rebuild UI trees ----
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_well_track_tree"):
+            self._populate_well_track_tree()
+        if hasattr(self, "_populate_well_tops_tree"):
+            self._populate_well_tops_tree()
+        if hasattr(self, "_populate_window_tree"):
+            self._populate_window_tree()
+        if hasattr(self, "_populate_well_log_tree"):
+            self._populate_well_log_tree()
+
+        # ---- 5) refresh panels if you prefer centralized refresh ----
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+
+        # Optional: update window title
+        self.setWindowTitle("PyWellSection — New Project")
