@@ -159,6 +159,14 @@ def draw_multi_wells_panel_on_figure(
     top_phys = max(ref_depths)
     bottom_phys = max(bottoms)
 
+    for w in selected_wells:
+        for log_name, log_def in w.get("logs", {}).items():
+            depth = log_def["depth"]
+            min_data_depth = np.nanmin(depth)
+            max_data_depth = np.nanmax(depth)
+            if max_data_depth < top_phys: top_phys = max_data_depth
+            if min_data_depth > bottom_phys: bottom_phys = min_data_depth
+
     # ---- 2) Compute per-well offsets and global plotting range ----
     # offset_i is in TRUE depth coordinates (e.g. formation top depth)
     offsets = []
@@ -173,6 +181,10 @@ def draw_multi_wells_panel_on_figure(
     gobal_mid_plot = 0.0
 
 
+
+
+
+
     if depth_window is not None:
         #print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
@@ -181,6 +193,7 @@ def draw_multi_wells_panel_on_figure(
             global_top_plot = top_depth_window + offsets[0]
             global_bottom_plot = bottom_depth_window + offsets[0]
     else:
+        print ("does this ever happen?")
         top_plot_candidates = []
         bottom_plot_candidates = []
         for off in offsets:
@@ -193,6 +206,17 @@ def draw_multi_wells_panel_on_figure(
         global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 #    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
+
+    if offsets[0] != 0.0:
+        w = selected_wells[0]
+        top_ref_depth = w["reference_depth"] - offsets[0]
+        bottom_ref_depth = top_ref_depth + w["total_depth"]
+        print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
+        global_top_plot = min(top_ref_depth, global_top_plot)
+        global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
+
+
+    print(f"global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
 
 
 
@@ -345,6 +369,8 @@ def draw_multi_wells_panel_on_figure(
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
 
+    print("now axes limits are:",axes[0].get_ylim())
+
     return axes, well_main_axes
 
 
@@ -484,9 +510,6 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         curve_cache=curve_cache,
         track=track
     )
-
-
-
 
 def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs = None):
     """

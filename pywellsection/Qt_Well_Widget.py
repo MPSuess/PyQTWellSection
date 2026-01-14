@@ -533,12 +533,12 @@ class WellPanelWidget(QWidget):
         # layout is [Depth, W0T0, W0T1, ..., spacer, Depth, W1T0, W1T1, ..., spacer, ...]
         for wi in range(n_wells):
             first_track_idx = wi * (n_tracks + 2)
-            print ("first track idx:", first_track_idx)
+            #print ("first track idx:", first_track_idx)
             for ti in range(n_tracks):
                 ax_index = first_track_idx + ti +1
                 if ax_index < n_wells * (n_tracks +2):
                     ax = self.axes[first_track_idx + ti+1]
-                    print ("added ax number:", first_track_idx + ti+1 )
+                    #print ("added ax number:", first_track_idx + ti+1 )
                     self.axis_index[ax] = (wi, ti)
 
     def _connect_ylim_sync(self):
@@ -673,9 +673,10 @@ class WellPanelWidget(QWidget):
         if top_name not in tops:
             return
 
-        if len(self._flatten_depths) > 0:
-        #if self._flatten_depths is not None:
-            flatten_depth = self._flatten_depths[wi]
+        if self._flatten_depths is not None:
+            if len(self._flatten_depths) > 0:
+                flatten_depth = self._flatten_depths[wi]
+            else: flatten_depth = 0
         else:
             flatten_depth = 0
 
@@ -711,7 +712,7 @@ class WellPanelWidget(QWidget):
 
         txt = main_ax.text(
             x_label_pos,
-            depth- flatten_depth,
+            depth-flatten_depth,
             top_name,
             va="center",
             ha="left",
