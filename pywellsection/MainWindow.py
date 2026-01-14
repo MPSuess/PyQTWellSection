@@ -527,8 +527,6 @@ class MainWindow(QMainWindow):
         LOG.debug(f"Saving project as {path}")
         self._project_file_save(path)
 
-
-
     def _project_file_save(self, path = None):
         """
         Save project as:
@@ -749,7 +747,6 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
-
 
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1838,8 +1835,6 @@ class MainWindow(QMainWindow):
         self.panel.set_visible_tops(visible if visible else None)
         self.panel.draw_panel()
 
-    #        self.panel.set_visible_tops(visible)
-
     def _rebuild_visible_logs_from_tree(self):
         """Collect checked logs and inform the panel."""
         root = self.continous_logs_folder
@@ -2671,8 +2666,6 @@ class MainWindow(QMainWindow):
                 return window
         return None
 
-    from PyQt5.QtWidgets import QMessageBox
-
     def _action_load_bitmap_into_bitmap_track(self, track_name: str):
         """
         Load an image and assign it to a selected well under the bitmap key
@@ -2871,7 +2864,6 @@ class MainWindow(QMainWindow):
         )
 
         dock.activated.connect(self._on_panel_activated)
-
         dock.panel.visible_tops = None
         dock.panel.visible_logs = None
         dock.panel.visible_tracks = None
@@ -3184,8 +3176,6 @@ class MainWindow(QMainWindow):
         self._populate_well_tree()
         self.panel.draw_panel()
 
-    from PyQt5.QtWidgets import QMessageBox
-
     def _delete_well_from_project(self, well_name: str, confirm: bool = True):
         """
         Delete a well from the project by name.
@@ -3273,7 +3263,6 @@ class MainWindow(QMainWindow):
         for dock in getattr(self, "_panel_docks", []) or []:
             if dock and getattr(dock, "panel", None) is not None:
                 yield dock.panel
-
 
     def _on_tree_context_menu(self, pos):
         """
@@ -3524,7 +3513,6 @@ class MainWindow(QMainWindow):
                     win.set_title(new_title)
             self._populate_window_tree()
 
-
     def _on_window_tree_context_menu(self, pos=None):
         """Show a context menu for the tree."""
 
@@ -3695,8 +3683,6 @@ class MainWindow(QMainWindow):
                 # print(window_dict)
                 window_list.append(window_dict)
         return window_list
-
-    from PyQt5.QtWidgets import QMessageBox
 
     def _delete_bitmap_from_well(self, well_name: str, bitmap_key: str, confirm: bool = True):
         """

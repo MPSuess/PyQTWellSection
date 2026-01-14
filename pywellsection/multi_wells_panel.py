@@ -143,7 +143,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     if not filtered_tracks:
-        n_tracks = 1
+        n_tracks = 0
     else:
         n_tracks = len(filtered_tracks)
 
@@ -174,7 +174,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     if depth_window is not None:
-        print ("depth_window", depth_window)
+        #print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
         global_mid_plot = (top_depth_window + bottom_depth_window) / 2
         if top_depth_window < global_mid_plot < bottom_depth_window:
@@ -293,7 +293,7 @@ def draw_multi_wells_panel_on_figure(
         # ---- Normal multi-track case ----
         for ti, track in enumerate(filtered_tracks):
             col_idx = wi * (n_tracks + 2) + ti +1
-            print(f"col_idx={col_idx} wi={wi} ti={ti} n_tracks={n_tracks}")
+            #print(f"col_idx={col_idx} wi={wi} ti={ti} n_tracks={n_tracks}")
             base_ax = axes[col_idx]
             #LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
             # Shared plotting Y-range for all wells
@@ -311,9 +311,9 @@ def draw_multi_wells_panel_on_figure(
             base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
-            mid_track = n_tracks // 2
+            mid_track = (n_tracks+1) // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
+                base_ax.set_title(well.get("name", f"Well {wi + 1}"), y=10, pad=5, fontsize=10)
 
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
@@ -328,8 +328,6 @@ def draw_multi_wells_panel_on_figure(
                 _draw_lithofacies_track(base_ax,well,track, offset)
 
 
-
-    fig.canvas.draw()
     add_depth_range_labels(fig, axes, selected_wells, n_tracks)
 
     if corr_artists is None:
@@ -821,8 +819,8 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
 
-        first_track_idx = wi * (n_tracks + 1)
-        last_track_idx = first_track_idx + n_tracks - 1
+        first_track_idx = wi * (n_tracks + 2)
+        last_track_idx = first_track_idx + n_tracks
         left = axes[first_track_idx].get_position().x0
         right = axes[last_track_idx].get_position().x1
         mid_x = (left + right) / 2
@@ -1033,7 +1031,7 @@ def add_tops_and_correlations(
                 if open_bottom > open_top:
 
                     for ti in range(n_tracks):
-                        col_idx = first_track_idx + ti
+                        col_idx = first_track_idx + ti +1
                         base_ax = axes[col_idx]
                         base_ax.axhspan(
                             open_top,
@@ -1226,102 +1224,6 @@ def add_tops_and_correlations(
             # corr_artists.append(poly)
 
     return corr_artists
-
-def _apply_track_fills_v0(base_ax, curve_cache: dict, track: dict):
-    """
-    Draw fills for a track on base_ax using cached curves.
-    Notes:
-      - Fills are drawn in base_ax coordinates via fill_betweenx.
-      - Works even if the visible curve is on a twiny axis.
-      - For log x-scales: fill is approximate in linear x-space; visually OK if xlim is set.
-    """
-    fills = track.get("fills", []) or []
-    if not fills:
-        return
-
-    for f in fills:
-        ftype = (f.get("type") or "").strip().lower()
-        alpha = float(f.get("alpha", 0.3))
-        facecolor = f.get("facecolor", "#cccccc")
-        hatch = f.get("hatch", None)
-        zorder = float(f.get("zorder", 0.6))
-
-        if ftype == "to_value":
-            log_name = f.get("log")
-            if log_name not in curve_cache:
-                continue
-
-            value = float(f.get("value", 0.0))
-            where = (f.get("where") or "greater").lower()
-
-            depth_plot = np.asarray(curve_cache[log_name]["depth_plot"], dtype=float)
-            x = np.asarray(curve_cache[log_name]["x"], dtype=float)
-
-            # mask
-            if where == "less":
-                mask = x < value
-            else:
-                mask = x > value
-
-            # Fill between curve and fixed value
-            base_ax.fill_betweenx(
-                depth_plot,
-                x,
-                value,
-                where=mask,
-                alpha=alpha,
-                facecolor=facecolor,
-                hatch=hatch,
-                linewidth=0.0,
-                zorder=zorder,
-            )
-
-        elif ftype == "between_logs":
-            left = f.get("log_left")
-            right = f.get("log_right")
-            if left not in curve_cache or right not in curve_cache:
-                continue
-
-            dl = np.asarray(curve_cache[left]["depth_plot"], dtype=float)
-            xl = np.asarray(curve_cache[left]["x"], dtype=float)
-            dr = np.asarray(curve_cache[right]["depth_plot"], dtype=float)
-            xr = np.asarray(curve_cache[right]["x"], dtype=float)
-
-            # resample right curve to left depth if needed
-            if len(dl) != len(dr) or not np.allclose(dl, dr, atol=1e-6, rtol=0):
-                # interpolate xr at dl (depths are monotonic)
-                # sort for safety
-                ord_r = np.argsort(dr)
-                drs = dr[ord_r]
-                xrs = xr[ord_r]
-                xr_i = np.interp(dl, drs, xrs)
-            else:
-                xr_i = xr
-
-            where = (f.get("where") or "all").lower()
-            if where == "left_greater":
-                mask = xl > xr_i
-            elif where == "right_greater":
-                mask = xr_i > xl
-            else:
-                mask = None  # fill all
-
-            base_ax.fill_betweenx(
-                dl,
-                xl,
-                xr_i,
-                where=mask,
-                alpha=alpha,
-                facecolor=facecolor,
-                hatch=hatch,
-                linewidth=0.0,
-                zorder=zorder,
-            )
-
-        else:
-            # unknown fill type -> ignore
-            continue
-
 
 def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
     """
