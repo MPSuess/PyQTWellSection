@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from PyQt5.QtCore import Qt, pyqtSignal, QEvent, QSize
-
+from scipy.stats import false_discovery_control
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
 from .multi_wells_panel import add_tops_and_correlations
@@ -63,7 +63,8 @@ class WellPanelWidget(QWidget):
         self.well_gap_factor = panel_settings["well_gap_factor"]
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
-        self.redraw_requested = panel_settings["redraw_requested"]
+
+        self.redraw_requested = False
 
         if not panel_settings.get("vertical_scale", 0):
             self.vertical_scale = 1.0
@@ -92,7 +93,7 @@ class WellPanelWidget(QWidget):
         self._px_per_well = 100
         self._px_per_well_gap = 10
         self._px_per_depth_track = 100
-        self._min_canvas_width = 600
+        self._min_canvas_width = 50
 
         self.enable_track_mouse_scrolling()
         self.depth_window = None
@@ -204,7 +205,7 @@ class WellPanelWidget(QWidget):
                 filtered_tracks = [t for t in self.tracks if t.get("name") in visible_tracks]
 
             if not filtered_tracks:
-                n_tracks = 1
+                n_tracks = 0
             else:
                 n_tracks = len(filtered_tracks)
 
@@ -299,6 +300,9 @@ class WellPanelWidget(QWidget):
     # ---------- PICK MODE ----------
     def _arm_pick_for_dialog(self):
         """Hide dialog and start pick-on-plot mode."""
+
+        #print("startin dialog pick mode")
+
         if self._active_top_dialog is None or self._active_pick_context is None:
             return
 
@@ -340,11 +344,14 @@ class WellPanelWidget(QWidget):
         wi = self._active_pick_context["wi"]
 
         if self._flatten_depths is not None:
-        #if len(self._flatten_depths) > 0:
-            flatten_depth = self._flatten_depths[wi]
+            if len(self._flatten_depths) > 0:
+                flatten_depth = self._flatten_depths[wi]
+            else:
+                flatten_depth = 0
         else:
             flatten_depth = 0
-        LOG.debug("dialog pick event received")
+
+        print("dialog pick event received")
 
         ctx = self._active_pick_context
         depth = None
@@ -393,18 +400,21 @@ class WellPanelWidget(QWidget):
             # toolbar.mode is '' when inactive, 'zoom rect' or 'pan/zoom' when active
             return
 
+        #print("top click")
+
+
         mapped = self._map_event_to_well_axes(event)
         if mapped is None:
             return
         wi, ti, ax, depth_plot, depth_true = mapped
-        #print (event.button, wi, ti, ax, depth_plot, depth_true)
+        # ("received:",event.button, wi, ti, ax, depth_plot, depth_true)
 
         if self._in_dialog_pick_mode:
             return
         if event.button != 1:
             return
 
-        if ti-wi <= 0: return 0
+        #if ti-wi <= 0: return 0
 
         well = self.wells[wi]
         if "tops" not in well or not well["tops"]:
@@ -515,17 +525,21 @@ class WellPanelWidget(QWidget):
             filtered_tracks = [t for t in self.tracks if t.get("name") in self.visible_tracks]
 
         if not filtered_tracks:
-            n_tracks = 1
+            n_tracks = 0
         else:
             n_tracks = len(filtered_tracks)
 
 
-        # layout is [W0T0, W0T1, ..., spacer, W1T0, W1T1, ..., spacer, ...]
+        # layout is [Depth, W0T0, W0T1, ..., spacer, Depth, W1T0, W1T1, ..., spacer, ...]
         for wi in range(n_wells):
-            first_track_idx = wi * (n_tracks + 1)
+            first_track_idx = wi * (n_tracks + 2)
+            #print ("first track idx:", first_track_idx)
             for ti in range(n_tracks):
-                ax = self.axes[first_track_idx + ti]
-                self.axis_index[ax] = (wi, ti)
+                ax_index = first_track_idx + ti +1
+                if ax_index < n_wells * (n_tracks +2):
+                    ax = self.axes[first_track_idx + ti+1]
+                    #print ("added ax number:", first_track_idx + ti+1 )
+                    self.axis_index[ax] = (wi, ti)
 
     def _connect_ylim_sync(self):
         # disconnect old if any
@@ -588,8 +602,9 @@ class WellPanelWidget(QWidget):
             return
 
         wi_target = self._active_pick_context["wi"]
+        print ("currently_picked:" ,wi_target)
         depth = float(event.ydata)
-        if self._flatten_depths is not None:
+        if len(self._flatten_depths)>0:
         #if len(self._flatten_depths) > 0:
             flatten_depth = self._flatten_depths[wi_target]
         else:
@@ -612,7 +627,7 @@ class WellPanelWidget(QWidget):
             #     depth = max-flatten_depth
 
 
-        LOG.debug("move", event.ydata, min, max, depth, flatten_depth)
+        #LOG.debug("move", event.ydata, min, max, depth, flatten_depth)
 
 
         # draw a thin hatched band across ALL tracks of the selected well
@@ -621,12 +636,12 @@ class WellPanelWidget(QWidget):
         if self.visible_tracks is None: # in this case all tracks are visible
             self.visible_tracks = [t.get("name") for t in self.tracks]
         n_tracks = len(self.visible_tracks)
-        first_track_idx = wi_target * (n_tracks + 1)
+        first_track_idx = wi_target * (n_tracks + 2)
 
 
 
         for ti in range(n_tracks):
-            base_ax = self.axes[first_track_idx + ti]
+            base_ax = self.axes[first_track_idx + ti +1]
 
             # choose a small thickness relative to the depth range
             y0, y1 = base_ax.get_ylim()
@@ -640,80 +655,7 @@ class WellPanelWidget(QWidget):
 
         self.canvas.draw_idle()
         #self.draw_panel()
-    ###----
-    # def _handle_dialog_pick_click(self, event):
-    #     """
-    #     One-click depth pick for the dialog:
-    #       - use event.ydata if available; otherwise use last_depth from context
-    #       - update dialog spinbox
-    #       - ALWAYS exit pick mode, remove band, and show dialog again
-    #     """
-    #     LOG.debug("click", event.ydata)
-    #
-    #     if not self._in_dialog_pick_mode:
-    #         return
-    #     if self._active_pick_context is None:
-    #          return
-    #
-    #     ctx = self._active_pick_context
-    #
-    #     # Prefer depth from this click, but fall back to last valid depth
-    #     depth = None
-    #     if event.ydata is not None:
-    #         depth = float(event.ydata)
-    #         ctx["last_depth"] = depth
-    #     else:
-    #         depth = ctx.get("last_depth")
-    #
-    #     # If we have any valid depth, update the dialog spinbox
-    #     if depth is not None:
-    #         self._active_top_dialog.set_depth(depth)
-    #
-    #     # --- Exit pick mode no matter what ---
-    #
-    #     if self._dialog_pick_cid is not None:
-    #         self.canvas.mpl_disconnect(self._dialog_pick_cid)
-    #         self._dialog_pick_cid = None
-    #     if self._motion_pick_cid is not None:
-    #         self.canvas.mpl_disconnect(self._motion_pick_cid)
-    #         self._motion_pick_cid = None
-    #
-    #     self._in_dialog_pick_mode = False
-    #
-    #     # Remove moving band
-    #     self._clear_pick_line()
-    #
-    #     # Show dialog again so user can confirm / adjust / OK / Cancel
-    #     self._active_top_dialog.show()
-    #     self._active_top_dialog.raise_()
-    #     self._active_top_dialog.activateWindow()
-    #
-    #     return depth
-    #
-    #
-    # def _handle_dialog_pick(self, event):
-    #     """
-    #     Handle a single click while in dialog 'Pick on plot' mode:
-    #       - take the ydata as depth
-    #       - update the dialog's spinbox
-    #       - exit pick mode
-    #     """
-    #     # only care about clicks inside an axis
-    #     if event.inaxes is not None and event.ydata is not None and self._active_top_dialog is not None:
-    #         depth = float(event.ydata)
-    #         self._active_top_dialog.set_depth(depth)
-    #
-    #     # exit pick mode and disconnect handler
-    #     if self._dialog_pick_cid is not None:
-    #         self.canvas.mpl_disconnect(self._dialog_pick_cid)
-    #         self._dialog_pick_cid = None
-    #
-    #     self._in_dialog_pick_mode = False
-    #
-    #     # prevent this click from also triggering _on_top_click afterwards
-    #     # (we already consumed it)
-    #
-    #
+
     def _clear_temp_highlight(self):
         """Remove any temporary highlight artists (selected top)."""
         for art in self._temp_highlight_artists:
@@ -731,9 +673,10 @@ class WellPanelWidget(QWidget):
         if top_name not in tops:
             return
 
-        if len(self._flatten_depths) > 0:
-        #if self._flatten_depths is not None:
-            flatten_depth = self._flatten_depths[wi]
+        if self._flatten_depths is not None:
+            if len(self._flatten_depths) > 0:
+                flatten_depth = self._flatten_depths[wi]
+            else: flatten_depth = 0
         else:
             flatten_depth = 0
 
@@ -769,7 +712,7 @@ class WellPanelWidget(QWidget):
 
         txt = main_ax.text(
             x_label_pos,
-            depth- flatten_depth,
+            depth-flatten_depth,
             top_name,
             va="center",
             ha="left",
@@ -1058,37 +1001,8 @@ class WellPanelWidget(QWidget):
         self._clear_temp_highlight()
         self.draw_panel()
 
-    def _build_axes(self):
-        """(Re)build subplot layout and axis index from wells/tracks."""
-        self.fig.clear()
-        self.axes = []
-        self.axis_index = {}
-
-        self.n_wells = len(self.visible_wells)
-        self.n_tracks = len(self.tracks)
-
-        # Example layout: each well has n_tracks + 1 spacer axes horizontally
-        # adjust to your actual layout logic
-        for wi in range(self.n_wells):
-            for ti in range(self.n_tracks):
-                ax = self.fig.add_subplot(
-                    self.n_wells, self.n_tracks + 1, wi * (self.n_tracks + 1) + ti + 1
-                )
-                self.axes.append(ax)
-                self.axis_index[ax] = (wi, ti)
-
-            # spacer axis if you use one
-            spacer_ax = self.fig.add_subplot(
-                self.n_wells, self.n_tracks + 1, wi * (self.n_tracks + 1) + self.n_tracks + 1
-            )
-            spacer_ax.set_visible(False)
-            self.axes.append(spacer_ax)
-
-        self.fig.tight_layout()
-
     def _flatten_on_formation_top(self, top_name: str):
-        """
-        Compute per-well flatten depth for a given formation top, then redraw panel.
+        """ Compute per-well flatten depth for a given formation top, then redraw panel.
 
         For each well:
           - If the top exists: use its depth.
@@ -1096,7 +1010,7 @@ class WellPanelWidget(QWidget):
             and below (in this well's tops), based on self.stratigraphy.
         """
         if not self.stratigraphy or top_name not in self.stratigraphy:
-            # Unknown in strat column -> do nothing
+        # Unknown in strat column -> do nothing
             return
 
         flatten_depths = []
@@ -1186,6 +1100,10 @@ class WellPanelWidget(QWidget):
 
         ax = event.inaxes
 
+        #print("event axis:", ax)
+
+        #print ("self.axis_index", self.axis_index)
+
         # If event is on a twinx axis, map it to its base axis by overlap
         if ax not in self.axis_index:
             ax_pos = ax.get_position()
@@ -1193,6 +1111,7 @@ class WellPanelWidget(QWidget):
             best_overlap = 0.0
             for base_ax in self.axis_index.keys():
                 pos = base_ax.get_position()
+                #print(base_ax)
                 x0 = max(ax_pos.x0, pos.x0)
                 x1 = min(ax_pos.x1, pos.x1)
                 y0 = max(ax_pos.y0, pos.y0)
@@ -1210,14 +1129,14 @@ class WellPanelWidget(QWidget):
         offset = self._get_flatten_offset_for_well(wi)
         depth_true = depth_plot + offset
 
+        #print ("found wi, ti, depth_plot, depth_true: ", wi, ti, depth_plot, depth_true)
+
         return wi, ti, ax, depth_plot, depth_true
 
     def set_wells(self, wells):
         self.wells = wells
         #self.visible_wells = wells
         self._flatten_depths = None
- #       if wells and self.stratigraphy is not None:
- #           self.draw_panel()
 
     def set_visible_wells(self, visible_wells):
         self.visible_wells = visible_wells
@@ -1227,14 +1146,12 @@ class WellPanelWidget(QWidget):
 
     def set_visible_tops(self, visible_tops):
         self.visible_tops = visible_tops
-#        self.draw_panel()
 
     def get_visible_tops(self):
         return self.visible_tops
 
     def set_visible_logs(self, visible_logs):
         self.visible_logs = visible_logs
-#        self.draw_panel()
 
     def set_visible_discrete_logs(self, visible_discrete_logs):
         self.visible_discrete_logs = visible_discrete_logs
@@ -1247,7 +1164,6 @@ class WellPanelWidget(QWidget):
 
     def get_visible_bitmaps(self):
         return self.visible_bitmaps
-
 
     def get_visible_logs(self):
         return self.visible_logs
@@ -1393,7 +1309,8 @@ class WellPanelWidget(QWidget):
         self.fig_set_size(event.width(), event.height())
 
     def fig_set_size(self, width, height):
-        print (width, height)
+        #print (width, height)
+        return
 
     def update_canvas_size_from_layout(self):
         """
@@ -1417,6 +1334,8 @@ class WellPanelWidget(QWidget):
 
         total_cols = n_wells * (n_tracks + 1) + (n_wells - 1)
 
+        #print (total_cols, n_tracks, n_wells)
+
         # compute width in pixels: tracks + gaps
         if n_wells <= 0:
             width_px = self._min_canvas_width
@@ -1435,6 +1354,7 @@ class WellPanelWidget(QWidget):
 
         # set matplotlib figure size in inches to match pixel size
         self.fig.set_size_inches(width_px / dpi, height_px / dpi, forward=True)
+
 
     def enable_track_mouse_scrolling(self):
         """Enable mouse-wheel scrolling inside tracks (pan/zoom depth window)."""
@@ -1732,6 +1652,7 @@ class WellPanelDock(QDockWidget):
     def set_title(self, title):
         self.title = title
         self.setWindowTitle(title)
+        self.panel.panel_title = title
         self.setObjectName(title)
 
 

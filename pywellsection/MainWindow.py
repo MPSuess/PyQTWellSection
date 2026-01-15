@@ -3,6 +3,8 @@
 ### You like to improve the code? just join the developers team :-).
 ### This program is licensed according to EUPL1.2
 ### M. Peter Süss, University of Tuebingen, Copyright 2025, 2026
+### v 12.04
+from os import removedirs
 
 ### TODO: reformulate the code to be more object oriented ... .
 # Move all well functions into a separate class.
@@ -59,6 +61,8 @@ from pywellsection.dialogs import LoadCoreBitmapDialog
 from pywellsection.dialogs import HelpDialog
 from pywellsection.dialogs import LoadBitmapForTrackDialog
 from pywellsection.dialogs import BitmapPlacementDialog
+from pywellsection.dialogs import TrackSettingsDialog
+from pywellsection.dialogs import EditWellLogTableDialog
 from pathlib import Path
 from collections import OrderedDict
 
@@ -211,6 +215,11 @@ class MainWindow(QMainWindow):
 
         # --- File menu ---
         file_menu = menubar.addMenu("&File")
+
+        act_new = QAction("New project…", self)
+        act_new.setShortcut("Ctrl+N")
+        act_new.triggered.connect(lambda: self._new_project(confirm=True))
+        file_menu.addAction(act_new)
 
         act_open = QAction("Open project...", self)
         act_open.setShortcut("Ctrl+O")
@@ -445,10 +454,25 @@ class MainWindow(QMainWindow):
                         }
             for well in wells:
                 bitmaps = well.get("bitmaps", None)
+                # if bitmaps:
+                #     for bitmap in bitmaps:
+                #         if bitmap is not None:
+                #             self.all_bitmaps.append(bitmap)
+
                 if bitmaps:
                     for bitmap in bitmaps:
                         if bitmap is not None:
-                            self.all_bitmaps.append(bitmap)
+                            bitmap_cfg = bitmaps[bitmap]
+                            bmp_full_path = bitmap_cfg.get("path", None)
+                            if bmp_full_path:
+                                fpath, fname = os.path.split(bmp_full_path)
+                                p_path, pname = os.path.split(path)
+                                rel_path = os.path.relpath(fpath, start=path)
+                                bmp_project_path = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
+                                bitmap_cfg["path"] = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
+                                self.all_bitmaps.append(bitmap)
+                                well[bitmap] = bitmap_cfg
+                                print (bitmap_cfg)
 
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
             self.panel.visible_tops = window_dict[0]["visible_tops"]
@@ -509,8 +533,6 @@ class MainWindow(QMainWindow):
         LOG.debug(f"Saving project as {path}")
         self._project_file_save(path)
 
-
-
     def _project_file_save(self, path = None):
         """
         Save project as:
@@ -522,6 +544,12 @@ class MainWindow(QMainWindow):
           MyProject.data/
               data.json
         """
+
+        old_path = None
+
+        if self.current_project_path:
+            old_path = self.current_project_path
+
         if not path and self.current_project_path:
             path = self.current_project_path
 
@@ -552,6 +580,9 @@ class MainWindow(QMainWindow):
         # build project data payload (your actual content)
 
         wells = getattr(self.panel, "wells", [])
+        if len(wells) == 0:
+            LOG.debug("Project was not saved: no wells to save")
+            return
         LOG.debug(f"Saving {wells[0]}")
 
         for well in wells:
@@ -614,19 +645,41 @@ class MainWindow(QMainWindow):
 
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
-            if os.path.exists(data_dir):
-                shutil.rmtree(data_dir)
-            os.rename(tmp_dir, data_dir)
+            if os.path.exists(data_dir) and old_path: # simple save ... .
+                if old_path == path: # simple save ... .
+                # just copy the new data.json into the existing data_dir
+                    shutil.copy2(tmp_data_json, data_dir)
+                    os.remove(tmp_data_json)
+                    os.removedirs(tmp_dir)
+                else: # .. save existing project under new name ...
+                        o_path, ofname = os.path.split(old_path)
+                        oproject_stem = os.path.splitext(ofname)[0]
+                        o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
+                        #os.makedirs(data_dir, exist_ok=True)
+                        if os.path.exists(data_dir): # a previous project was saved under this name
+                            shutil.rmtree(data_dir)
+                        shutil.copytree(o_data_path, data_dir)
+                        shutil.copy2(tmp_data_json, data_dir)
+                        os.remove(tmp_data_json)
+                        os.removedirs(tmp_dir)
+
+            else: # a new project from scratch
+                if os.path.exists(data_dir): # a previous project was saved under this name
+                    shutil.rmtree(data_dir)
+                os.rename(tmp_dir, data_dir)
+
 
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
             os.replace(tmp_pws, path)
 
-            # keep last save path if you want
-            self._last_project_path = path
+            # keep last saved path if you want
+            self._last_project_path = old_path
+            self.current_project_path = path
 
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
+
 
 
         except Exception as e:
@@ -700,7 +753,6 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
-
 
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1248,7 +1300,7 @@ class MainWindow(QMainWindow):
                         | Qt.ItemIsEnabled
                     )
                     # store mnemonic for possible future actions
-                    log_item.setData(0, Qt.UserRole, log_name)
+                    log_item.setData(0, Qt.UserRole, ("well_log",well_name , log_name))
                     parent_for_logs.addChild(log_item)
 
             # --- lithofacies ---
@@ -1379,6 +1431,9 @@ class MainWindow(QMainWindow):
         # delete all logs under the folder and rebuild from scratch
         ### Remember current selection by name
         ### First continous Logs
+
+        print ("_populate_well_log_tree")
+
         self.well_tree.blockSignals(True)
         prev_selected = set()
         ### Start with populating the continous logs tree ###
@@ -1391,24 +1446,23 @@ class MainWindow(QMainWindow):
         root.takeChildren()
 
         log_names = set()
-        if self.all_logs is None:
-            return
-        for log in self.all_logs:
-            name = log
-            if name:
-                log_names.add(name)
-        for name in sorted(log_names):
-            it = QTreeWidgetItem([name])
-            it.setFlags(
-                it.flags()
-                | Qt.ItemIsUserCheckable
-                | Qt.ItemIsSelectable
-                | Qt.ItemIsEnabled
-            )
-            it.setData(0, Qt.UserRole, name)
-            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
-            it.setCheckState(0, state)
-            root.addChild(it)
+        if self.all_logs:
+            for log in self.all_logs:
+                name = log
+                if name:
+                    log_names.add(name)
+            for name in sorted(log_names):
+                it = QTreeWidgetItem([name])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                it.setData(0, Qt.UserRole, name)
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                root.addChild(it)
 
         ### Second discrete Logs ###
         prev_selected = set()
@@ -1446,7 +1500,6 @@ class MainWindow(QMainWindow):
             if it.checkState(0) == Qt.Checked:
                 prev_selected.add(it.data(0, Qt.UserRole))
         root.takeChildren()
-
         bmp_names = set()
         if self.all_bitmaps:
             for bmp in self.all_bitmaps:
@@ -1465,7 +1518,6 @@ class MainWindow(QMainWindow):
                 state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
                 it.setCheckState(0, state)
                 root.addChild(it)
-
 
         self.well_tree.blockSignals(False)
         self._rebuild_visible_logs_from_tree()
@@ -1788,8 +1840,6 @@ class MainWindow(QMainWindow):
 
         self.panel.set_visible_tops(visible if visible else None)
         self.panel.draw_panel()
-
-    #        self.panel.set_visible_tops(visible)
 
     def _rebuild_visible_logs_from_tree(self):
         """Collect checked logs and inform the panel."""
@@ -2622,8 +2672,6 @@ class MainWindow(QMainWindow):
                 return window
         return None
 
-    from PyQt5.QtWidgets import QMessageBox
-
     def _action_load_bitmap_into_bitmap_track(self, track_name: str):
         """
         Load an image and assign it to a selected well under the bitmap key
@@ -2822,7 +2870,6 @@ class MainWindow(QMainWindow):
         )
 
         dock.activated.connect(self._on_panel_activated)
-
         dock.panel.visible_tops = None
         dock.panel.visible_logs = None
         dock.panel.visible_tracks = None
@@ -3135,8 +3182,6 @@ class MainWindow(QMainWindow):
         self._populate_well_tree()
         self.panel.draw_panel()
 
-    from PyQt5.QtWidgets import QMessageBox
-
     def _delete_well_from_project(self, well_name: str, confirm: bool = True):
         """
         Delete a well from the project by name.
@@ -3225,7 +3270,6 @@ class MainWindow(QMainWindow):
             if dock and getattr(dock, "panel", None) is not None:
                 yield dock.panel
 
-
     def _on_tree_context_menu(self, pos):
         """
         Show a context menu for logs in the tree:
@@ -3233,15 +3277,20 @@ class MainWindow(QMainWindow):
           - logs under each track in the 'Tracks' folder
         """
         item = self.well_tree.itemAt(pos)
+        menu = QMenu(self)
         if item is None:
             return
 
         global_pos = self.well_tree.viewport().mapToGlobal(pos)
         parent = item.parent()
+        data = item.data(0, Qt.UserRole)
+        parent_data = parent.data(0, Qt.UserRole) if parent else None
 
-        # --- Wells folder or well items: show "Add new well..." ---
+        print (item, data)
+        print (parent, parent_data)
+
         if item is self.well_root_item:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_add_well = menu.addAction("Add new well...")
             act_edit_all_wells = menu.addAction("Edit all well settings ...")
@@ -3255,7 +3304,7 @@ class MainWindow(QMainWindow):
             return
 
         if parent is self.well_root_item:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             well_name = item.text(0)
             act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
@@ -3278,12 +3327,35 @@ class MainWindow(QMainWindow):
             if chosen == act_delete_well:
                 self._delete_well_from_project(well_name, confirm = True)
 
+        if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
+            #menu = QMenu(self)
+            _, well_name, bitmap_key = data
+            act_del = menu.addAction(f"Delete bitmap from well {well_name}")
+            chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
+            if chosen == act_del:
+                if well_name and bitmap_key:
+                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=True)
+                elif not well_name:
+                    for well in self.all_wells:
+                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
+            return
+
+        if isinstance(data, tuple) and len(data) == 3 and data[0] == "well_log":
+            _, well_name, log_name = data
+
+            act_edit = menu.addAction("Edit log data (table)…")
+            chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
+            if chosen == act_edit:
+                self._edit_well_log_table(well_name, log_name)
+            return
+
+
         # --- case 1: logs under "Logs" folder ---
         if parent is self.continous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
             if not log_name:
                 return
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
@@ -3293,15 +3365,19 @@ class MainWindow(QMainWindow):
             bitmap_name = item.data(0, Qt.UserRole) or item.text(0)
             if not bitmap_name:
                 return
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_edit = menu.addAction(f"Edit bitmap position'{bitmap_name}'...")
+            act_del = menu.addAction("Delete bitmap…")
+
             chosen = menu.exec_(global_pos)
             if chosen == act_edit:
                 self._action_edit_bitmap_positions(track_name=bitmap_name)
-
+            if chosen == act_del:
+                for well in self.all_wells:
+                    self._delete_bitmap_from_well(well.get("name"), bitmap_name, confirm=True)
 
         if item is self.well_tops_folder:
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_edit_stratigraphy = menu.addAction("Edit well tops ...")
             chosen = menu.exec_(global_pos)
@@ -3316,7 +3392,7 @@ class MainWindow(QMainWindow):
             if not track_name:
                 return
 
-            menu = QMenu(self)
+            #menu = QMenu(self)
 
             act_add_track = menu.addAction("Add new track...")
             act_add_disc_track = menu.addAction("Add new discrete track...")
@@ -3341,7 +3417,7 @@ class MainWindow(QMainWindow):
                     track_cfg = track
                     break
 
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             if track.get("type") == "discrete":
                 #menu = QMenu(self)
@@ -3353,19 +3429,23 @@ class MainWindow(QMainWindow):
                 #menu = QMenu(self)
                 act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
                 act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
+                act_delete_all = menu.addAction("Delete all bitmaps for this track…")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_add_core_bitmap:
                     self._action_load_bitmap_into_bitmap_track(track_name)
                 elif chosen == act_edit_bitmap_track:
                     self._action_edit_bitmap_positions(track_name=track_name)
-
+                elif chosen == act_delete_all:
+                    self._delete_bitmaps_for_bitmap_track(track_name, confirm=True)
             elif track.get("type") == "continuous":
                 #menu = QMenu(self)
                 act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
                 act_add_log = menu.addAction(f"Add new log to track ...")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_edit:
-                    self._edit_log_display_settings(track_name)
+                    #self._edit_log_display_settings(track_name)
+                    self._action_edit_track_settings(track_name)
+                    menu.close()
                 elif chosen == act_add_log:
                     self._action_add_log_to_track()
             elif track.get("type") == "lithofacies":
@@ -3374,13 +3454,15 @@ class MainWindow(QMainWindow):
                 chosen = menu.exec_(global_pos)
                 if chosen == act_edit_lithofacies_settings:
                     self._action_edit_lithofacies_settings_for_track(track_name)
-            chosen = menu.exec_(global_pos)
 
+            chosen = menu.exec_(global_pos)
             if chosen == act_delete_track:
                 self._action_delete_track()
 
-
             return
+
+
+
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
 
@@ -3444,9 +3526,11 @@ class MainWindow(QMainWindow):
                     win.set_title(new_title)
             self._populate_window_tree()
 
-
     def _on_window_tree_context_menu(self, pos=None):
         """Show a context menu for the tree."""
+
+        menu = QMenu(self)
+
         if pos is None:
             return
 
@@ -3457,14 +3541,14 @@ class MainWindow(QMainWindow):
         global_pos = self.window_tree.viewport().mapToGlobal(pos)
 
         if item == self.window_root:
-            menu = QMenu(self)
+            #menu = QMenu(self)
             act_add_window = menu.addAction("Add new well section window...")
             chosen = menu.exec_(global_pos)
             if chosen == act_add_window:
                 #print("Add new window...")
                 self._action_add_well_panel_dock()
         elif item.parent() == self.window_root:
-            menu = QMenu(self)
+            #menu = QMenu(self)
             window_name = item.text(0)
             act_delete_window = menu.addAction(f"Delete window '{window_name}'...")
             chosen = menu.exec_(global_pos)
@@ -3612,4 +3696,319 @@ class MainWindow(QMainWindow):
                 # print(window_dict)
                 window_list.append(window_dict)
         return window_list
- 
+
+    def _delete_bitmap_from_well(self, well_name: str, bitmap_key: str, confirm: bool = True):
+        """
+        Delete a bitmap with given key from a single well.
+        """
+        if not well_name or not bitmap_key:
+            return
+
+        well = next((w for w in getattr(self, "all_wells", []) if w.get("name") == well_name), None)
+        if well is None:
+            QMessageBox.information(self, "Delete bitmap", f"Well '{well_name}' not found.")
+            return
+
+        bm = (well.get("bitmaps") or {})
+        if bitmap_key not in bm:
+            QMessageBox.information(self, "Delete bitmap", f"No bitmap '{bitmap_key}' in well '{well_name}'.")
+            return
+
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete bitmap",
+                f"Delete bitmap '{bitmap_key}' from well '{well_name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        try:
+            del bm[bitmap_key]
+            # clean empty container
+            if not bm:
+                well.pop("bitmaps", None)
+        except Exception as e:
+            QMessageBox.critical(self, "Delete bitmap", f"Failed to delete bitmap:\n{e}")
+            return
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _delete_bitmap_key_from_all_wells(self, bitmap_key: str, confirm: bool = True):
+        """
+        Delete a bitmap key from ALL wells (useful for 'delete track images').
+        """
+        if not bitmap_key:
+            return
+
+        wells = getattr(self, "all_wells", []) or []
+        hits = []
+        for w in wells:
+            bm = (w.get("bitmaps") or {})
+            if bitmap_key in bm:
+                hits.append(w.get("name", "<unnamed>"))
+
+        if not hits:
+            QMessageBox.information(self, "Delete bitmaps", f"No wells contain bitmap '{bitmap_key}'.")
+            return
+
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete bitmaps",
+                f"Delete bitmap '{bitmap_key}' from {len(hits)} well(s)?\n\n"
+                + "\n".join(hits[:15]) + ("\n…" if len(hits) > 15 else ""),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        for w in wells:
+            bm = (w.get("bitmaps") or {})
+            if bitmap_key in bm:
+                del bm[bitmap_key]
+                if not bm:
+                    w.pop("bitmaps", None)
+
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _delete_bitmaps_for_bitmap_track(self, track_name: str, confirm: bool = True):
+        """
+        Resolve bitmap key from bitmap track and delete it from all wells.
+        """
+        track = next((t for t in getattr(self, "tracks", []) if t.get("name") == track_name), None)
+        if track is None or "bitmap" not in track:
+            QMessageBox.information(self, "Delete bitmaps", "Selected track is not a bitmap track.")
+            return
+
+        key = (track.get("bitmap") or {}).get("key")
+        if not key:
+            QMessageBox.warning(self, "Delete bitmaps", "Bitmap track has no bitmap key.")
+            return
+
+        self._delete_bitmap_key_from_all_wells(key, confirm=confirm)
+
+    def _available_log_names(self) -> list[str]:
+        names = set()
+        for w in getattr(self, "all_wells", []) or []:
+            for ln in (w.get("logs", {}) or {}).keys():
+                names.add(ln)
+        return sorted(names)
+
+    def _action_edit_track_settings(self, track_name: str):
+        track = next((t for t in self.all_tracks if t.get("name") == track_name), None)
+        if track is None:
+            return
+
+        dlg = TrackSettingsDialog(self, track, available_logs=self._available_log_names())
+        if dlg.exec_() == QDialog.Accepted:
+            self.panel_settings["redraw_requested"]=False
+            # redraw / refresh
+            if hasattr(self, "_refresh_all_panels"):
+                self._refresh_all_panels()
+            if hasattr(self, "_populate_well_track_tree"):
+                self._populate_well_track_tree()
+            self.panel_settings["redraw_requested"] = True
+            self.panel.draw_panel()
+
+    def _edit_well_log_table(self, well_name: str, log_name: str):
+        wells = getattr(self, "all_wells", []) or []
+        well = next((w for w in wells if w.get("name") == well_name), None)
+        if well is None:
+            QMessageBox.warning(self, "Edit log", f"Well '{well_name}' not found.")
+            return
+
+        logs = well.get("logs", {}) or {}
+        log_def = logs.get(log_name)
+        if log_def is None:
+            QMessageBox.warning(self, "Edit log", f"Log '{log_name}' not found in well '{well_name}'.")
+            return
+
+        depth = log_def.get("depth", [])
+        data = log_def.get("data", [])
+
+        dlg = EditWellLogTableDialog(self, well_name, log_name, depth, data)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        new_depth, new_data = dlg.result_arrays()
+        if new_depth is None:
+            return
+
+        # Update model
+        log_def["depth"] = new_depth
+        log_def["data"] = new_data
+        logs[log_name] = log_def
+        well["logs"] = logs
+
+        # Redraw + rebuild tree if you show log stats/availability
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
+    def _new_project(self, confirm: bool = True):
+        """
+        Reset the application state for a new project:
+          - clears all data (wells/tracks/stratigraphy)
+          - closes/removes all extra panel docks
+          - resets central panel state/filters
+          - rebuilds trees and redraws
+
+        Call this from File → New project...
+        """
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "New project",
+                "Start a new project?\n\n"
+                "This will clear wells, logs, tops, tracks, bitmaps and close all panel windows.\n"
+                "Unsaved changes will be lost.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        # ---- 1) clear core project data ----
+        wells, tracks, stratigraphy = create_dummy_data()
+
+        wells.test_class()
+
+        self.all_wells = wells
+        self.all_stratigraphy = stratigraphy
+        self.all_tracks = tracks
+
+        self.all_logs = None
+        self.all_discrete_logs = None
+        self.all_bitmaps = None
+
+        self.well_gap_factor = 3.0
+        self.track_gap_factor = 1.0
+        self.track_width = 1.0
+        self.vertical_scale = 2.0
+
+        window_name = "Well Section 1"
+
+        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+                               "vertical_scale": self.vertical_scale
+                               }
+
+        # Optional: clear any additional project-level state
+        for attr in (
+            "_last_project_path",
+            "_project_path",
+            "_project_name",
+        ):
+            if hasattr(self, attr):
+                setattr(self, attr, None)
+
+        # ---- 2) close/remove all docked panels ----
+        # Keep central panel; remove all dock panels
+        for dock in list(getattr(self, "WindowList", []) or []):
+            try:
+                self.removeDockWidget(dock)
+            except Exception:
+                pass
+            try:
+                dock.setParent(None)
+                dock.deleteLater()
+            except Exception:
+                pass
+
+        self.WindowList = []
+
+        self.dock = WellPanelDock(
+            parent=self,
+            wells=self.all_wells,
+            tracks=self.all_tracks,
+            stratigraphy=self.all_stratigraphy,
+            panel_settings=self.panel_settings
+        )
+        self.dock.activated.connect(self._on_panel_activated)
+
+        # self.tabifiedDockWidgetActivated.connect(self.window_activate)
+
+        self.dock.panel.active_panel = True
+        self.panel = self.dock.panel
+
+        self.WindowList = []
+
+        self.active_window = self.dock
+
+        self.WindowList.append(self.active_window)
+
+
+
+        # ---- 3) reset central panel view state/filters ----
+        if hasattr(self, "panel") and self.panel is not None:
+            p = self.panel
+            p.wells = self.all_wells
+            p.tracks = self.all_tracks
+            p.stratigraphy = self.all_stratigraphy
+
+            # clear common per-panel state
+            for attr, default in (
+                ("visible_wells", None),
+                ("visible_tracks", None),
+                ("visible_logs", None),
+                ("visible_bitmaps", None),
+                ("visible_discrete_logs", None),
+                ("visible_tops", None),
+                ("flatten_depths", None),
+                ("depth_window", None),
+                ("highlight_top", None),
+                ("_active_pick_context", None),
+                ("_bitmap_pick_ctx", None),
+                ("_in_dialog_pick_mode", False),
+            ):
+                if hasattr(p, attr):
+                    setattr(p, attr, default)
+
+            # disconnect any lingering mpl event connections (optional safety)
+            for cid_attr in ("_dialog_pick_cid", "_motion_pick_cid", "_bitmap_pick_cid", "_scroll_cid"):
+                if hasattr(p, cid_attr):
+                    cid = getattr(p, cid_attr)
+                    if cid is not None and hasattr(p, "canvas"):
+                        try:
+                            p.canvas.mpl_disconnect(cid)
+                        except Exception:
+                            pass
+                    setattr(p, cid_attr, None)
+
+            # re-enable desired event handlers if you use them
+            if hasattr(p, "enable_track_mouse_scrolling"):
+                p.enable_track_mouse_scrolling()
+
+            # redraw (empty)
+            if hasattr(p, "draw_panel"):
+                p.draw_panel()
+
+        # ---- 4) rebuild UI trees ----
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_well_track_tree"):
+            self._populate_well_track_tree()
+        if hasattr(self, "_populate_well_tops_tree"):
+            self._populate_well_tops_tree()
+        if hasattr(self, "_populate_window_tree"):
+            self._populate_window_tree()
+        if hasattr(self, "_populate_well_log_tree"):
+            self._populate_well_log_tree()
+
+        # ---- 5) refresh panels if you prefer centralized refresh ----
+        if hasattr(self, "_refresh_all_panels"):
+            self._refresh_all_panels()
+
+        # Optional: update window title
+        self.setWindowTitle("PyWellSection — New Project")
