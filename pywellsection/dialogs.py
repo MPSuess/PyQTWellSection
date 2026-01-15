@@ -849,7 +849,8 @@ class StratigraphyEditorDialog(QDialog):
 
 class LayoutSettingsDialog(QDialog):
     def __init__(self, parent, well_gap_factor: float, track_width: float, vertical_scale: float,
-                 depth_min: float, depth_max:float):
+                 depth_min: float, depth_max:float, track_gap_factor:float, gap_proportional_to_distance:float,
+                 gap_distance_ref_m: float, gap_min_factor: float, gap_max_factor: float):
         super().__init__(parent)
         self.setWindowTitle("Layout settings")
         self.resize(400, 150)
@@ -873,6 +874,42 @@ class LayoutSettingsDialog(QDialog):
         self.spin_track.setSingleStep(0.1)
         self.spin_track.setValue(float(track_width))
         form.addRow("Track width:", self.spin_track)
+
+        self.spin_track_gap = QDoubleSpinBox(self)
+        self.spin_track_gap.setDecimals(3)
+        self.spin_track_gap.setRange(0.0, 1e6)
+        self.spin_track_gap.setValue(float(track_gap_factor))
+        form.addRow("Track gap factor:", self.spin_track_gap)
+
+        form.addRow(QLabel(""), QLabel(""))  # spacer row
+
+        # --- proportional gap settings ---
+        self.chk_prop = QCheckBox("Gap proportional to well distance", self)
+        self.chk_prop.setChecked(bool(gap_proportional_to_distance))
+        form.addRow(self.chk_prop)
+
+        self.spin_ref_m = QDoubleSpinBox(self)
+        self.spin_ref_m.setDecimals(2)
+        self.spin_ref_m.setRange(0.01, 1e12)
+        self.spin_ref_m.setValue(float(gap_distance_ref_m))
+        self.spin_ref_m.setSuffix(" m")
+        form.addRow("Reference distance:", self.spin_ref_m)
+
+        self.spin_min_fac = QDoubleSpinBox(self)
+        self.spin_min_fac.setDecimals(3)
+        self.spin_min_fac.setRange(0.0, 1e6)
+        self.spin_min_fac.setValue(float(gap_min_factor))
+        form.addRow("Min gap factor:", self.spin_min_fac)
+
+        self.spin_max_fac = QDoubleSpinBox(self)
+        self.spin_max_fac.setDecimals(3)
+        self.spin_max_fac.setRange(0.0, 1e6)
+        self.spin_max_fac.setValue(float(gap_max_factor))
+        form.addRow("Max gap factor:", self.spin_max_fac)
+
+        # enable/disable dependent fields
+        self.chk_prop.toggled.connect(self._update_enabled)
+        self._update_enabled(self.chk_prop.isChecked())
 
         self.spin_scale = QDoubleSpinBox(self)
         self.spin_scale.setFixedWidth(100)
@@ -898,16 +935,26 @@ class LayoutSettingsDialog(QDialog):
         self.spin_max_depth.setValue(float(depth_max))
         form.addRow("Section maximum depth:", self.spin_max_depth)
 
-
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+
+    def _update_enabled(self, enabled: bool):
+        self.spin_ref_m.setEnabled(enabled)
+        self.spin_min_fac.setEnabled(enabled)
+        self.spin_max_fac.setEnabled(enabled)
+
+
     def values(self):
         return (float(self.spin_gap.value()), float(self.spin_track.value()),
                 float(self.spin_scale.value()), float(self.spin_min_depth.value()),
-                float(self.spin_max_depth.value()))
+                float(self.spin_max_depth.value()), float(self.spin_track_gap.value()),
+                bool(self.chk_prop.isChecked()),
+                float(self.spin_ref_m.value()), float(self.spin_min_fac.value()),
+                float(self.spin_max_fac.value())
+                )
 
 
 

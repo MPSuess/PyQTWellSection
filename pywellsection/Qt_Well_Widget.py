@@ -64,6 +64,12 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = panel_settings["track_gap_factor"]
         self.track_width = panel_settings["track_width"]
 
+        self.gap_proportional_to_distance = panel_settings.get("gap_proportional_to_distance",False)
+        self.gap_distance_mode = panel_settings.get("gap_distance_mode","auto")
+        self.gap_distance_ref_m = panel_settings.get("gap_distance_ref_m", 1000)
+        self.gap_min_factor = panel_settings.get("gap_min_factor",0.8)
+        self.gap_max_factor = panel_settings.get("gap_max_factor",8.0)
+
         self.redraw_requested = False
 
         if not panel_settings.get("vertical_scale", 0):
@@ -234,7 +240,11 @@ class WellPanelWidget(QWidget):
                 visible_tracks = visible_tracks,
                 depth_window=depth_window,
                 stratigraphy=self.stratigraphy,
-                vertical_scale=self.vertical_scale
+                vertical_scale=self.vertical_scale,
+                gap_proportional_to_distance = self.gap_proportional_to_distance,
+                gap_distance_ref_m = self.gap_distance_ref_m,
+                gap_min_factor = self.gap_min_factor,
+                gap_max_factor = self.gap_max_factor,
             )
             self._connect_ylim_sync()
             self._build_axis_index()
@@ -1190,6 +1200,16 @@ class WellPanelWidget(QWidget):
         self.track_gap_factor = settings["track_gap_factor"]
         self.track_width = settings["track_width"]
         self.vertical_scale = settings["vertical_scale"]
+
+        self.gap_proportional_to_distance = settings.get("gap_proportional_to_distance",False)
+        self.gap_distance_mode = settings.get("gap_distance_mode","auto")
+        self.gap_distance_ref_m = settings.get("gap_distance_ref_m", 1000)
+        self.gap_min_factor = settings.get("gap_min_factor",0.8)
+        self.gap_max_factor = settings.get("gap_max_factor",8.0)
+
+
+
+
 
     def set_vertical_scale(self, vertical_scale):
         self.vertical_scale = vertical_scale

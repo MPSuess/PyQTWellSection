@@ -7,6 +7,7 @@ import matplotlib.patches as patches
 from matplotlib.image import BboxImage
 from matplotlib.transforms import Bbox, TransformedBbox
 from matplotlib.collections import LineCollection
+from pywellsection.tools import _well_distance_m
 
 import numpy as np
 
@@ -88,26 +89,13 @@ def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                 ticklabel.set_fontsize(size * 0.9)
 
 
-def draw_multi_wells_panel_on_figure(
-    fig,
-    wells,
-    tracks,
-    suptitle=None,
-    well_gap_factor=3.0,
-    track_gap_factor=0.5,
-    track_width = 1.0,
-    corr_artists=None,
-    highlight_top=None,
-    flatten_depths=None,
-    visible_wells=None,
-    visible_tops = None,
-    visible_logs = None,
-    visible_discrete_logs = None,
-    visible_bitmaps = None,
-    visible_tracks = None,
-    depth_window = None,
-    stratigraphy = None,
-    vertical_scale = 1.0
+def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_factor=3.0, track_gap_factor=0.5,
+                                     track_width = 1.0, corr_artists=None, highlight_top=None, flatten_depths=None,
+                                     visible_wells=None, visible_tops = None, visible_logs = None,
+                                     visible_discrete_logs = None, visible_bitmaps = None, visible_tracks = None,
+                                     depth_window = None, stratigraphy = None, vertical_scale = 1.0,
+                                     gap_proportional_to_distance = None, gap_distance_ref_m = 1000,
+                                     gap_min_factor = 0.8, gap_max_factor = 8.0,
 ):
     """
     Draw multi-well, multi-track log panel with:
@@ -180,11 +168,6 @@ def draw_multi_wells_panel_on_figure(
     global_bottom_plot = -99999.0
     gobal_mid_plot = 0.0
 
-
-
-
-
-
     if depth_window is not None:
         #print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
@@ -205,7 +188,6 @@ def draw_multi_wells_panel_on_figure(
         global_bottom_plot = max(bottom_plot_candidates) - offsets[0]
         global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
-#    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
     if offsets[0] != 0.0:
         w = selected_wells[0]
@@ -221,10 +203,39 @@ def draw_multi_wells_panel_on_figure(
 
 
     # ---- 3) Layout: tracks + spacer columns ----
+
+    # --- compute per-gap spacer factors ---
+    gap_factors = []
+    if gap_proportional_to_distance and n_wells > 1:
+        # distance (meters) between adjacent wells
+        dists = []
+        for i in range(n_wells - 1):
+            d = _well_distance_m(wells[i], wells[i + 1])
+            dists.append(d)
+
+        # Convert distance to ratio relative to reference distance
+        # factor = well_gap_factor * clamp( dist / ref )
+        ref = float(gap_distance_ref_m) if gap_distance_ref_m else 1000.0
+        ref = max(ref, 1e-6)
+
+        for d in dists:
+            if d is None or not np.isfinite(d) or d <= 0:
+                # fallback to default constant gap
+                f = well_gap_factor
+            else:
+                rel = d / ref
+                rel = max(float(gap_min_factor), min(float(gap_max_factor), rel))
+                f = well_gap_factor * rel
+            gap_factors.append(f)
+    else:
+        gap_factors = [well_gap_factor] * max(0, n_wells - 1)
+
+    # --- Layout: tracks + spacer columns ---
     total_cols = n_wells * (n_tracks+1) + (n_wells - 1)
     width_ratios = []
     col_is_spacer = []
 
+    gap_i = 0
     for w in range(n_wells):
         width_ratios.append(track_width/2)
         col_is_spacer.append(False)
@@ -232,8 +243,23 @@ def draw_multi_wells_panel_on_figure(
             width_ratios.append(track_width)
             col_is_spacer.append(False)
         if w != n_wells - 1:
-            width_ratios.append(well_gap_factor)
+            width_ratios.append(gap_factors[gap_i])
             col_is_spacer.append(True)
+            gap_i += 1
+
+    # total_cols = n_wells * (n_tracks+1) + (n_wells - 1)
+    # width_ratios = []
+    # col_is_spacer = []
+    #
+    # for w in range(n_wells):
+    #     width_ratios.append(track_width/2)
+    #     col_is_spacer.append(False)
+    #     for _ in range(n_tracks):
+    #         width_ratios.append(track_width)
+    #         col_is_spacer.append(False)
+    #     if w != n_wells - 1:
+    #         width_ratios.append(well_gap_factor)
+    #         col_is_spacer.append(True)
 
     gs = fig.add_gridspec(
         1,
@@ -254,9 +280,16 @@ def draw_multi_wells_panel_on_figure(
     for ax, is_spacer in zip(axes, col_is_spacer):
         if is_spacer:
             ax.axis("off")
-
             ax.set_ylim(global_top_plot, global_bottom_plot)
             ax.invert_yaxis()
+
+    add_well_distances_in_spacers(
+        axes=axes,
+        wells=wells,
+        n_tracks=n_tracks+1,
+        spacer_col_flags=col_is_spacer,
+        fmt="Δ {d:.0f} m",
+    )
 
     well_main_axes = []
 
@@ -855,20 +888,8 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
 
-def add_tops_and_correlations(
-    fig,
-    axes,
-    wells,
-    well_main_axes,
-    n_tracks,
-    correlations_only=False,
-    corr_artists=None,
-    highlight_top=None,
-    flatten_depths=None,
-    visible_tops=None,
-    visible_tracks = None,
-    stratigraphy = None,
-):
+def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlations_only=False,corr_artists=None,
+    highlight_top=None,flatten_depths=None,visible_tops=None,visible_tracks = None, stratigraphy = None):
     """
     Handle:
       - tops (lines, labels, within-well interval fill)
@@ -1506,10 +1527,7 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                 x_min, x_max = base_ax.get_xlim()
                 base_ax.set_xlim(x_max, x_min)
 
-
-def single_curve_log_color_fill(base_ax, depth_plot,
-                                mask,
-                                x, xlim, color_map=None):
+def single_curve_log_color_fill(base_ax, depth_plot,mask, x, xlim, color_map=None):
 
     #x_min = np.nanmin(x[mask])
     #x_max = np.nanmax(x[mask])
@@ -1534,9 +1552,6 @@ def single_curve_log_color_fill(base_ax, depth_plot,
     width = bbox.width
 
     colored_line(y_const, depth_plot, x_norm, base_ax, linewidth=width * 2, cmap=color_map, zorder=0.001)
-
-
-
 
 def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
     """
@@ -1652,3 +1667,44 @@ def colored_line(x, y, c, ax, **lc_kwargs):
     lc.set_array(c)  # set the colors of each segment
 
     return ax.add_collection(lc)
+
+def add_well_distances_in_spacers(axes, wells, n_tracks, spacer_col_flags, fmt="Δ {d:.0f} m"):
+    """
+    Draw distance between adjacent wells into the spacer column between them.
+    - axes: list of subplot axes including spacer columns
+    - wells: in display order (left->right)
+    - n_tracks: number of tracks per well used in this draw call
+    - spacer_col_flags: list[bool] same length as axes (True if spacer column)
+    """
+    if len(wells) < 2:
+        return
+
+    # Collect spacer axes in left->right order
+    spacer_axes = [ax for ax, is_spacer in zip(axes, spacer_col_flags) if is_spacer]
+    # There should be exactly (n_wells-1) spacer axes if layout matches
+    # but we won't hard-fail if it doesn't.
+    for i in range(min(len(spacer_axes), len(wells) - 1)):
+        w_left = wells[i]
+        w_right = wells[i + 1]
+        ax_sp = spacer_axes[i]
+
+        d_m = _well_distance_m(w_left, w_right)
+
+        if d_m is None:
+            text = "Δ n/a"
+        else:
+            # switch to km if large
+            if d_m >= 10000:
+                text = f"Δ {d_m/1000:.2f} km"
+            else:
+                text = fmt.format(d=d_m)
+
+        # Draw near top of spacer; zorder high so it sits on top of correlation fills
+        ax_sp.text(
+            0.5, 0.02, text,
+            transform=ax_sp.transAxes,
+            ha="center", va="bottom",
+            fontsize=9,
+            zorder=50,
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.75),
+        )

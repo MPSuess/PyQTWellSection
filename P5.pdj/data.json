@@ -11659,19 +11659,19 @@
       },
       "visible_logs": [
         "CAL",
-        "PHI",
-        "RT",
+        "GR",
         "RHOB",
-        "GR"
+        "PHI",
+        "RT"
       ],
       "visible_tracks": [
-        "GR-CAL",
         "core",
-        "f3",
-        "RHOB-PHI",
+        "GR-CAL",
+        "RT-RHOB",
         "LithoFacies",
         "Facies",
-        "RT-RHOB"
+        "f3",
+        "RHOB-PHI"
       ],
       "visible_wells": [
         "Well A",
