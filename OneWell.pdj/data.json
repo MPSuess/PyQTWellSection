@@ -5078,32 +5078,6 @@
           ]
         }
       },
-      "bitmaps": {
-        "bitmap1": {
-          "path": "core1.png",
-          "top_depth": 200.0,
-          "base_depth": 300.0,
-          "track": "core"
-        },
-        "bitmap2": {
-          "path": "core1.png",
-          "top_depth": 300.0,
-          "base_depth": 400.0,
-          "track": "core2"
-        },
-        "cp077": {
-          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
-          "top_depth": 0.0,
-          "base_depth": 100.0,
-          "track": "core"
-        },
-        "cpb777": {
-          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
-          "top_depth": 500.0,
-          "base_depth": 600.0,
-          "track": "core"
-        }
-      },
       "tops": {
         "Formation A": {
           "depth": 200,
@@ -5241,7 +5215,37 @@
           "rel_top": 83.0,
           "rel_base": 100.0
         }
-      ]
+      ],
+      "bitmaps": {
+        "cp001": {
+          "name": "bitmap",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/OneWell.pdj/Well A_cp001.png",
+          "top_depth": 0.0,
+          "base_depth": 100.0,
+          "track": "core"
+        },
+        "cp002": {
+          "name": "bitmap2",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/OneWell.pdj/Well A_cp002.png",
+          "top_depth": 100.0,
+          "base_depth": 300.0,
+          "track": "core"
+        }
+      },
+      "cp001": {
+        "name": "bitmap",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/OneWell.pdj/Well A_cp001.png",
+        "top_depth": 0.0,
+        "base_depth": 100.0,
+        "track": "core"
+      },
+      "cp002": {
+        "name": "bitmap2",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/OneWell.pdj/Well A_cp002.png",
+        "top_depth": 100.0,
+        "base_depth": 300.0,
+        "track": "core"
+      }
     }
   ],
   "tracks": [
@@ -5249,9 +5253,9 @@
       "name": "LithoFacies",
       "type": "lithofacies",
       "config": {
-        "hardness_scale": 2,
+        "hardness_scale": 0.3,
         "spline": {
-          "smooth": 1,
+          "smooth": 1.0,
           "num_samples": 25
         }
       },
@@ -5284,15 +5288,26 @@
           "label": "Gamma Ray (API)",
           "color": "green",
           "xlim": [
-            0,
-            150
+            0.0,
+            150.0
           ],
           "xscale": "linear",
           "direction": "normal",
-          "render": "points",
+          "render": "line",
           "marker": ".",
           "markersize": 2.0,
-          "alpha": 0.9
+          "alpha": 0.9,
+          "decimate": 1,
+          "clip": true,
+          "mask_nan": true,
+          "zorder": 2,
+          "linewidth": 1.0,
+          "style": "-",
+          "colorscale": "turbo_r",
+          "colorrange": [
+            0.0,
+            0.0
+          ]
         },
         {
           "log": "CAL",
@@ -5305,6 +5320,19 @@
           "xscale": "linear",
           "direction": "reverse"
         }
+      ],
+      "fills": [
+        {
+          "type": "between_logs",
+          "facecolor": "#cccccc",
+          "facetype": "GR",
+          "alpha": 0.35,
+          "hatch": null,
+          "zorder": 0.6,
+          "log_left": "GR",
+          "log_right": "CAL",
+          "where": "all"
+        }
       ]
     },
     {
@@ -5316,11 +5344,24 @@
           "label": "Resistivity (\u03a9\u00b7m)",
           "color": "red",
           "xlim": [
-            1,
-            100
+            1.0,
+            100.0
           ],
           "xscale": "log",
-          "direction": "normal"
+          "direction": "normal",
+          "render": "points",
+          "alpha": 1.0,
+          "decimate": 1,
+          "clip": true,
+          "mask_nan": true,
+          "zorder": 2,
+          "marker": ".",
+          "markersize": 2.0,
+          "colorscale": "None",
+          "colorrange": [
+            0.0,
+            0.0
+          ]
         }
       ]
     },
@@ -5344,11 +5385,24 @@
           "label": "Porosity",
           "color": "purple",
           "xlim": [
-            0,
+            0.0,
             0.5
           ],
           "xscale": "linear",
-          "direction": "normal"
+          "direction": "normal",
+          "render": "line",
+          "alpha": 1.0,
+          "decimate": 1,
+          "clip": true,
+          "mask_nan": true,
+          "zorder": 2,
+          "linewidth": 2.000000000000001,
+          "style": "--",
+          "colorscale": "None",
+          "colorrange": [
+            0.0,
+            0.0
+          ]
         }
       ]
     },
@@ -5483,19 +5537,18 @@
         }
       },
       "visible_logs": [
-        "PHI",
-        "CAL",
-        "RHOB",
         "GR",
+        "PHI",
+        "RHOB",
+        "CAL",
         "RT"
       ],
       "visible_tracks": [
         "LithoFacies",
-        "GR-CAL",
         "core",
+        "GR-CAL",
         "Facies",
         "RT-RHOB",
-        "f3",
         "RHOB-PHI"
       ],
       "visible_wells": [
@@ -5512,7 +5565,7 @@
   ],
   "ui_layout": {
     "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAbEAAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAHcAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAB3QAABOcAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAADPAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAAAAAAAAAPwAAADoAAAAzwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAANsAAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAc8AAAG1AAAAAAAAAAAAAAAAAAADbAAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAbEAAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAHcAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAB3QAABOcAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAAAAAAAAAPwAAAAYAAADbAAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAADbAAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
     "tab_groups": [
       [
         "Console",
@@ -5520,8 +5573,8 @@
         "Log"
       ],
       [
-        "Input",
-        "Windows"
+        "Windows",
+        "Input"
       ]
     ]
   }

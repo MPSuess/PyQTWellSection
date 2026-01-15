@@ -5078,32 +5078,6 @@
           ]
         }
       },
-      "bitmaps": {
-        "bitmap1": {
-          "path": "core1.png",
-          "top_depth": 200.0,
-          "base_depth": 300.0,
-          "track": "core"
-        },
-        "bitmap2": {
-          "path": "core1.png",
-          "top_depth": 300.0,
-          "base_depth": 400.0,
-          "track": "core2"
-        },
-        "cp077": {
-          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
-          "top_depth": 0.0,
-          "base_depth": 100.0,
-          "track": "core"
-        },
-        "cpb777": {
-          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
-          "top_depth": 500.0,
-          "base_depth": 600.0,
-          "track": "core"
-        }
-      },
       "tops": {
         "Formation A": {
           "depth": 200,
@@ -5241,7 +5215,37 @@
           "rel_top": 83.0,
           "rel_base": 100.0
         }
-      ]
+      ],
+      "bitmaps": {
+        "cp001": {
+          "name": "bitmap",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
+          "top_depth": 0.0,
+          "base_depth": 100.0,
+          "track": "core"
+        },
+        "cp002": {
+          "name": "bitmap2",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
+          "top_depth": 100.0,
+          "base_depth": 300.0,
+          "track": "core"
+        }
+      },
+      "cp001": {
+        "name": "bitmap",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
+        "top_depth": 0.0,
+        "base_depth": 100.0,
+        "track": "core"
+      },
+      "cp002": {
+        "name": "bitmap2",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
+        "top_depth": 100.0,
+        "base_depth": 300.0,
+        "track": "core"
+      }
     },
     {
       "name": "Well B",
@@ -8324,15 +8328,7 @@
           "level": "sequence"
         }
       },
-      "facies_intervals": [],
-      "bitmaps": {
-        "cp001": {
-          "path": "/Users/suess/PycharmProjects/PyWellSection/core1.png",
-          "top_depth": 500.0,
-          "base_depth": 600.0,
-          "track": "core"
-        }
-      }
+      "facies_intervals": []
     },
     {
       "name": "Well C",
@@ -11623,33 +11619,64 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": [
-        "Formation A",
-        "Sequence 1",
-        "Member A1",
-        "Lower Formation A",
-        "Carboniferous"
-      ],
+      "visible_tops": {
+        "Upper Formation A": {
+          "level": "sequence",
+          "color": "#ff0000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Formation A": {
+          "level": "formation",
+          "color": "#ffcc00",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Sequence 1": {
+          "level": "sequence",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Member A1": {
+          "level": "member",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Carboniferous": {
+          "level": "formation",
+          "color": "#000000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Lower Formation A": {
+          "level": "sequence",
+          "color": "#0000ff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        }
+      },
       "visible_logs": [
+        "CAL",
         "PHI",
         "RT",
         "RHOB",
-        "GR",
-        "CAL"
+        "GR"
       ],
       "visible_tracks": [
-        "RT-RHOB",
-        "Facies",
+        "GR-CAL",
         "core",
         "f3",
-        "GR-CAL",
+        "RHOB-PHI",
         "LithoFacies",
-        "RHOB-PHI"
+        "Facies",
+        "RT-RHOB"
       ],
       "visible_wells": [
+        "Well A",
         "Well B",
-        "Well C",
-        "Well A"
+        "Well C"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
@@ -11706,8 +11733,8 @@
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAANfAAABcgAACiIAAAUiAAADXwAAAY4AAAoiAAAFIgAAAAAAAAAACgAAAANfAAABjgAACiIAAAUi",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAXaAAADffwCAAAAAfwAAAAYAAADfQAAASQA/////AEAAAAC/AAAAAAAAACvAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAAsAAABSoAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAMEAAAArgD////8AAADHQAAAHgAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAAA6QAAA338AgAAAAT7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG/AAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAHYAAABvQAAAKsA////+gAAAAEBAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAF8A////AAAAAAAAA30AAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAAByQAAAVXAAAABwAAADUAAAckAAAFVwAAAAAAAAAACgAAAAAHAAAANQAAByQAAAVX",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAFC/wCAAAAAfwAAAAYAAAFCwAAASQA/////AEAAAAC/AAAAAAAAAH1AAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAB9gAABSgAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAReAAAArgD////8AAAEdwAAAKwAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAADJgAABQv8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAAFCwAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
     "tab_groups": [
       [
         "Console",

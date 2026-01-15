@@ -4,8 +4,15 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
+from matplotlib.image import BboxImage
+from matplotlib.transforms import Bbox, TransformedBbox
+from matplotlib.collections import LineCollection
 
 import numpy as np
+
+from numpy import ndarray
+from numpy import dtype
+from typing import Any
 
 import logging
 import pandas as pd
@@ -21,6 +28,7 @@ logging.getLogger("matplotlib.ticker").setLevel("CRITICAL")
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel("DEBUG")
+
 
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
@@ -135,7 +143,7 @@ def draw_multi_wells_panel_on_figure(
 
 
     if not filtered_tracks:
-        n_tracks = 1
+        n_tracks = 0
     else:
         n_tracks = len(filtered_tracks)
 
@@ -151,6 +159,14 @@ def draw_multi_wells_panel_on_figure(
     top_phys = max(ref_depths)
     bottom_phys = max(bottoms)
 
+    for w in selected_wells:
+        for log_name, log_def in w.get("logs", {}).items():
+            depth = log_def["depth"]
+            min_data_depth = np.nanmin(depth)
+            max_data_depth = np.nanmax(depth)
+            if max_data_depth < top_phys: top_phys = max_data_depth
+            if min_data_depth > bottom_phys: bottom_phys = min_data_depth
+
     # ---- 2) Compute per-well offsets and global plotting range ----
     # offset_i is in TRUE depth coordinates (e.g. formation top depth)
     offsets = []
@@ -165,14 +181,19 @@ def draw_multi_wells_panel_on_figure(
     gobal_mid_plot = 0.0
 
 
+
+
+
+
     if depth_window is not None:
-        print ("depth_window", depth_window)
+        #print ("depth_window", depth_window)
         top_depth_window, bottom_depth_window = depth_window
         global_mid_plot = (top_depth_window + bottom_depth_window) / 2
         if top_depth_window < global_mid_plot < bottom_depth_window:
             global_top_plot = top_depth_window + offsets[0]
             global_bottom_plot = bottom_depth_window + offsets[0]
     else:
+        print ("does this ever happen?")
         top_plot_candidates = []
         bottom_plot_candidates = []
         for off in offsets:
@@ -185,6 +206,17 @@ def draw_multi_wells_panel_on_figure(
         global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 #    global_mid_plot = (global_top_plot + global_bottom_plot) / 2
+
+    if offsets[0] != 0.0:
+        w = selected_wells[0]
+        top_ref_depth = w["reference_depth"] - offsets[0]
+        bottom_ref_depth = top_ref_depth + w["total_depth"]
+        print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
+        global_top_plot = min(top_ref_depth, global_top_plot)
+        global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
+
+
+    print(f"global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
 
 
 
@@ -247,12 +279,12 @@ def draw_multi_wells_panel_on_figure(
         first_track_idx = wi * (n_tracks + 2)
 
 
-        print (f"wi={wi} first_track_idx={first_track_idx}")
+        #print (f"wi={wi} first_track_idx={first_track_idx}")
 
         col_idx = wi * (n_tracks + 2)
         base_ax = axes[col_idx]
         base_ax.set_ylim(global_top_plot, global_bottom_plot)
-        print(f"base_ax.ylim={base_ax.get_ylim()}")
+        #print(f"base_ax.ylim={base_ax.get_ylim()}")
         base_ax.invert_yaxis()
         base_ax.grid(True, linestyle="--", alpha=0.3)
         base_ax.set_ylabel("Depth (m)", labelpad=8)
@@ -285,7 +317,7 @@ def draw_multi_wells_panel_on_figure(
         # ---- Normal multi-track case ----
         for ti, track in enumerate(filtered_tracks):
             col_idx = wi * (n_tracks + 2) + ti +1
-            print(f"col_idx={col_idx} wi={wi} ti={ti} n_tracks={n_tracks}")
+            #print(f"col_idx={col_idx} wi={wi} ti={ti} n_tracks={n_tracks}")
             base_ax = axes[col_idx]
             #LOG.debug(f"track {ti+1}/{n_tracks} offset={offset:.0f} ref_depth={ref_depth:.0f} well_td={well_td:.0f}")
             # Shared plotting Y-range for all wells
@@ -293,19 +325,13 @@ def draw_multi_wells_panel_on_figure(
             base_ax.invert_yaxis()
             base_ax.grid(True, linestyle="--", alpha=0.3)
 
-            # if ti == 0:
-            #     base_ax.set_ylabel("Depth (m)", labelpad=8)
-            #     base_ax.tick_params(axis="y", labelleft=True)
-            #     if depth_formatter is not None:
-            #         base_ax.yaxis.set_major_formatter(depth_formatter)
-            # else:
-            #
+
             base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
-            mid_track = n_tracks // 2
+            mid_track = (n_tracks) // 2
             if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, fontsize=10)
+                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
 
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
@@ -320,8 +346,6 @@ def draw_multi_wells_panel_on_figure(
                 _draw_lithofacies_track(base_ax,well,track, offset)
 
 
-
-    fig.canvas.draw()
     add_depth_range_labels(fig, axes, selected_wells, n_tracks)
 
     if corr_artists is None:
@@ -345,10 +369,15 @@ def draw_multi_wells_panel_on_figure(
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
 
+    print("now axes limits are:",axes[0].get_ylim())
+
     return axes, well_main_axes
 
 
 def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
+
+    curve_cache = {}
+
     for j, log_cfg in enumerate(track.get("logs", [])):
         log_name = log_cfg["log"]
 
@@ -362,6 +391,13 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         depth = log_def["depth"]
         data = log_def["data"]
+
+
+
+        mask = [x > 0 for x in depth]
+
+
+
 
         # plotting depth: flattened if offset != 0
         depth_plot = [x - offset for x in depth]
@@ -399,6 +435,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             x = x[m]
             y = y[m]
 
+        mask = [t > 0 for t in x]
+
+
         # --- plot ---
         if render in ("points", "scatter", "markers"):
             twin_ax.plot(
@@ -410,6 +449,20 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
                 alpha=alpha,
                 zorder=zorder,
             )
+        elif render == "color":
+            x_min = np.nanmin(x)
+            x_max = np.nanmax(x)
+            x_range = x_max - x_min
+            x_norm = (x-x_min)/(x_range)
+            # ensure that we stay between 0 and 1
+            x_norm = np.clip(x_norm, 0, 1)
+            y_const = np.linspace(0.5, 0.5, len(depth_plot))
+
+            bbox = twin_ax.get_window_extent()
+            width = bbox.width
+
+            colored_line(y_const, depth_plot, x_norm, twin_ax, linewidth=2*width, cmap="viridis")
+
         else:
             twin_ax.plot(
                 x, y,
@@ -453,6 +506,20 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         )
 
         twin_ax.grid(False)
+
+        # cache for fills
+        curve_cache[log_name] = {
+            "depth_plot": depth_plot,
+            "x": data,
+            "twin_ax": twin_ax,
+            "cfg": log_cfg,
+        }
+
+    _apply_track_fills(
+        base_ax=base_ax,
+        curve_cache=curve_cache,
+        track=track
+    )
 
 def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs = None):
     """
@@ -779,8 +846,8 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
 
-        first_track_idx = wi * (n_tracks + 1)
-        last_track_idx = first_track_idx + n_tracks - 1
+        first_track_idx = wi * (n_tracks + 2)
+        last_track_idx = first_track_idx + n_tracks
         left = axes[first_track_idx].get_position().x0
         right = axes[last_track_idx].get_position().x1
         mid_x = (left + right) / 2
@@ -985,13 +1052,13 @@ def add_tops_and_correlations(
                 y0, y1 = main_ax.get_ylim()
                 depth_max = max(y0, y1)
                 depth_range = abs(y0 - y1) or 1.0
-                thickness = depth_range * 0.01
+                thickness = depth_range * 0.001
                 open_top = deepest_formation
                 open_bottom = min(deepest_formation + thickness, depth_max)
                 if open_bottom > open_top:
 
                     for ti in range(n_tracks):
-                        col_idx = first_track_idx + ti
+                        col_idx = first_track_idx + ti +1
                         base_ax = axes[col_idx]
                         base_ax.axhspan(
                             open_top,
@@ -1185,4 +1252,403 @@ def add_tops_and_correlations(
 
     return corr_artists
 
+def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
+    """
+    Draw fills for a track on base_ax using cached curves.
 
+    Supported:
+      - type: "to_value"      (curve vs constant)
+      - type: "between_logs"  (curve vs curve)
+      - type: "to_minmax"     (curve vs its track x-limits min/max)
+    """
+    fills = track.get("fills", []) or []
+    if not fills:
+        return
+
+
+
+
+
+    for f in fills:
+        ftype = (f.get("type") or "").strip().lower()
+        alpha = float(f.get("alpha", 0.3))
+        facecolor = f.get("facecolor", "#cccccc")
+        facetype = f.get("facetype", "color")
+        hatch = f.get("hatch", None)
+        zorder = float(f.get("zorder", 0.6))
+
+
+        ### type ... to_value
+
+        if ftype == "to_value":
+            log_name = f.get("log")
+            color_type = f.get("color_type", "curve")
+            if log_name not in curve_cache:
+                continue
+
+            logs = track.get("logs", []) or []
+            for log in logs:
+                track_log_name = log.get("log")
+                if track_log_name == log_name:
+                    track_xlim = log.get("xlim")
+                    color_map = log.get("colorscale", None)
+                    _, track_xmax = track_xlim or (0.0, 1.0)
+
+
+            value = float(f.get("value", 0.0))
+            where = (f.get("where") or "greater").lower()
+
+            depth_plot = np.asarray(curve_cache[log_name]["depth_plot"], dtype=float)
+            x = np.asarray(curve_cache[log_name]["x"], dtype=float)
+
+            mask = (x < value) if where == "less" else (x > value)
+
+            if facetype == "color":
+
+                base_ax.fill_betweenx(
+                    depth_plot, x, value,
+                    where=mask, alpha=alpha,
+                    facecolor=facecolor, hatch=hatch,
+                    linewidth=0.0, zorder=zorder,
+                )
+            else:
+                single_curve_log_color_fill(base_ax, depth_plot, mask, x, track_xlim, color_map)
+
+                base_ax.fill_betweenx(
+                    depth_plot, x, value,
+                    where=mask, alpha=1,
+                    facecolor="white",
+                    linewidth=0.0, zorder=0.01,
+                )
+
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            xscale = log_cfg.get("xscale", "linear")
+            base_ax.set_xscale("log" if xscale == "log" else "linear")
+            if "xlim" in log_cfg:
+                base_ax.set_xlim(log_cfg["xlim"])
+            if log_cfg.get("direction", "normal") == "reverse":
+                x_min, x_max = base_ax.get_xlim()
+                base_ax.set_xlim(x_max, x_min)
+
+
+        elif ftype == "to_minmax":
+            log_name = f.get("log")
+            if log_name not in curve_cache:
+                continue
+
+            side = (f.get("side") or "min").lower()  # "min" or "max"
+
+            depth_plot = np.asarray(curve_cache[log_name]["depth_plot"], dtype=float)
+            x = np.asarray(curve_cache[log_name]["x"], dtype=float)
+
+            # Use the curve's displayed x-limits (track min/max) from the twiny axis
+            twin_ax = curve_cache[log_name]["twin_ax"]
+            x0, x1 = twin_ax.get_xlim()
+            xmin, xmax = (min(x0, x1), max(x0, x1))
+            bound = xmin if side == "min" else xmax
+
+            logs = track.get("logs", []) or []
+            for log in logs:
+                track_log_name = log.get("log")
+                if track_log_name == log_name:
+                    track_xlim = log.get("xlim")
+                    color_map = log.get("colorscale", None)
+                    _, track_xmax = track_xlim or (0.0, 1.0)
+
+
+
+            # Only fill inside the axis range
+            if side == "min":
+                mask = x > xmin
+            else:
+                mask = x < xmax
+
+            # base_ax.fill_betweenx(
+            #     depth_plot, x, bound,
+            #     where=mask, alpha=alpha,
+            #     facecolor=facecolor, hatch=hatch,
+            #     linewidth=0.0, zorder=zorder,
+            # )
+
+            if facetype == "color":
+
+                base_ax.fill_betweenx(
+                    depth_plot, x, bound,
+                    where=mask, alpha=alpha,
+                    facecolor=facecolor, hatch=hatch,
+                    linewidth=0.0, zorder=zorder,
+                )
+            else:
+                single_curve_log_color_fill(base_ax, depth_plot, mask, x, track_xlim, color_map)
+
+                base_ax.fill_betweenx(
+                    depth_plot, x, bound,
+                    where=mask, alpha=1,
+                    facecolor="white",
+                    linewidth=0.0, zorder=0.01,
+                )
+
+
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            xscale = log_cfg.get("xscale", "linear")
+            base_ax.set_xscale("log" if xscale == "log" else "linear")
+            if "xlim" in log_cfg:
+                base_ax.set_xlim(log_cfg["xlim"])
+            if log_cfg.get("direction", "normal") == "reverse":
+                x_min, x_max = base_ax.get_xlim()
+                base_ax.set_xlim(x_max, x_min)
+
+
+        ### finaly the between logs case ....
+        ###
+        elif ftype == "between_logs":
+
+            log_name = f.get("log_left")
+            if log_name not in curve_cache:
+                continue
+
+            logs = track.get("logs", []) or []
+            for log in logs:
+                track_log_name = log.get("log")
+                if track_log_name == log_name:
+                    track_xlim = log.get("xlim")
+                    color_map = log.get("colorscale", None)
+                    _, track_xmax = track_xlim or (0.0, 1.0)
+
+            twin_ax = curve_cache[log_name]["twin_ax"]
+            x0, x1 = twin_ax.get_xlim()
+            xmin, xmax = (min(x0, x1), max(x0, x1))
+
+
+            left = f.get("log_left")
+            right = f.get("log_right")
+            if left not in curve_cache or right not in curve_cache:
+                continue
+
+            dl = np.asarray(curve_cache[left]["depth_plot"], dtype=float)
+            xl = np.asarray(curve_cache[left]["x"], dtype=float)
+            dr = np.asarray(curve_cache[right]["depth_plot"], dtype=float)
+            xr = np.asarray(curve_cache[right]["x"], dtype=float)
+
+            l_log_cfg = curve_cache[left].get("cfg", None)
+            l_xlim = l_log_cfg.get("xlim", None) if l_log_cfg else None
+            l_direction = l_log_cfg.get("direction", "normal") if l_log_cfg else "normal"
+            l_xscale = l_log_cfg.get("xscale", "linear") if l_log_cfg else "linear"
+
+            r_log_cfg = curve_cache[right].get("cfg", None)
+            r_xlim = r_log_cfg.get("xlim", None) if r_log_cfg else None
+            r_direction = r_log_cfg.get("direction", "normal") if r_log_cfg else "normal"
+            r_xscale = r_log_cfg.get("xscale", "linear") if r_log_cfg else "linear"
+
+            # we have to transform the right log curve to the left log value range and direction
+
+            xr_min = r_xlim[0]
+            xr_max = r_xlim[1]
+            xl_min = l_xlim[0]
+            xl_max = l_xlim[1]
+
+            if l_direction == "reverse" or r_direction == "reverse":
+                xr_min, xr_max = xr_max, xr_min
+
+            xr = (xr - xr_min)/(xr_max - xr_min)
+            xr = xr * (xl_max - xl_min) + xl_min
+
+
+
+            # Resample right curve to left depth if needed
+            if len(dl) != len(dr) or not np.allclose(dl, dr, atol=1e-6, rtol=0):
+                ord_r = np.argsort(dr)
+                drs = dr[ord_r]
+                xrs = xr[ord_r]
+                xr_i = np.interp(dl, drs, xrs)
+            else:
+                xr_i = xr
+
+            where = (f.get("where") or "all").lower()
+            if where == "left_greater":
+                mask = xl > xr_i
+            elif where == "right_greater":
+                mask = xr_i > xl
+            else:
+                mask = None
+
+            if facetype == "color":
+                base_ax.fill_betweenx(
+                    dl, xl, xr_i,
+                    where=mask, alpha=alpha,
+                    facecolor=facecolor, hatch=hatch,
+                    linewidth=0.0, zorder=zorder,
+                )
+
+            else:
+                single_curve_log_color_fill(base_ax, dl, mask, xl, track_xlim, color_map)
+
+                base_ax.fill_betweenx(
+                    dl, xl, xmin,
+                    where=mask, alpha=1,
+                    facecolor="white",
+                    linewidth=0.0, zorder=zorder,
+                )
+                base_ax.fill_betweenx(
+                    dl, xr_i,xmax,
+                    where=mask, alpha=1,
+                    facecolor="white",
+                    linewidth=0.0, zorder=zorder,
+                )
+
+
+
+
+            base_ax.set_xscale("log" if l_xscale == "log" else "linear")
+            if "xlim" in l_log_cfg:
+                base_ax.set_xlim(l_log_cfg["xlim"])
+            if l_log_cfg.get("direction", "normal") == "reverse":
+                x_min, x_max = base_ax.get_xlim()
+                base_ax.set_xlim(x_max, x_min)
+
+
+def single_curve_log_color_fill(base_ax, depth_plot,
+                                mask,
+                                x, xlim, color_map=None):
+
+    #x_min = np.nanmin(x[mask])
+    #x_max = np.nanmax(x[mask])
+
+    if color_map is None or color_map == "None":
+        color_map = "viridis"
+
+    x_min, x_max = xlim or (0.0, 1.0)
+
+
+    x_range = x_max - x_min
+    x_norm = (x - x_min) / (x_range)
+
+    # ensure that we stay between 0 and 1
+
+    x_norm = np.clip(x_norm, 0, 1)
+
+    y_const = np.linspace(0.5, 0.5, len(depth_plot))
+    x_max_const = np.linspace(x_max, x_max, len(depth_plot))
+
+    bbox = base_ax.get_window_extent()
+    width = bbox.width
+
+    colored_line(y_const, depth_plot, x_norm, base_ax, linewidth=width * 2, cmap=color_map, zorder=0.001)
+
+
+
+
+def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
+    """
+    Plot a line with a color specified between (x, y) points by a third value.
+
+    It does this by creating a collection of line segments between each pair of
+    neighboring points. The color of each segment is determined by the
+    made up of two straight lines each connecting the current (x, y) point to the
+    midpoints of the lines connecting the current point with its two neighbors.
+    This creates a smooth line with no gaps between the line segments.
+
+    Parameters
+    ----------
+    x, y : array-like
+        The horizontal and vertical coordinates of the data points.
+    c : array-like
+        The color values, which should have a size one less than that of x and y.
+    ax : Axes
+        Axis object on which to plot the colored line.
+    **lc_kwargs
+        Any additional arguments to pass to matplotlib.collections.LineCollection
+        constructor. This should not include the array keyword argument because
+        that is set to the color argument. If provided, it will be overridden.
+
+    Returns
+    -------
+    matplotlib.collections.LineCollection
+        The generated line collection representing the colored line.
+    """
+    if "array" in lc_kwargs:
+        warnings.warn('The provided "array" keyword argument will be overridden')
+
+    # Check color array size (LineCollection still works, but values are unused)
+    if len(c) != len(x) - 1:
+        LOG.debug(
+            "The c argument should have a length one less than the length of x and y. "
+            "If it has the same length, use the colored_line function instead."
+        )
+
+    # Create a set of line segments so that we can color them individually
+    # This creates the points as an N x 1 x 2 array so that we can stack points
+    # together easily to get the segments. The segments array for line collection
+    # needs to be (numlines) x (points per line) x 2 (for x and y)
+    points = np.array([y, x]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    lc = LineCollection(segments, **lc_kwargs)
+
+    # Set the values used for colormapping
+    lc.set_array(c)
+
+    return ax.add_collection(lc)
+
+def colored_line(x, y, c, ax, **lc_kwargs):
+    """
+    Plot a line with a color specified along the line by a third value.
+
+    It does this by creating a collection of line segments. Each line segment is
+    made up of two straight lines each connecting the current (x, y) point to the
+    midpoints of the lines connecting the current point with its two neighbors.
+    This creates a smooth line with no gaps between the line segments.
+
+    Parameters
+    ----------
+    x, y : array-like
+        The horizontal and vertical coordinates of the data points.
+    c : array-like
+        The color values, which should be the same size as x and y.
+    ax : Axes
+        Axis object on which to plot the colored line.
+    **lc_kwargs
+        Any additional arguments to pass to matplotlib.collections.LineCollection
+        constructor. This should not include the array keyword argument because
+        that is set to the color argument. If provided, it will be overridden.
+
+    Returns
+    -------
+    matplotlib.collections.LineCollection
+        The generated line collection representing the colored line.
+    """
+    if "array" in lc_kwargs:
+        warnings.warn('The provided "array" keyword argument will be overridden')
+
+    # Default the capstyle to butt so that the line segments smoothly line up
+    default_kwargs = {"capstyle": "butt"}
+    default_kwargs.update(lc_kwargs)
+
+    # Compute the midpoints of the line segments. Include the first and last points
+    # twice so we don't need any special syntax later to handle them.
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    x = np.interp(x, np.linspace(0, 1, len(x)), np.linspace(0, 1, len(x)))
+
+
+
+    x_midpts = np.hstack((x[0], 0.5 * (x[1:] + x[:-1]), x[-1]))
+    y_midpts = np.hstack((y[0], 0.5 * (y[1:] + y[:-1]), y[-1]))
+
+    # Determine the start, middle, and end coordinate pair of each line segment.
+    # Use the reshape to add an extra dimension so each pair of points is in its
+    # own list. Then concatenate them to create:
+    # [
+    #   [(x1_start, y1_start), (x1_mid, y1_mid), (x1_end, y1_end)],
+    #   [(x2_start, y2_start), (x2_mid, y2_mid), (x2_end, y2_end)],
+    #   ...
+    # ]
+    coord_start = np.column_stack((x_midpts[:-1], y_midpts[:-1]))[:, np.newaxis, :]
+    coord_mid = np.column_stack((x, y))[:, np.newaxis, :]
+    coord_end = np.column_stack((x_midpts[1:], y_midpts[1:]))[:, np.newaxis, :]
+    segments = np.concatenate((coord_start, coord_mid, coord_end), axis=1)
+
+    lc = LineCollection(segments, **default_kwargs)
+    lc.set_array(c)  # set the colors of each segment
+
+    return ax.add_collection(lc)
