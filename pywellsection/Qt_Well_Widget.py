@@ -149,7 +149,8 @@ class WellPanelWidget(QWidget):
 
     def draw_panel(self):
 
-        redraw_requested = self.panel_settings["redraw_requested"]
+
+        redraw_requested = self.panel_settings.get("redraw_requested",None)
 
         LOG.debug(f"redraw requested: {self.visible_wells}")
 
