@@ -112,12 +112,32 @@ class MainWindow(QMainWindow):
         self.track_gap_factor = 1.0
         self.track_width = 1.0
         self.vertical_scale = 2.0
+        self.gap_proportional_to_distance = False
+        self.gap_distance_mode="auto"
+        self.gap_distance_ref_m = 1000.0
+        self.gap_min_factor = 0.8
+        self.gap_max_factor = 8.0
+
+
+        # --- layout settings ---
+        self.layout_settings = {
+            "well_gap_factor": 3.0,  # legacy constant spacer width
+            "track_width": 1.0,
+            "track_gap_factor": 0.5,
+        }
+
+
 
         window_name = "Well Section 1"
 
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested,
-                               "vertical_scale": self.vertical_scale
+                               "vertical_scale": self.vertical_scale,
+                               "gap_proportional_to_distance": self.gap_proportional_to_distance,
+                               "gap_distance_mode": self.gap_distance_mode,
+                               "gap_distance_ref_m": self.gap_distance_ref_m,
+                               "gap_min_factor": self.gap_min_factor,
+                               "gap_max_factor": self.gap_max_factor,  # clamp large gaps
                                }
 
         self.dock = WellPanelDock(
@@ -481,8 +501,11 @@ class MainWindow(QMainWindow):
             self.panel.visible_wells = window_dict[0]["visible_wells"]
             self.WindowList[0].set_title(window_dict[0]["window_title"])
             self.panel.vertical_scale = window_dict[0].get("vertical_scale", 1.0)
-
-            #
+            self.panel.gap_proportional_to_distance = window_dict[0].get("gap_proportional_to_distance", False)
+            self.panel.gap_distance_mode = window_dict[0].get("gap_distance_mode", "auto")
+            self.panel.gap_distance_ref_m = window_dict[0].get("gap_distance_ref_m", 1000)
+            self.panel.gap_min_factor = window_dict[0].get("gap_min_factor", 0.8)
+            self.panel.gap_max_factor = window_dict[0].get("gap_max_factor", 8.0)
 
             #add all remaining windows back in
             for window in window_dict[1:]:
@@ -633,7 +656,7 @@ class MainWindow(QMainWindow):
             if old_path == path: # if old equals new simple save ... .
             # just copy the new data.json into the existing data_dir
                 shutil.copy2(tmp_data_json, data_dir)
-                shutil.rmtree(tmp_data_json)
+                shutil.rmtree(tmp_dir)
             elif old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
                     o_path, ofname = os.path.split(old_path)
                     oproject_stem = os.path.splitext(ofname)[0]
@@ -2164,14 +2187,19 @@ class MainWindow(QMainWindow):
             track_width=self.panel.track_width,
             vertical_scale = 1,
             depth_min = depth_min,
-            depth_max = depth_max
+            depth_max = depth_max,
+            track_gap_factor = self.track_gap_factor,
+            gap_proportional_to_distance = self.gap_proportional_to_distance,
+            gap_distance_ref_m = self.gap_distance_ref_m,
+            gap_min_factor = self.gap_min_factor,
+            gap_max_factor = self.gap_max_factor
         )
         if dlg.exec_() != QDialog.Accepted:
             return
 
-        gap, tw, vs, depth_min, depth_max= dlg.values()
+        gap, tw, vs, depth_min, depth_max, tgf, gptdi, gdrm, gmf, gxf= dlg.values()
         self.panel.set_current_depth_window(depth_min, depth_max)
-        self.set_layout_params(gap, tw, vs)
+        self.set_layout_params(gap, tw, vs, tgf, gptdi, gdrm, gmf, gxf)
 
     def _action_edit_all_tops(self):
         """Open table dialog to edit/add/delete tops of all wells."""
@@ -3049,13 +3077,29 @@ class MainWindow(QMainWindow):
             trend = "constant"
         return lithology, trend
 
-    def set_layout_params(self, well_gap_factor: float, track_width: float, vertical_scale: float):
+    def set_layout_params(self, well_gap_factor: float, track_width: float,
+                          vertical_scale: float, track_gap_factor: float,
+                          gap_proportional_to_distance:bool, gap_distance_ref_m: float,
+                          gap_min_factor: float, gap_max_factor: float):
         """Update panel layout (gap between wells and track width) and redraw."""
         self.well_gap_factor = max(0.1, float(well_gap_factor))
         self.track_width = max(0.1, float(track_width))
-        self.vertical_scale = vertical_scale
+        self.vertical_scale = float(vertical_scale)
+        self.gap_proportional_to_distance = bool(gap_proportional_to_distance)
+        self.gap_distance_ref_m = float(gap_distance_ref_m)
+        self.gap_min_factor = min(0.8,float(gap_min_factor))
+        self.gap_max_factor = max(8.0,float(gap_max_factor))
+        self.track_gap_factor = float(track_gap_factor)
+
+
         self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width, "vertical_scale": self.vertical_scale}
+                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+                               "vertical_scale": self.vertical_scale,
+                               "gap_proportional_to_distance": self.gap_proportional_to_distance,
+                               "gap_distance_ref_m": self.gap_distance_ref_m,
+                               "gap_min_factor": self.gap_min_factor,
+                               "gap_max_factor": self.gap_max_factor,  # clamp large gaps
+                               }
         self.panel.set_panel_settings(self.panel_settings)
         self.panel.draw_panel()
 
