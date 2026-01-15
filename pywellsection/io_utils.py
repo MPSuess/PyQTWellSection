@@ -15,6 +15,199 @@ from PyQt5.QtWidgets import (
 )
 
 
+def _file_load_tops_from_csv(self, path: str):
+    """
+    Load formation / fault tops from a CSV file with columns:
+        Well_name, MD, Horizon, Name, Type
+
+    and merge them into:
+        - self.all_wells[*]["tops"]
+        - self.stratigraphy (adds role if needed)
+
+    Rules:
+      - well must exist in self.all_wells (matched by well['name'])
+      - top name is taken from:
+          * if Type == 'Fault':  Name or Horizon
+          * else:                Horizon or Name
+      - role:
+          * if Type == 'Fault'  -> 'fault'
+          * else                -> 'stratigraphy'
+      - depth is MD (float)
+    """
+    # ---- read CSV ----
+    try:
+        with open(path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            rows = list(reader)
+    except Exception as e:
+        QMessageBox.critical(self, "Load tops CSV", f"Failed to read file:\n{e}")
+        return
+
+    if not rows:
+        QMessageBox.information(self, "Load tops CSV", "No data rows found in CSV.")
+        return
+
+    # ---- index wells by name ----
+    if not hasattr(self, "all_wells") or not self.all_wells:
+        QMessageBox.warning(
+            self,
+            "Load tops CSV",
+            "No wells in project. Please create/import wells before loading tops."
+        )
+        return
+
+    wells_by_name = {}
+    for w in self.all_wells:
+        nm = w.get("name")
+        if nm:
+            wells_by_name[nm] = w
+
+    # ---- ensure we have a stratigraphy dict ----
+    strat = getattr(self, "stratigraphy", None)
+    if strat is None or not isinstance(strat, dict):
+        strat = OrderedDict()
+    else:
+        # preserve existing order
+        strat = OrderedDict(strat)
+
+    unknown_wells = set()
+    skipped_rows = 0
+    added_tops = 0
+    updated_tops = 0
+
+    for row in rows:
+        well_name = (row.get("Well_name") or "").strip()
+        md_str = (row.get("MD") or "").strip()
+        horizon = (row.get("Horizon") or "").strip()
+        name_col = (row.get("Name") or "").strip()
+        type_col = (row.get("Type") or "").strip()
+
+        if not well_name or not md_str:
+            skipped_rows += 1
+            continue
+
+        # parse depth
+        try:
+            depth = float(md_str.replace(",", "."))  # comma or dot decimals
+        except ValueError:
+            skipped_rows += 1
+            continue
+
+        # find well
+        well = wells_by_name.get(well_name)
+        if well is None:
+            unknown_wells.add(well_name)
+            skipped_rows += 1
+            continue
+
+        # determine top name + role
+        # For Faults -> name comes from Name or Horizon
+        # For others -> name from Horizon or Name
+        ttype = type_col.strip()
+        if ttype == "Fault":
+            top_name = name_col or horizon
+            role = "fault"
+        else:
+            top_name = horizon or name_col
+            role = "stratigraphy"
+
+        if not top_name:
+            # can't use an unnamed row
+            skipped_rows += 1
+            continue
+
+        # ---- update stratigraphy meta ----
+        meta = strat.get(top_name, {})
+        if not isinstance(meta, dict):
+            meta = {}
+
+        # keep existing fields, just ensure role exists / updated
+        meta.setdefault("level", "")  # you can refine this later
+        meta.setdefault("color", "#000000")
+        meta.setdefault("hatch", "-")
+        # if no role defined yet, set it; if already set, we do NOT overwrite
+        meta.setdefault("role", role)
+
+        strat[top_name] = meta
+
+        # ---- update well tops ----
+        tops = well.setdefault("tops", {})
+        old_val = tops.get(top_name)
+
+        if isinstance(old_val, dict):
+            old_val["depth"] = depth
+            tops[top_name] = old_val
+            updated_tops += 1
+        elif old_val is not None:
+            # old was a bare number
+            tops[top_name] = {"depth": depth}
+            updated_tops += 1
+        else:
+            tops[top_name] = {"depth": depth}
+            added_tops += 1
+
+    # store stratigraphy back
+    self.stratigraphy = strat
+
+    # ---- update panel ----
+    if hasattr(self, "panel"):
+        self.panel.wells = self.all_wells
+        self.panel.stratigraphy = self.stratigraphy
+        # keep zoom/flatten; if you want to reset, uncomment:
+        # self.panel.current_depth_window = None
+        # self.panel._flatten_depths = None
+        self.panel.draw_panel()
+
+    # ---- refresh trees ----
+    if hasattr(self, "_populate_well_tree"):
+        self._populate_well_tree()
+    if hasattr(self, "_populate_top_tree"):
+        self._populate_top_tree()
+
+    # ---- summary message ----
+    msg = [
+        f"Added tops:   {added_tops}",
+        f"Updated tops: {updated_tops}",
+        f"Skipped rows: {skipped_rows}",
+    ]
+    if unknown_wells:
+        msg.append(
+            "\nUnknown wells encountered (not in project):\n  "
+            + ", ".join(sorted(unknown_wells))
+        )
+
+    QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
+
+
+def _file_export_discrete_logs_csv(self):
+    path, _ = QFileDialog.getSaveFileName(
+        self,
+        "Export Discrete Logs",
+        "",
+        "CSV files (*.csv);;All files (*.*)"
+    )
+    if not path:
+        return
+
+    # Call your actual export function
+    export_discrete_logs_to_csv(self, path)
+
+    self._file_load_tops_from_csv(path)
+
+
+def _file_import_discrete_logs_csv(self):
+    path, _ = QFileDialog.getOpenFileName(
+        self,
+        "Import discrete logs from CSV",
+        "",
+        "CSV files (*.csv);;All files (*.*)"
+    )
+    if not path:
+        return
+
+    import_discrete_logs_from_csv(self, path)
+
+
 def load_project_from_json(path):
     path = Path(path)
 
@@ -46,8 +239,6 @@ def load_project_from_json(path):
     ui_layout = data.get("ui_layout", {})
 
     return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
-
-
 
 def load_project_from_json_old(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""

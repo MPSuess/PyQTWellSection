@@ -527,7 +527,7 @@ class MainWindow(QMainWindow):
             win.panel.draw_panel()
 
     def _project_file_save_as(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Save project as", "", "Well project (*.json);;All files (*.*)")
+        path, _ = QFileDialog.getSaveFileName(self, "Save project as", "", "Well project (*.pwj);;All files (*.*)")
         if not path:
             return
         LOG.debug(f"Saving project as {path}")
@@ -558,7 +558,7 @@ class MainWindow(QMainWindow):
                 self,
                 "Save project",
                 "",
-                "PyWellSection Project (*.pws);;All files (*.*)"
+                "PyWellSection Project (*.pwj);;All files (*.*)"
             )
             if not path:
                 return
@@ -575,7 +575,7 @@ class MainWindow(QMainWindow):
             project_stem = project_stem[:-5]
         data_dir_name = f"{project_stem}.pdj"
         data_dir = os.path.join(base_dir, data_dir_name)
-        data_json_path = os.path.join(data_dir, "PyQtWell.jsn")
+        data_json_path = os.path.join(data_dir, "Data.json")
 
         # build project data payload (your actual content)
 
@@ -598,21 +598,6 @@ class MainWindow(QMainWindow):
 
         window_list = self._get_window_list()
 
-
-
-        #
-        # project_data = {
-        #     "wells": getattr(self, "all_wells", []),
-        #     "tracks": getattr(self, "tracks", []),
-        #     "stratigraphy": getattr(self, "stratigraphy", {}),
-        # }
-        #
-        # # Optional: include UI layout if you already implemented it
-        # if hasattr(self, "_dock_layout_snapshot"):
-        #     try:
-        #         project_data["ui_layout"] = self._dock_layout_snapshot()
-        #     except Exception:
-        #         pass
 
         # Write into a temp dir first (safer than half-written projects)
         tmp_dir = os.path.join(base_dir, f".{data_dir_name}.tmp")
@@ -645,41 +630,33 @@ class MainWindow(QMainWindow):
 
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
-            if os.path.exists(data_dir) and old_path: # simple save ... .
-                if old_path == path: # simple save ... .
-                # just copy the new data.json into the existing data_dir
+            if old_path == path: # if old equals new simple save ... .
+            # just copy the new data.json into the existing data_dir
+                shutil.copy2(tmp_data_json, data_dir)
+                shutil.rmtree(tmp_data_json)
+            elif old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
+                    o_path, ofname = os.path.split(old_path)
+                    oproject_stem = os.path.splitext(ofname)[0]
+                    o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
+                    #os.makedirs(data_dir, exist_ok=True)
+                    if os.path.exists(data_dir): # a previous project was saved under this name
+                        shutil.rmtree(data_dir)
+                    shutil.copytree(o_data_path, data_dir)
                     shutil.copy2(tmp_data_json, data_dir)
-                    os.remove(tmp_data_json)
-                    os.removedirs(tmp_dir)
-                else: # .. save existing project under new name ...
-                        o_path, ofname = os.path.split(old_path)
-                        oproject_stem = os.path.splitext(ofname)[0]
-                        o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
-                        #os.makedirs(data_dir, exist_ok=True)
-                        if os.path.exists(data_dir): # a previous project was saved under this name
-                            shutil.rmtree(data_dir)
-                        shutil.copytree(o_data_path, data_dir)
-                        shutil.copy2(tmp_data_json, data_dir)
-                        os.remove(tmp_data_json)
-                        os.removedirs(tmp_dir)
+                    shutil.rmtree(tmp_dir)
 
             else: # a new project from scratch
                 if os.path.exists(data_dir): # a previous project was saved under this name
                     shutil.rmtree(data_dir)
                 os.rename(tmp_dir, data_dir)
-
-
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
             os.replace(tmp_pws, path)
-
             # keep last saved path if you want
             self._last_project_path = old_path
             self.current_project_path = path
-
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
-
 
 
         except Exception as e:
