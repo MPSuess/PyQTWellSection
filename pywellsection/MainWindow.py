@@ -36,6 +36,8 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
 
 from pywellsection.Qt_Well_Widget import WellPanelWidget, WellPanelDock
+from pywellsection.Qt_Map_Widget import MapDockWindow, MapPanelWidget
+
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
@@ -63,6 +65,7 @@ from pywellsection.dialogs import LoadBitmapForTrackDialog
 from pywellsection.dialogs import BitmapPlacementDialog
 from pywellsection.dialogs import TrackSettingsDialog
 from pywellsection.dialogs import EditWellLogTableDialog
+from pywellsection.dialogs import EditWellPanelOrderDialog
 from pathlib import Path
 from collections import OrderedDict
 
@@ -82,7 +85,7 @@ logging.getLogger("parso.cache").setLevel("CRITICAL")
 LOG = logging.getLogger(__name__)
 LOG.setLevel("ERROR")
 
-PROJECT_FILE_VERSION = 1.0  # bump when you change project schema
+PROJECT_FILE_VERSION = 2.0  # bump when you change project schema
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -107,6 +110,7 @@ class MainWindow(QMainWindow):
         self.all_logs = None
         self.all_discrete_logs = None
         self.all_bitmaps = None
+        self.all_profiles = None
 
         self.well_gap_factor = 3.0
         self.track_gap_factor = 1.0
@@ -130,7 +134,7 @@ class MainWindow(QMainWindow):
 
         window_name = "Well Section 1"
 
-        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+        self.well_panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested,
                                "vertical_scale": self.vertical_scale,
                                "gap_proportional_to_distance": self.gap_proportional_to_distance,
@@ -139,20 +143,21 @@ class MainWindow(QMainWindow):
                                "gap_min_factor": self.gap_min_factor,
                                "gap_max_factor": self.gap_max_factor,  # clamp large gaps
                                }
+        self.map_panel_settings = {"show_labels": True, "equal_aspect": True, "show_grid": True}
 
         self.dock = WellPanelDock(
             parent=self,
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings=self.panel_settings
+            well_panel_settings=self.well_panel_settings
         )
-        self.dock.activated.connect(self._on_panel_activated)
+        self.dock.activated.connect(self._on_well_panel_activated)
 
         #self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
-        self.dock.panel.active_panel = True
-        self.panel = self.dock.panel
+        self.dock.well_panel.active_well_panel = True
+        self.well_panel = self.dock.well_panel
 
         self.WindowList = []
 
@@ -174,7 +179,7 @@ class MainWindow(QMainWindow):
         self.dock_commands.setWidget(self.textedit_commands)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_commands)
 
-        # log panel
+        # log well_panel
         self.textbox_logger = QTextEditLogger(self)
         formatter = logging.Formatter("%(name)-20s - %(levelname)-8s - %(message)s")
         self.textbox_logger.setFormatter(formatter)
@@ -219,13 +224,13 @@ class MainWindow(QMainWindow):
 
         self.redraw_requested = True
 
-        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+        self.well_panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested,
-                               "panel_title":self.dock.title}
+                               "well_panel_title":self.dock.title}
 
-        self.panel.set_visible_wells(None)
-        self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
-        self.panel.draw_panel()
+        self.well_panel.set_visible_wells(None)
+        self.well_panel.update_well_panel(tracks, wells, stratigraphy, self.well_panel_settings)
+        self.well_panel.draw_well_panel()
 
         # ---- build menu bar ----
         self._create_menubar()
@@ -311,14 +316,19 @@ class MainWindow(QMainWindow):
         act_layout.triggered.connect(self._action_layout_settings)
         view_menu.addAction(act_layout)
 
+        act_new_map = QAction("New Map window", self)
+        act_new_map.triggered.connect(self._open_map_window)
+        view_menu.addAction(act_new_map)
+
+
         # act_new_window = QAction("New Well Section Window ...", self)
         # act_new_window.triggered.connect(self._action_add_well_panel_dock)
         # view_menu.addAction(act_new_window)
         #
-        # act_close_panel = QAction("Close active well panel", self)
-        # act_close_panel.setShortcut("Ctrl+W")
-        # act_close_panel.triggered.connect(self._remove_well_panel_dock)
-        # view_menu.addAction(act_close_panel)
+        # act_close_well_panel = QAction("Close active well well_panel", self)
+        # act_close_well_panel.setShortcut("Ctrl+W")
+        # act_close_well_panel.triggered.connect(self._remove_well_panel_dock)
+        # view_menu.addAction(act_close_well_panel)
 
         tools_menu = menubar.addMenu("&Tools")
 
@@ -381,6 +391,34 @@ class MainWindow(QMainWindow):
     # FILE HANDLERS (placeholders for now)
     # ------------------------------------------------
 
+    def _new_pws_project(self, confirm=False):
+        if confirm:
+            reply = QMessageBox.question(self, 'Message',
+                                         "Are you sure you want to create a new project?", QMessageBox.Yes |
+                                         QMessageBox.No, QMessageBox.No)
+            # create
+            self.project = PWSProject(name="My Project", crs="EPSG:32632", units={"xy": "m", "depth": "m"})
+
+            # connect old references
+            self.all_wells = self.project.all_wells
+            self.tracks = self.project.all_tracks
+            self.stratigraphy = self.project.all_stratigraphy
+
+    def _save_pws_project(self, path):
+            # save
+            data = self.project.to_dict()
+
+
+    def _load_pws_project(self, path):
+            self.project = PWSProject.from_dict(json_data)
+
+    def _redraw_all_panels(self):
+        for win in self.WindowList:
+            if win.type == "WellSection":
+                win.well_panel.draw_well_panel()
+            elif win.type == ("MapWindow"):
+                win._draw_map()
+
     def _project_file_open(self):
 
         #        BaseWindow = WindowList[0]
@@ -398,7 +436,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
 
             # remove all existing windows
-            self.panel = self.WindowList[0].panel
+            self.well_panel = self.WindowList[0].well_panel
             for window in self.WindowList[1:]:
                 LOG.debug(f"Removing window {window.title}")
                 self._remove_well_panel_dock(window, confirm=False)
@@ -494,25 +532,30 @@ class MainWindow(QMainWindow):
                                 well[bitmap] = bitmap_cfg
                                 print (bitmap_cfg)
 
-            #self.panel.panel_settings = window_dict[0]["panel_settings"]
-            self.panel.visible_tops = window_dict[0]["visible_tops"]
-            self.panel.visible_logs = window_dict[0]["visible_logs"]
-            self.panel.visible_tracks = window_dict[0]["visible_tracks"]
-            self.panel.visible_wells = window_dict[0]["visible_wells"]
+            #self.well_panel.well_panel_settings = window_dict[0]["well_panel_settings"]
+            self.well_panel.visible_tops = window_dict[0]["visible_tops"]
+            self.well_panel.visible_logs = window_dict[0]["visible_logs"]
+            self.well_panel.visible_tracks = window_dict[0]["visible_tracks"]
+            self.well_panel.visible_wells = window_dict[0]["visible_wells"]
             self.WindowList[0].set_title(window_dict[0]["window_title"])
-            self.panel.vertical_scale = window_dict[0].get("vertical_scale", 1.0)
-            self.panel.gap_proportional_to_distance = window_dict[0].get("gap_proportional_to_distance", False)
-            self.panel.gap_distance_mode = window_dict[0].get("gap_distance_mode", "auto")
-            self.panel.gap_distance_ref_m = window_dict[0].get("gap_distance_ref_m", 1000)
-            self.panel.gap_min_factor = window_dict[0].get("gap_min_factor", 0.8)
-            self.panel.gap_max_factor = window_dict[0].get("gap_max_factor", 8.0)
+            self.well_panel.vertical_scale = window_dict[0].get("vertical_scale", 1.0)
+            self.well_panel.gap_proportional_to_distance = window_dict[0].get("gap_proportional_to_distance", False)
+            self.well_panel.gap_distance_mode = window_dict[0].get("gap_distance_mode", "auto")
+            self.well_panel.gap_distance_ref_m = window_dict[0].get("gap_distance_ref_m", 1000)
+            self.well_panel.gap_min_factor = window_dict[0].get("gap_min_factor", 0.8)
+            self.well_panel.gap_max_factor = window_dict[0].get("gap_max_factor", 8.0)
 
             #add all remaining windows back in
             for window in window_dict[1:]:
                 if (window["type"] == "WellSection"):
+                    if window["well_panel_settings"]:
+                        panel_setting = window["well_panel_settings"]
+                    else:
+                        panel_setting = window["well_panel_settings"]
                     dock = self._add_well_panel_dock(window["window_title"], window["visible_tops"],
                                                      window["visible_logs"], window["visible_tracks"],
-                                                     window["visible_wells"], window["panel_settings"])
+                                                     window["visible_wells"], panel_setting)
+
                     dock.set_title(window["window_title"])
                     if window["visible"]:
                         dock.setVisible(True)
@@ -520,7 +563,7 @@ class MainWindow(QMainWindow):
                         dock.setVisible(False)
 
             self.redraw_requested = False
-            self.panel_settings["redraw_requested"] = False
+            self.well_panel_settings["redraw_requested"] = False
 
             # populate well tree
             self._populate_well_tree()
@@ -530,24 +573,20 @@ class MainWindow(QMainWindow):
             self._populate_window_tree()
             self._dock_layout_restore(ui_layout)
 
-            #            self.panel.update_panel(tracks, wells, stratigraphy, self.panel_settings)
+            #            self.well_panel.update_well_panel(tracks, wells, stratigraphy, self.well_panel_settings)
 
-            self.panel.set_visible_tops(self.all_stratigraphy)
+            self.well_panel.set_visible_tops(self.all_stratigraphy)
 
-            self._refresh_all_panels()
+            self._refresh_all_well_panels()
 
             # ✅ Trigger full redraw
             #            self.redraw_requested = True
-            self.panel_settings["redraw_requested"] = True
-            #self.panel.draw_panel()
+            self.well_panel_settings["redraw_requested"] = True
+            #self.well_panel.draw_well_panel()
             self._redraw_all_panels()
 
         except Exception as e:
             QMessageBox.critical(self, "Open Error", str(e))
-
-    def _redraw_all_panels(self):
-        for win in self.WindowList:
-            win.panel.draw_panel()
 
     def _project_file_save_as(self):
         path, _ = QFileDialog.getSaveFileName(self, "Save project as", "", "Well project (*.pwj);;All files (*.*)")
@@ -602,7 +641,7 @@ class MainWindow(QMainWindow):
 
         # build project data payload (your actual content)
 
-        wells = getattr(self.panel, "wells", [])
+        wells = getattr(self.well_panel, "wells", [])
         if len(wells) == 0:
             LOG.debug("Project was not saved: no wells to save")
             return
@@ -611,8 +650,8 @@ class MainWindow(QMainWindow):
         for well in wells:
             LOG.debug(f"Saving {well["name"]}")
 
-        tracks = getattr(self.panel, "tracks", [])
-        stratigraphy = getattr(self.panel, "stratigraphy", None)
+        tracks = getattr(self.well_panel, "tracks", [])
+        stratigraphy = getattr(self.well_panel, "stratigraphy", None)
         extra_metadata = {
             "app": "pywellsection",
             "version": "0.1.0",
@@ -701,58 +740,6 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "Project saved", f"Saved:\n{path}\n\nData:\n{data_json_path}")
 
-    def _project_file_save_old(self, path=None):
-
-        if not path and self.current_project_path:
-            path = self.current_project_path
-
-        if path is None:
-
-            """Save wells/tracks data to a JSON file (example)."""
-            path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Save project",
-                "",
-                "Well project (*.json);;All files (*.*)"
-            )
-            if not path:
-                return
-
-            path = Path(path)
-
-        else:
-            path = Path(path)
-
-        try:
-            wells = getattr(self.panel, "wells", [])
-            LOG.debug(f"Saving {wells[0]}")
-
-            for well in wells:
-                LOG.debug(f"Saving {well["name"]}")
-
-            tracks = getattr(self.panel, "tracks", [])
-            stratigraphy = getattr(self.panel, "stratigraphy", None)
-            extra_metadata = {
-                "app": "pywellsection",
-                "version": "0.1.0",
-            }
-            ui_layout = self._dock_layout_snapshot()
-
-            window_list = self._get_window_list()
-
-            project = export_project_to_json(path, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
-
-            LOG.debug(f"Saving {project["wells"][0]["name"]} done")
-
-            self.current_project_path = path
-            LOG.debug(f"Project saved as: {self.current_project_path}")
-
-            self.project_name = Path(path).stem
-            self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
-
-
-        except Exception as e:
-            QMessageBox.critical(self, "Save error", f"Failed to save project:\n{e}")
 
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -839,9 +826,9 @@ class MainWindow(QMainWindow):
             else:
                 self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
 
-        # Update panel + tree views
-        self.panel.set_wells(self.all_wells)
-        self.panel.draw_panel()
+        # Update well_panel + tree views
+        self.well_panel.set_wells(self.all_wells)
+        self.well_panel.draw_well_panel()
 
         # refresh tree sections
         self._populate_well_tree()
@@ -1142,14 +1129,14 @@ class MainWindow(QMainWindow):
         # store stratigraphy back
         self.stratigraphy = strat
 
-        # ---- update panel ----
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.stratigraphy = self.stratigraphy
+        # ---- update well_panel ----
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
+            self.well_panel.stratigraphy = self.stratigraphy
             # keep zoom/flatten; if you want to reset, uncomment:
-            # self.panel.current_depth_window = None
-            # self.panel._flatten_depths = None
-            self.panel.draw_panel()
+            # self.well_panel.current_depth_window = None
+            # self.well_panel._flatten_depths = None
+            self.well_panel.draw_well_panel()
 
         # ---- refresh trees ----
         if hasattr(self, "_populate_well_tree"):
@@ -1327,7 +1314,7 @@ class MainWindow(QMainWindow):
                     blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
 
         self.well_tree.blockSignals(False)
-        self._rebuild_panel_from_tree()
+        self._rebuild_well_panel_from_tree()
 
     def _populate_well_tops_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
@@ -1422,8 +1409,8 @@ class MainWindow(QMainWindow):
 
         self.well_tree.blockSignals(False)
 
-        # Apply current selection to panel
-        #self._rebuild_panel_from_tree()
+        # Apply current selection to well_panel
+        #self._rebuild_well_panel_from_tree()
 
     def _populate_well_log_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
@@ -1597,6 +1584,7 @@ class MainWindow(QMainWindow):
 
         for win in self.WindowList:
             window_name = win.get_title()
+            window_type = win.get_type()
             visible = win.get_visible()
             if not window_name:
                 continue
@@ -1610,6 +1598,7 @@ class MainWindow(QMainWindow):
                 | Qt.ItemIsEditable
             )
             window_item.setData(0, Qt.UserRole, window_name)
+            window_item.setData(1, Qt.UserRole, window_type)
             state = (
                 Qt.Checked
                 if (visible)
@@ -1623,7 +1612,7 @@ class MainWindow(QMainWindow):
         """Recompute displayed wells whenever a checkbox changes."""
 
         #LOG.debug(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
-        #self.panel.set_draw_panel(False)
+        #self.well_panel.set_draw_well_panel(False)
 
         if item.data(0, Qt.UserRole) is None:
             return 0
@@ -1645,23 +1634,23 @@ class MainWindow(QMainWindow):
         if item is self.continous_logs_folder or p is self.continous_logs_folder:
             #LOG.debug("LOGS FOLDER changed")
             self._rebuild_visible_logs_from_tree()
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         if item is self.discrete_logs_folder or p is self.discrete_logs_folder:
             LOG.debug("DISCRETE LOGS FOLDER changed")
             self._rebuild_visible_discrete_logs_from_tree()
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         if item is self.bitmaps_folder or p is self.bitmaps_folder:
             LOG.debug("BITMAPS FOLDER changed")
             self._rebuild_visible_bitmaps_from_tree()
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         # Tracks
         if item is self.track_root_item or p is self.track_root_item:
             self._rebuild_visible_tracks_from_tree()
 
-        #self.panel.set_draw_panel(True)
+        #self.well_panel.set_draw_well_panel(True)
 
     def _select_all_wells(self):
         self.well_tree.blockSignals(True)
@@ -1669,7 +1658,7 @@ class MainWindow(QMainWindow):
         for i in range(root.childCount()):
             root.child(i).setCheckState(0, Qt.Checked)
         self.well_tree.blockSignals(False)
-        self._rebuild_panel_from_tree()
+        self._rebuild_well_panel_from_tree()
 
     def _select_no_wells(self):
         self.well_tree.blockSignals(True)
@@ -1677,21 +1666,21 @@ class MainWindow(QMainWindow):
         for i in range(root.childCount()):
             root.child(i).setCheckState(0, Qt.Unchecked)
         self.well_tree.blockSignals(False)
-        self._rebuild_panel_from_tree()
+        self._rebuild_well_panel_from_tree()
 
-    def _set_tree_from_panel(self):
+    def _set_tree_from_well_panel(self):
 
         #LOG.debug("Setting well tree ... .")
         self.well_tree.itemChanged.connect(self.do_nothing)
 
-        wells = self.panel.get_visible_wells()
+        wells = self.well_panel.get_visible_wells()
 
         if wells is not None:
             nb_wells = len(wells)
         checked_names = set()
         root = self.well_root_item
 
-        self.panel.panel_settings["redraw_requested"] = False
+        self.well_panel.well_panel_settings["redraw_requested"] = False
 
         for i in range(root.childCount()):
             it = root.child(i)
@@ -1702,7 +1691,7 @@ class MainWindow(QMainWindow):
                         state = Qt.Checked
             it.setCheckState(0, state)
 
-        tops = self.panel.get_visible_tops()
+        tops = self.well_panel.get_visible_tops()
         #LOG.debug("visible tops:", tops)
         root = self.stratigraphy_root
         for i in range(root.childCount()):
@@ -1714,7 +1703,7 @@ class MainWindow(QMainWindow):
                         state = Qt.Checked
             it.setCheckState(0, state)
 
-        tracks = self.panel.get_visible_tracks()
+        tracks = self.well_panel.get_visible_tracks()
         #LOG.debug ("getting visible tracks", tracks)
         root = self.track_root_item
         for i in range(root.childCount()):
@@ -1727,7 +1716,7 @@ class MainWindow(QMainWindow):
                         state = Qt.Checked
             it.setCheckState(0, state)
 
-        logs = self.panel.get_visible_logs()
+        logs = self.well_panel.get_visible_logs()
         #LOG.debug("getting visible logs", logs)
         root = self.continous_logs_folder
         for i in range(root.childCount()):
@@ -1740,18 +1729,18 @@ class MainWindow(QMainWindow):
                         state = Qt.Checked
             it.setCheckState(0, state)
 
-        self.panel.panel_settings["redraw_requested"] = True
+        self.well_panel.well_panel_settings["redraw_requested"] = True
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
-        self.panel.draw_panel()
+        self.well_panel.draw_well_panel()
 
     def do_nothing(self):
         return
 
-    def _rebuild_panel_from_tree(self):
-        """Collect checked wells (by name) and send to panel."""
+    def _rebuild_well_panel_from_tree(self):
+        """Collect checked wells (by name) and send to well_panel."""
         checked_names = set()
 
-        #LOG.debug("rebuild_panel_from_tree")
+        #LOG.debug("rebuild_well_panel_from_tree")
 
         root = self.stratigraphy_root
         for i in range(root.childCount()):
@@ -1760,7 +1749,7 @@ class MainWindow(QMainWindow):
                 checked_names.add(it.data(0, Qt.UserRole))
         selected = checked_names
 
-        self.panel.set_visible_tops(selected)
+        self.well_panel.set_visible_tops(selected)
 
         checked_names = set()
 
@@ -1771,9 +1760,9 @@ class MainWindow(QMainWindow):
                 checked_names.add(it.data(0, Qt.UserRole))
         selected = checked_names
 
-        #LOG.debug (f"rebuild_panel tracks{selected}")
+        #LOG.debug (f"rebuild_well_panel tracks{selected}")
 
-        self.panel.set_visible_tracks(selected)
+        self.well_panel.set_visible_tracks(selected)
 
         checked_names = set()
 
@@ -1786,12 +1775,12 @@ class MainWindow(QMainWindow):
         # Map names → well dicts (keep original order)
         selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
         # If none selected, you can either show none or all; here: show none
-        #self.panel.set_wells(selected)
+        #self.well_panel.set_wells(selected)
 
-        self.panel.set_visible_wells(checked_names)
+        self.well_panel.set_visible_wells(checked_names)
 
     def _rebuild_wells_from_tree(self):
-        """Collect checked wells (by name) and send to panel."""
+        """Collect checked wells (by name) and send to well_panel."""
         checked_names = set()
 
         checked_names = set()
@@ -1804,12 +1793,12 @@ class MainWindow(QMainWindow):
         # Map names → well dicts (keep original order)
         #selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
         # If none selected, you can either show none or all; here: show none
-        # self.panel.set_wells(selected)
+        # self.well_panel.set_wells(selected)
 
         #LOG.debug(f"rebuild_wells_from_tree: {checked_names}")
 
-        self.panel.set_visible_wells(checked_names)
-        self.panel.draw_panel()
+        self.well_panel.set_visible_wells(checked_names)
+        self.well_panel.draw_well_panel()
 
     def _rebuild_visible_tops_from_tree(self):
         root = self.stratigraphy_root
@@ -1838,11 +1827,11 @@ class MainWindow(QMainWindow):
 
         #LOG.debug (f"_rebuild_visible_tops_from_tree visible:{visible}")
 
-        self.panel.set_visible_tops(visible if visible else None)
-        self.panel.draw_panel()
+        self.well_panel.set_visible_tops(visible if visible else None)
+        self.well_panel.draw_well_panel()
 
     def _rebuild_visible_logs_from_tree(self):
-        """Collect checked logs and inform the panel."""
+        """Collect checked logs and inform the well_panel."""
         root = self.continous_logs_folder
         visible = set()
         for i in range(root.childCount()):
@@ -1858,7 +1847,7 @@ class MainWindow(QMainWindow):
         else:
             visible_set = visible if visible else set()
         #LOG.debug ("visible logs:", visible)
-        self.panel.set_visible_logs(visible)
+        self.well_panel.set_visible_logs(visible)
 
     def _rebuild_visible_discrete_logs_from_tree(self):
         root = self.discrete_logs_folder
@@ -1875,7 +1864,7 @@ class MainWindow(QMainWindow):
         else:
             visible_set = visible if visible else set()
 
-        self.panel.set_visible_discrete_logs(visible_set)
+        self.well_panel.set_visible_discrete_logs(visible_set)
 
     def _rebuild_visible_bitmaps_from_tree(self):
         root = self.bitmaps_folder
@@ -1892,10 +1881,10 @@ class MainWindow(QMainWindow):
         else:
             visible_set = visible if visible else set()
 
-        self.panel.set_visible_bitmaps(visible_set)
+        self.well_panel.set_visible_bitmaps(visible_set)
 
     def _rebuild_visible_tracks_from_tree(self):
-        """Collect checked tracks and inform the panel."""
+        """Collect checked tracks and inform the well_panel."""
         root = self.track_root_item
         visible = set()
         for i in range(root.childCount()):
@@ -1911,14 +1900,14 @@ class MainWindow(QMainWindow):
         else:
             visible_set = visible if visible else None
 
-        self.panel.set_visible_tracks(visible)
+        self.well_panel.set_visible_tracks(visible)
 
     def add_log_to_track(self, track_name: str, log_name: str,
                          label: str = None, color: str = "black",
                          xscale: str = "linear", direction: str = "normal",
                          xlim=None):
         """
-        Add a new log config to a track by name and refresh panel & trees.
+        Add a new log config to a track by name and refresh well_panel & trees.
 
         - track_name: name of the track (track['name'])
         - log_name:   log mnemonic as used in well['logs'][log_name]
@@ -1959,11 +1948,11 @@ class MainWindow(QMainWindow):
         # 4) append to track
         track["logs"].append(log_cfg)
 
-        # 5) propagate to panel & tree widgets
-        #if self.panel.tracks is not None:
-        #    self.panel.tracks = self.panel.tracks
-        #    #LOG.debug(self.panel.tracks)# keep panel in sync
-        #self.panel.draw_panel()
+        # 5) propagate to well_panel & tree widgets
+        #if self.well_panel.tracks is not None:
+        #    self.well_panel.tracks = self.well_panel.tracks
+        #    #LOG.debug(self.well_panel.tracks)# keep well_panel in sync
+        #self.well_panel.draw_well_panel()
 
         # refresh log+track trees so the new log shows up
         self._populate_well_log_tree()
@@ -2024,9 +2013,9 @@ class MainWindow(QMainWindow):
         self.all_tracks.append(new_track)
         #self.all_tracks.append(new_track)
 
-        # Keep panel in sync
-        #self.panel.tracks = self.tracks
-        #self.panel.draw_panel()
+        # Keep well_panel in sync
+        #self.well_panel.tracks = self.tracks
+        #self.well_panel.draw_well_panel()
 
         # Refresh tree sections that depend on tracks
         self._populate_well_track_tree()
@@ -2053,19 +2042,19 @@ class MainWindow(QMainWindow):
         # remove from tracks list
         del self.all_tracks[idx]
 
-        # keep panel in sync
-        if hasattr(self, "panel"):
-            self.panel.tracks = self.all_tracks
+        # keep well_panel in sync
+        if hasattr(self, "well_panel"):
+            self.well_panel.tracks = self.all_tracks
 
             # clean up visible_tracks if needed
-            vt = getattr(self.panel, "visible_tracks", None)
+            vt = getattr(self.well_panel, "visible_tracks", None)
             if vt is not None:
                 vt = set(vt)
                 if track_name in vt:
                     vt.remove(track_name)
-                self.panel.visible_tracks = vt or None
+                self.well_panel.visible_tracks = vt or None
 
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         # refresh tree sections
         self._populate_well_track_tree()  # tracks folder
@@ -2153,16 +2142,16 @@ class MainWindow(QMainWindow):
         self.stratigraphy = new_strat
         self.all_stratigraphy = new_strat
 
-        # 2) push into panel
-        if hasattr(self, "panel"):
-            self.panel.stratigraphy = new_strat
+        # 2) push into well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.stratigraphy = new_strat
 
             # flattening uses strat key order:
             # if you have any cached flatten state, you might want to reset:
-            if hasattr(self.panel, "_flatten_depths"):
-                self.panel._flatten_depths = None
+            if hasattr(self.well_panel, "_flatten_depths"):
+                self.well_panel._flatten_depths = None
 
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         # 3) refresh "Stratigraphic tops" folder in tree
         #        if hasattr(self, "_populate_top_tree"):
@@ -2170,21 +2159,21 @@ class MainWindow(QMainWindow):
 
     def _action_layout_settings(self):
         """Open dialog to adjust distance between wells and track width."""
-        if not hasattr(self, "panel"):
+        if not hasattr(self, "well_panel"):
             return
         #
-        # if self.panel.current_depth_window is None:
+        # if self.well_panel.current_depth_window is None:
         #     depth_min = -9999
         #     depth_max = 9999
         # else:
-        #     depth_min, depth_max = self.panel.current_depth_window
+        #     depth_min, depth_max = self.well_panel.current_depth_window
 
-        depth_min, depth_max = self.panel.get_current_depth_window()
+        depth_min, depth_max = self.well_panel.get_current_depth_window()
 
         dlg = LayoutSettingsDialog(
             self,
-            well_gap_factor=self.panel.well_gap_factor,
-            track_width=self.panel.track_width,
+            well_gap_factor=self.well_panel.well_gap_factor,
+            track_width=self.well_panel.track_width,
             vertical_scale = 1,
             depth_min = depth_min,
             depth_max = depth_max,
@@ -2198,7 +2187,7 @@ class MainWindow(QMainWindow):
             return
 
         gap, tw, vs, depth_min, depth_max, tgf, gptdi, gdrm, gmf, gxf= dlg.values()
-        self.panel.set_current_depth_window(depth_min, depth_max)
+        self.well_panel.set_current_depth_window(depth_min, depth_max)
         self.set_layout_params(gap, tw, vs, tgf, gptdi, gdrm, gmf, gxf)
 
     def _action_edit_all_tops(self):
@@ -2281,10 +2270,10 @@ class MainWindow(QMainWindow):
             # store as simple depth; if you use richer top dicts, adapt this
             tops[top_name] = depth
 
-        # --- redraw panel with updated tops ---
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.draw_panel()
+        # --- redraw well_panel with updated tops ---
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
+            self.well_panel.draw_well_panel()
 
         # --- refresh tops tree ---
         if hasattr(self, "_populate_top_tree"):
@@ -2307,11 +2296,11 @@ class MainWindow(QMainWindow):
             self.all_wells = []
         self.all_wells.append(new_well)
 
-        # Update panel wells (keep tracks & stratigraphy)
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
+        # Update well_panel wells (keep tracks & stratigraphy)
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
             # you might want to reset flattening or keep it; here we keep zoom/flatten
-            self.panel.draw_panel()
+            self.well_panel.draw_well_panel()
 
         # Refresh wells tree (and maybe other trees)
         if hasattr(self, "_populate_well_tree"):
@@ -2347,10 +2336,10 @@ class MainWindow(QMainWindow):
         # append track
         self.tracks.append(new_track)
 
-        # push to panel
-        if hasattr(self, "panel"):
-            self.panel.tracks = self.tracks
-            self.panel.draw_panel()
+        # push to well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.tracks = self.tracks
+            self.well_panel.draw_well_panel()
 
         # refresh track tree
         if hasattr(self, "_populate_track_tree"):
@@ -2428,10 +2417,10 @@ class MainWindow(QMainWindow):
         disc_cfg["color_map"] = new_map
         disc_cfg["default_color"] = new_default
 
-        # redraw panel
-        if hasattr(self, "panel"):
-            self.panel.tracks = self.all_tracks
-            self.panel.draw_panel()
+        # redraw well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.tracks = self.all_tracks
+            self.well_panel.draw_well_panel()
 
     def _action_edit_all_wells(self):
         """Open dialog to edit all well header settings."""
@@ -2460,13 +2449,13 @@ class MainWindow(QMainWindow):
             w["reference_depth"] = hdr["reference_depth"]
             w["total_depth"] = hdr["total_depth"]
 
-        # push into panel
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
+        # push into well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
             # optional: keep current zoom; if you want to reset, uncomment:
-            # self.panel.current_depth_window = None
-            # self.panel._flatten_depths = None
-            self.panel.draw_panel()
+            # self.well_panel.current_depth_window = None
+            # self.well_panel._flatten_depths = None
+            self.well_panel.draw_well_panel()
 
         # refresh tree views that show wells
         if hasattr(self, "_populate_well_tree"):
@@ -2502,13 +2491,13 @@ class MainWindow(QMainWindow):
         well["reference_depth"] = hdr["reference_depth"]
         well["total_depth"] = hdr["total_depth"]
 
-        # update panel
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
+        # update well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
             # optional: keep zoom/flatten; if you want to reset, uncomment:
-            # self.panel.current_depth_window = None
-            # self.panel._flatten_depths = None
-            self.panel.draw_panel()
+            # self.well_panel.current_depth_window = None
+            # self.well_panel._flatten_depths = None
+            self.well_panel.draw_well_panel()
 
         # refresh trees (names may have changed)
         if hasattr(self, "_populate_well_tree"):
@@ -2556,9 +2545,9 @@ class MainWindow(QMainWindow):
         well["reference_depth"] = hdr["reference_depth"]
         well["total_depth"] = hdr["total_depth"]
 
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.draw_panel()
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
+            self.well_panel.draw_well_panel()
 
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
@@ -2621,10 +2610,10 @@ class MainWindow(QMainWindow):
         facies_cfg["hardness_scale"] = params["hardness_scale"]
         facies_cfg["spline"] = params["spline"]
 
-        # redraw panel so changes take effect
-        if hasattr(self, "panel"):
-            self.panel.tracks = self.all_tracks
-            self.panel.draw_panel()
+        # redraw well_panel so changes take effect
+        if hasattr(self, "well_panel"):
+            self.well_panel.tracks = self.all_tracks
+            self.well_panel.draw_well_panel()
 
     def _action_edit_lithofacies_table(self):
         """Open table dialog to edit lithofacies intervals for all wells."""
@@ -2655,10 +2644,10 @@ class MainWindow(QMainWindow):
                 continue
             well["facies_intervals"] = list(intervals)
 
-        # redraw panel
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.draw_panel()
+        # redraw well_panel
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
+            self.well_panel.draw_well_panel()
 
         if unknown:
             QMessageBox.warning(
@@ -2765,14 +2754,14 @@ class MainWindow(QMainWindow):
         }
 
         # Redraw
-        if hasattr(self, "panel"):
-            self.panel.wells = self.all_wells
-            self.panel.tracks = self.tracks
-            self.panel.draw_panel()
+        if hasattr(self, "well_panel"):
+            self.well_panel.wells = self.all_wells
+            self.well_panel.tracks = self.tracks
+            self.well_panel.draw_well_panel()
 
-        # If you have multiple dock panels:
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        # If you have multiple dock well_panels:
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
 
         self._redraw_all_panels()
 
@@ -2852,11 +2841,11 @@ class MainWindow(QMainWindow):
         # ensure we have a bitmap track to display it
         #        self._ensure_bitmap_track_exists()
 
-        # push into panel & redraw
-        # if hasattr(self, "panel"):
-        #     self.panel.wells = self.all_wells
-        #     self.panel.tracks = self.tracks
-        #     self.panel.draw_panel()
+        # push into well_panel & redraw
+        # if hasattr(self, "well_panel"):
+        #     self.well_panel.wells = self.all_wells
+        #     self.well_panel.tracks = self.tracks
+        #     self.well_panel.draw_well_panel()
 
         # refresh tree (if you show bitmaps there)
 
@@ -2871,15 +2860,15 @@ class MainWindow(QMainWindow):
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings=self.panel_settings
+            well_panel_settings=self.well_panel_settings
         )
 
-        dock.activated.connect(self._on_panel_activated)
-        dock.panel.visible_tops = None
-        dock.panel.visible_logs = None
-        dock.panel.visible_tracks = None
+        dock.activated.connect(self._on_well_panel_activated)
+        dock.well_panel.visible_tops = None
+        dock.well_panel.visible_logs = None
+        dock.well_panel.visible_tracks = None
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
-        self._on_panel_activated(dock)
+        self._on_well_panel_activated(dock)
         self.WindowList.append(dock)
         self._populate_window_tree()
         nWindows = len(self.WindowList)
@@ -2916,17 +2905,28 @@ class MainWindow(QMainWindow):
 
         key = "track"
 
-        # Use the active panel (docked) if you implemented it; otherwise self.panel
-        panel = getattr(self, "active_panel", None) or self.panel
+        # Use the active well_panel (docked) if you implemented it; otherwise self.well_panel
+        well_panel = getattr(self, "active_well_panel", None) or self.well_panel
 
         dlg = BitmapPlacementDialog(
             parent=self,
             wells=self.all_wells,
             track_name=track_name,
             bitmap_key=key,
-            panel_widget=panel,
+            well_panel_widget=well_panel,
         )
         dlg.exec_()
+
+    def _action_edit_panel_wells(self, dock):
+        panel = dock.well_panel
+        dlg = EditWellPanelOrderDialog(self, panel=panel, project_wells=self.all_wells)
+        dlg.exec_()
+        # after dialog, update map windows / refresh trees if needed
+        if hasattr(self, "_update_map_windows"):
+            self._update_map_windows()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+
 
     def _ensure_bitmap_track_exists(self):
         """
@@ -2959,28 +2959,28 @@ class MainWindow(QMainWindow):
         return self.tracks[0]
 
     def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
-                             visible_wells=None, panel_settings=None):
+                             visible_wells=None, well_panel_settings=None):
 
-        vertical_scale = panel_settings.get("vertical_scale", 1.0)
-        panel_settings["vertical_scale"] = vertical_scale
+        vertical_scale = well_panel_settings.get("vertical_scale", 1.0)
+        well_panel_settings["vertical_scale"] = vertical_scale
 
         dock = WellPanelDock(
             parent=self,
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings=panel_settings
+            well_panel_settings=well_panel_settings
         )
-        dock.activated.connect(self._on_panel_activated)
+        dock.activated.connect(self._on_well_panel_activated)
 
-        dock.panel.visible_tops = visible_tops
-        dock.panel.visible_logs = visible_logs
-        dock.panel.visible_tracks = visible_tracks
-        dock.panel.visible_wells = visible_wells
+        dock.well_panel.visible_tops = visible_tops
+        dock.well_panel.visible_logs = visible_logs
+        dock.well_panel.visible_tracks = visible_tracks
+        dock.well_panel.visible_wells = visible_wells
         dock.setWindowTitle(window_title)
 
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
-        #self._on_panel_activated(dock)
+        #self._on_well_panel_activated(dock)
         self.WindowList.append(dock)
         return dock
 
@@ -2991,7 +2991,7 @@ class MainWindow(QMainWindow):
         Parameters
         ----------
         dock : WellPanelDock | None
-            If None, remove the currently active docked panel (if any).
+            If None, remove the currently active docked well_panel (if any).
         confirm : bool
             Ask user for confirmation.
         """
@@ -2999,18 +2999,18 @@ class MainWindow(QMainWindow):
         if dock is False:
             dock = None
             for d in self.WindowList:
-                if d and d.panel is getattr(self, "panel", None):
+                if d and d.well_panel is getattr(self, "well_panel", None):
                     dock = d
                     break
 
         if dock is None:
-            QMessageBox.information(self, "Remove panel", "No well panel selected.")
+            QMessageBox.information(self, "Remove well_panel", "No well well_panel selected.")
             return
 
         if confirm:
             res = QMessageBox.question(
                 self,
-                "Remove well panel",
+                "Remove well well_panel",
                 f"Close '{dock.title}'?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
@@ -3027,35 +3027,35 @@ class MainWindow(QMainWindow):
         except ValueError:
             pass
 
-        # Clear active panel if needed
-        if getattr(self, "active_panel", None) is dock.panel:
-            self.active_window = self.panel  # fall back to central panel
+        # Clear active well_panel if needed
+        if getattr(self, "active_well_panel", None) is dock.well_panel:
+            self.active_window = self.well_panel  # fall back to central well_panel
 
         dock.deleteLater()
 
-    def _on_panel_activated(self, dock: WellPanelDock):
+    def _on_well_panel_activated(self, dock: WellPanelDock):
         """
-        Called whenever a docked panel is clicked/focused.
-        Sets active panel and rebuilds tree (and anything else you want).
+        Called whenever a docked well_panel is clicked/focused.
+        Sets active well_panel and rebuilds tree (and anything else you want).
         """
-        if dock is None or dock.panel is None:
+        if dock is None or dock.well_panel is None:
             return
 
-        self.panel = dock.panel
+        self.well_panel = dock.well_panel
 
         #LOG.debug(f"Activated new window")
 
-        self.panel.set_draw_panel(False)
-        self._set_tree_from_panel()
-        self.panel.set_draw_panel(True)
-        #self.panel.draw_panel()
+        self.well_panel.set_draw_well_panel(False)
+        self._set_tree_from_well_panel()
+        self.well_panel.set_draw_well_panel(True)
+        #self.well_panel.draw_well_panel()
 
         # Optionally bring dock to front/tab
         dock.raise_()
 
         #LOG.debug ("Activated new window")
 
-        # If you need the tree to reflect active_panel view filters, do that here.
+        # If you need the tree to reflect active_well_panel view filters, do that here.
 
     def _parse_lithotrend(self, litho_str: str, trend_str: str):
         """
@@ -3081,7 +3081,7 @@ class MainWindow(QMainWindow):
                           vertical_scale: float, track_gap_factor: float,
                           gap_proportional_to_distance:bool, gap_distance_ref_m: float,
                           gap_min_factor: float, gap_max_factor: float):
-        """Update panel layout (gap between wells and track width) and redraw."""
+        """Update well_panel layout (gap between wells and track width) and redraw."""
         self.well_gap_factor = max(0.1, float(well_gap_factor))
         self.track_width = max(0.1, float(track_width))
         self.vertical_scale = float(vertical_scale)
@@ -3092,7 +3092,7 @@ class MainWindow(QMainWindow):
         self.track_gap_factor = float(track_gap_factor)
 
 
-        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+        self.well_panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested,
                                "vertical_scale": self.vertical_scale,
                                "gap_proportional_to_distance": self.gap_proportional_to_distance,
@@ -3100,8 +3100,8 @@ class MainWindow(QMainWindow):
                                "gap_min_factor": self.gap_min_factor,
                                "gap_max_factor": self.gap_max_factor,  # clamp large gaps
                                }
-        self.panel.set_panel_settings(self.panel_settings)
-        self.panel.draw_panel()
+        self.well_panel.set_well_panel_settings(self.well_panel_settings)
+        self.well_panel.draw_well_panel()
 
     def test_connect(self, pos):
         return True
@@ -3137,7 +3137,7 @@ class MainWindow(QMainWindow):
                 base_cfg.update(new_cfg)
 
                 # redraw
-                self.panel.draw_panel()
+                self.well_panel.draw_well_panel()
 
         # color = base_cfg.get("color", "black")
         # xscale = base_cfg.get("xscale", "linear")
@@ -3172,14 +3172,14 @@ class MainWindow(QMainWindow):
         #         else:
         #             log_cfg.pop("xlim", None)  # auto scale
         #
-        # # 4) Sync with panel and redraw
-        # if hasattr(self, "panel"):
-        #     self.panel.tracks = self.all_tracks
-        #     self.panel.draw_panel()
+        # # 4) Sync with well_panel and redraw
+        # if hasattr(self, "well_panel"):
+        #     self.well_panel.tracks = self.all_tracks
+        #     self.well_panel.draw_well_panel()
 
     def _move_well(self, well_name: str, direction: int):
         """
-        Move a well left/right in panel order.
+        Move a well left/right in well_panel order.
 
         direction:
             -1 → move left
@@ -3201,7 +3201,7 @@ class MainWindow(QMainWindow):
 
         # redraw + rebuild tree so order stays in sync
         self._populate_well_tree()
-        self.panel.draw_panel()
+        self.well_panel.draw_well_panel()
 
     def _delete_well_from_project(self, well_name: str, confirm: bool = True):
         """
@@ -3212,7 +3212,7 @@ class MainWindow(QMainWindow):
         Keeps:
           - tracks (project-wide)
           - stratigraphy (project-wide)
-        Then refreshes trees + all panels.
+        Then refreshes trees + all well_panels.
 
         Note: correlations/tops stored inside wells are deleted with the well.
         """
@@ -3245,8 +3245,8 @@ class MainWindow(QMainWindow):
         if getattr(self, "selected_well_name", None) == well_name:
             self.selected_well_name = None
 
-        # If your panel keeps visibility filters, remove the deleted well from them
-        for p in self._iter_all_panels():
+        # If your well_panel keeps visibility filters, remove the deleted well from them
+        for p in self._iter_all_well_panels():
             # visible_wells may be set/list/None
             vw = getattr(p, "visible_wells", None)
             if vw is not None:
@@ -3264,7 +3264,7 @@ class MainWindow(QMainWindow):
                 # safest: unflatten after structural change
                 p.flatten_depths = None
 
-        # Rebuild trees and redraw all panels
+        # Rebuild trees and redraw all well_panels
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
         if hasattr(self, "_populate_window_tree"):
@@ -3272,24 +3272,24 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_track_tree"):
             self._populate_track_tree()
 
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
         else:
             # fallback
-            if hasattr(self, "panel"):
-                self.panel.wells = self.all_wells
-                self.panel.draw_panel()
+            if hasattr(self, "well_panel"):
+                self.well_panel.wells = self.all_wells
+                self.well_panel.draw_well_panel()
         self._redraw_all_panels()
 
-    def _iter_all_panels(self):
+    def _iter_all_well_panels(self):
         """
-        Yield central panel + dock panels (if available).
+        Yield central well_panel + dock well_panels (if available).
         """
-        if hasattr(self, "panel") and self.panel is not None:
-            yield self.panel
-        for dock in getattr(self, "_panel_docks", []) or []:
-            if dock and getattr(dock, "panel", None) is not None:
-                yield dock.panel
+        if hasattr(self, "well_panel") and self.well_panel is not None:
+            yield self.well_panel
+        for dock in getattr(self, "_well_panel_docks", []) or []:
+            if dock and getattr(dock, "well_panel", None) is not None:
+                yield dock.well_panel
 
     def _on_tree_context_menu(self, pos):
         """
@@ -3487,34 +3487,34 @@ class MainWindow(QMainWindow):
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs
 
-    def _refresh_all_panels(self):
-        # central panel
-        if hasattr(self, "panel") and self.panel:
-            self.panel.wells = self.all_wells
-            self.panel.tracks = self.all_tracks
-            self.panel.stratigraphy = self.all_stratigraphy
-            self.panel.panel_settings = self.panel_settings
-        #            self.panel.draw_panel()
+    def _refresh_all_well_panels(self):
+        # central well_panel
+        if hasattr(self, "well_panel") and self.well_panel:
+            self.well_panel.wells = self.all_wells
+            self.well_panel.tracks = self.all_tracks
+            self.well_panel.stratigraphy = self.all_stratigraphy
+            self.well_panel.well_panel_settings = self.well_panel_settings
+        #            self.well_panel.draw_well_panel()
 
-        # docked panels
+        # docked well_panels
         for dock in list(self.WindowList):
-            if dock.panel:
-                dock.panel.wells = self.all_wells
-                dock.panel.tracks = self.all_tracks
-                dock.panel.stratigraphy = self.all_stratigraphy
-                dock.panel.panel_settings = self.panel_settings
+            if dock.well_panel:
+                dock.well_panel.wells = self.all_wells
+                dock.well_panel.tracks = self.all_tracks
+                dock.well_panel.stratigraphy = self.all_stratigraphy
+                dock.well_panel.well_panel_settings = self.well_panel_settings
                 wlist = []
-                for well in dock.panel.wells:
+                for well in dock.well_panel.wells:
                     name = well.get("name")
                     wlist.append(name)
                 visible_wells=[]
-                vw = dock.panel.visible_wells
+                vw = dock.well_panel.visible_wells
                 for w in wlist:
                     for v in vw:
                         if v == w:
                             visible_wells.append(v)
 
-                dock.panel.visible_wells=visible_wells
+                dock.well_panel.visible_wells=visible_wells
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
@@ -3533,7 +3533,7 @@ class MainWindow(QMainWindow):
             if win.title == win_name:
                 if state == Qt.Checked:
                     win.setVisible(True)
-                #            _on_panel_activated(self.WindowList[win_name])
+                #            _on_well_panel_activated(self.WindowList[win_name])
                 else:
                     win.setVisible(False)
 
@@ -3569,16 +3569,24 @@ class MainWindow(QMainWindow):
                 #print("Add new window...")
                 self._action_add_well_panel_dock()
         elif item.parent() == self.window_root:
+            data = item.data(0, Qt.UserRole)
+            type = item.data(1, Qt.UserRole)
+            print (data)
             #menu = QMenu(self)
             window_name = item.text(0)
             act_delete_window = menu.addAction(f"Delete window '{window_name}'...")
+            if type == "WellSection":
+                act_edit_window = menu.addAction(f"Edit wells in section '{window_name}'...")
+
             chosen = menu.exec_(global_pos)
             if chosen == act_delete_window:
                 #print("Delete window...")
                 dock = self.get_dock_by_title(item.text(0))
                 self._remove_well_panel_dock(dock)
                 self._populate_window_tree()
-
+            elif chosen == act_edit_window:
+                dock = self.get_dock_by_title(item.text(0))
+                self._action_edit_panel_wells(dock)
 
         parent = item.parent()
 #        chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
@@ -3696,9 +3704,9 @@ class MainWindow(QMainWindow):
         window_dict = {}
 
         for window in self.WindowList:
-            panel = window.panel
-            panel_settings = getattr(window.panel, "panel_settings", None)
-            # print(panel_settings)
+            panel = window.get_panel()
+            well_panel_settings = getattr(panel, "well_panel_settings", None)
+            # print(well_panel_settings)
             title = window.title
             visible = window.get_visible()
 
@@ -3706,14 +3714,14 @@ class MainWindow(QMainWindow):
 
             # print(title)
             if window.type == "WellSection":
-                visible_tops = getattr(window.panel, "visible_tops", None)
-                visible_logs = getattr(window.panel, "visible_logs", None)
-                visible_tracks = getattr(window.panel, "visible_tracks", None)
-                visible_wells = getattr(window.panel, "visible_wells", None)
+                visible_tops = getattr(window.well_panel, "visible_tops", None)
+                visible_logs = getattr(window.well_panel, "visible_logs", None)
+                visible_tracks = getattr(window.well_panel, "visible_tracks", None)
+                visible_wells = getattr(window.well_panel, "visible_wells", None)
                 window_dict = {"type": "WellSection", "visible": visible, "floating": floating,
                                "window_title": title, "visible_tops": visible_tops,
                                "visible_logs": visible_logs, "visible_tracks": visible_tracks,
-                               "visible_wells": visible_wells, "panel_settings": panel_settings}
+                               "visible_wells": visible_wells, "well_panel_settings": well_panel_settings}
                 # print(window_dict)
                 window_list.append(window_dict)
         return window_list
@@ -3755,8 +3763,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Delete bitmap", f"Failed to delete bitmap:\n{e}")
             return
 
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
@@ -3797,8 +3805,8 @@ class MainWindow(QMainWindow):
                 if not bm:
                     w.pop("bitmaps", None)
 
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
@@ -3832,14 +3840,14 @@ class MainWindow(QMainWindow):
 
         dlg = TrackSettingsDialog(self, track, available_logs=self._available_log_names())
         if dlg.exec_() == QDialog.Accepted:
-            self.panel_settings["redraw_requested"]=False
+            self.well_panel_settings["redraw_requested"]=False
             # redraw / refresh
-            if hasattr(self, "_refresh_all_panels"):
-                self._refresh_all_panels()
+            if hasattr(self, "_refresh_all_well_panels"):
+                self._refresh_all_well_panels()
             if hasattr(self, "_populate_well_track_tree"):
                 self._populate_well_track_tree()
-            self.panel_settings["redraw_requested"] = True
-            self.panel.draw_panel()
+            self.well_panel_settings["redraw_requested"] = True
+            self.well_panel.draw_well_panel()
 
     def _edit_well_log_table(self, well_name: str, log_name: str):
         wells = getattr(self, "all_wells", []) or []
@@ -3872,8 +3880,8 @@ class MainWindow(QMainWindow):
         well["logs"] = logs
 
         # Redraw + rebuild tree if you show log stats/availability
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
@@ -3881,8 +3889,8 @@ class MainWindow(QMainWindow):
         """
         Reset the application state for a new project:
           - clears all data (wells/tracks/stratigraphy)
-          - closes/removes all extra panel docks
-          - resets central panel state/filters
+          - closes/removes all extra well_panel docks
+          - resets central well_panel state/filters
           - rebuilds trees and redraws
 
         Call this from File → New project...
@@ -3892,7 +3900,7 @@ class MainWindow(QMainWindow):
                 self,
                 "New project",
                 "Start a new project?\n\n"
-                "This will clear wells, logs, tops, tracks, bitmaps and close all panel windows.\n"
+                "This will clear wells, logs, tops, tracks, bitmaps and close all well_panel windows.\n"
                 "Unsaved changes will be lost.",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
@@ -3920,7 +3928,7 @@ class MainWindow(QMainWindow):
 
         window_name = "Well Section 1"
 
-        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+        self.well_panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
                                "track_width": self.track_width, "redraw_requested": self.redraw_requested,
                                "vertical_scale": self.vertical_scale
                                }
@@ -3934,8 +3942,8 @@ class MainWindow(QMainWindow):
             if hasattr(self, attr):
                 setattr(self, attr, None)
 
-        # ---- 2) close/remove all docked panels ----
-        # Keep central panel; remove all dock panels
+        # ---- 2) close/remove all docked well_panels ----
+        # Keep central well_panel; remove all dock well_panels
         for dock in list(getattr(self, "WindowList", []) or []):
             try:
                 self.removeDockWidget(dock)
@@ -3954,14 +3962,14 @@ class MainWindow(QMainWindow):
             wells=self.all_wells,
             tracks=self.all_tracks,
             stratigraphy=self.all_stratigraphy,
-            panel_settings=self.panel_settings
+            well_panel_settings=self.well_panel_settings
         )
-        self.dock.activated.connect(self._on_panel_activated)
+        self.dock.activated.connect(self._on_well_panel_activated)
 
         # self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
-        self.dock.panel.active_panel = True
-        self.panel = self.dock.panel
+        self.dock.well_panel.active_well_panel = True
+        self.well_panel = self.dock.well_panel
 
         self.WindowList = []
 
@@ -3971,14 +3979,14 @@ class MainWindow(QMainWindow):
 
 
 
-        # ---- 3) reset central panel view state/filters ----
-        if hasattr(self, "panel") and self.panel is not None:
-            p = self.panel
+        # ---- 3) reset central well_panel view state/filters ----
+        if hasattr(self, "well_panel") and self.well_panel is not None:
+            p = self.well_panel
             p.wells = self.all_wells
             p.tracks = self.all_tracks
             p.stratigraphy = self.all_stratigraphy
 
-            # clear common per-panel state
+            # clear common per-well_panel state
             for attr, default in (
                 ("visible_wells", None),
                 ("visible_tracks", None),
@@ -4012,8 +4020,8 @@ class MainWindow(QMainWindow):
                 p.enable_track_mouse_scrolling()
 
             # redraw (empty)
-            if hasattr(p, "draw_panel"):
-                p.draw_panel()
+            if hasattr(p, "draw_well_panel"):
+                p.draw_well_panel()
 
         # ---- 4) rebuild UI trees ----
         if hasattr(self, "_populate_well_tree"):
@@ -4027,9 +4035,81 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_log_tree"):
             self._populate_well_log_tree()
 
-        # ---- 5) refresh panels if you prefer centralized refresh ----
-        if hasattr(self, "_refresh_all_panels"):
-            self._refresh_all_panels()
+        # ---- 5) refresh well_panels if you prefer centralized refresh ----
+        if hasattr(self, "_refresh_all_well_panels"):
+            self._refresh_all_well_panels()
 
         # Optional: update window title
         self.setWindowTitle("PyWellSection — New Project")
+
+    def _get_visible_wells_for_well_panel(self, well_panel):
+        """
+        Return wells shown in that well_panel in display order (left->right).
+        Adjust if you maintain a visible_wells filter.
+        """
+        wells = getattr(well_panel, "wells", []) or []
+
+        # If you have a visibility filter:
+        vw = getattr(well_panel, "visible_wells", None)
+        if vw is not None:
+            wells = [w for w in wells if w.get("name") in vw]
+
+        return wells
+
+    def _build_section_profiles(self):
+        """
+        Return list of profiles derived from each dock well_panel:
+          [{"name": "<well_panel title>", "points": [(x,y), ...]}, ...]
+        """
+        profiles = []
+
+        # include central well_panel too if desired
+        candidates = []
+        if hasattr(self, "well_panel") and self.well_panel is not None:
+            candidates.append(("Main Panel", self.well_panel))
+
+        for dock in getattr(self, "_well_panel_docks", []) or []:
+            if hasattr(dock, "well_panel"):
+                candidates.append((dock.windowTitle() or "Panel", dock.well_panel))
+
+        for name, well_panel in candidates:
+            wells = self._get_visible_wells_for_well_panel(well_panel)
+            pts = []
+            for w in wells:
+                x, y = w.get("x"), w.get("y")
+                if x is None or y is None:
+                    continue
+                try:
+                    pts.append((float(x), float(y)))
+                except Exception:
+                    pass
+            if len(pts) >= 2:
+                profiles.append({"name": name, "points": pts})
+
+        return profiles
+
+    def _open_map_window(self):
+        self.all_profiles = self._build_section_profiles()
+        dock = MapDockWindow(parent = self,
+                             wells = self.all_wells,
+                             profiles = self.all_profiles,
+                             map_layout_settings =  self.map_panel_settings,
+                             title=f"Map {len(self.WindowList) + 1}")
+
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        self.WindowList.append(dock)
+        self._update_map_windows()
+
+        if hasattr(self, "_populate_window_tree"):
+            self._populate_window_tree()
+
+    def _update_map_windows(self):
+        wells = getattr(self, "all_wells", []) or []
+        self.all_profiles = self._build_section_profiles()
+
+        for d in list(getattr(self, "WindowList", []) or []):
+            try:
+                if d.type == "MapWindow":
+                    d.set_data(wells, self.all_profiles)
+            except Exception:
+                pass
