@@ -510,9 +510,14 @@ class MainWindow(QMainWindow):
             #add all remaining windows back in
             for window in window_dict[1:]:
                 if (window["type"] == "WellSection"):
+                    if "panel_settings" not in window.keys():
+                        panel_settings = window["well_panel_settings"]
+                    else:
+                        panel_settings = window["panel_settings"]
+
                     dock = self._add_well_panel_dock(window["window_title"], window["visible_tops"],
                                                      window["visible_logs"], window["visible_tracks"],
-                                                     window["visible_wells"], window["panel_settings"])
+                                                     window["visible_wells"], panel_settings)
                     dock.set_title(window["window_title"])
                     if window["visible"]:
                         dock.setVisible(True)
@@ -3697,7 +3702,11 @@ class MainWindow(QMainWindow):
 
         for window in self.WindowList:
             panel = window.panel
-            panel_settings = getattr(window.panel, "panel_settings", None)
+            if "panel_settings" in window.keys():
+                panel_settings = getattr(window.panel, "panel_settings", None)
+            else:
+                panel_settings = getattr(window.panel, "well_panel_settings", None)
+
             # print(panel_settings)
             title = window.title
             visible = window.get_visible()

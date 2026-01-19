@@ -981,7 +981,7 @@ import json
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 
-SUPPORTED_PROJECT_FILE_VERSIONS = {1}
+SUPPORTED_PROJECT_FILE_VERSIONS = {1,2}
 
 
 def load_project_from_json_new(self, path: str | None = None):
