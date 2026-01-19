@@ -1017,6 +1017,9 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
 
 #                    print(f"add_tops_and_correlations stratigraphy: {stratigraphy}")
 
+                    if name not in stratigraphy.keys():
+                        continue
+
                     if stratigraphy[name]['role'] == 'stratigraphy':
                         base_ax.axhline(
                             info["depth"],
@@ -1049,6 +1052,8 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
                     color = info["color"]
                     #color = stratigraphy[name_upper]['color']
                     style = info["style"]
+                    if name_upper not in stratigraphy.keys():
+                        continue
                     if stratigraphy[name_upper]['role']=='stratigraphy':
                         for ti in range(n_tracks):
                             col_idx = first_track_idx + ti
