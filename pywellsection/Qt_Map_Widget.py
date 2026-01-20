@@ -29,7 +29,7 @@ class MapPanelWidget(QWidget):
         self.profiles = profiles
         self.layout_settings = map_panel_settings
         self.title = title
-        self.type = "WellSection"
+        self.type = "MapWindow"
         self.visible = True
         self.tabified = False
         self.setObjectName(title)
