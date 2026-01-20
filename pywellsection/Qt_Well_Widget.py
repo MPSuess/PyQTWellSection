@@ -42,7 +42,7 @@ import numpy as np
 #from mpl_interactions import panhandler
 
 class WellPanelWidget(QWidget):
-    def __init__(self, wells, tracks, stratigraphy, well_panel_settings, well_panel_title = None, parent=None):
+    def __init__(self, wells, tracks, stratigraphy, panel_settings, well_panel_title = None, parent=None):
         super().__init__(parent)
 
         self.wells = wells
@@ -53,31 +53,32 @@ class WellPanelWidget(QWidget):
         self.stratigraphy = stratigraphy
         self.logs = None
         self.depth_window = None
+        self.type = "well_panel"
 
         self._scroll_cid = None
 
-        self.well_panel_settings = well_panel_settings
+        self.panel_settings = panel_settings
 
         self.active_well_panel = False
 
-        self.well_gap_factor = well_panel_settings["well_gap_factor"]
-        self.track_gap_factor = well_panel_settings["track_gap_factor"]
-        self.track_width = well_panel_settings["track_width"]
+        self.well_gap_factor = panel_settings["well_gap_factor"]
+        self.track_gap_factor = panel_settings["track_gap_factor"]
+        self.track_width = panel_settings["track_width"]
 
-        self.gap_proportional_to_distance = well_panel_settings.get("gap_proportional_to_distance",False)
-        self.gap_distance_mode = well_panel_settings.get("gap_distance_mode","auto")
-        self.gap_distance_ref_m = well_panel_settings.get("gap_distance_ref_m", 1000)
-        self.gap_min_factor = well_panel_settings.get("gap_min_factor",0.8)
-        self.gap_max_factor = well_panel_settings.get("gap_max_factor",8.0)
+        self.gap_proportional_to_distance = panel_settings.get("gap_proportional_to_distance",False)
+        self.gap_distance_mode = panel_settings.get("gap_distance_mode","auto")
+        self.gap_distance_ref_m = panel_settings.get("gap_distance_ref_m", 1000)
+        self.gap_min_factor = panel_settings.get("gap_min_factor",0.8)
+        self.gap_max_factor = panel_settings.get("gap_max_factor",8.0)
 
         self.redraw_requested = False
 
-        if not well_panel_settings.get("vertical_scale", 0):
+        if not panel_settings.get("vertical_scale", 0):
             self.vertical_scale = 1.0
         else:
-            self.vertical_scale = well_panel_settings["vertical_scale"]
-#        self.well_panel_title = well_panel_settings["well_panel_title"]
-#        self.window_name = well_panel_settings["window_name"]
+            self.vertical_scale = panel_settings["vertical_scale"]
+#        self.well_panel_title = panel_settings["well_panel_title"]
+#        self.window_name = panel_settings["window_name"]
 
         #self.well_panel_title = self.parent.objectName()
         self.well_panel_title = well_panel_title
@@ -156,7 +157,7 @@ class WellPanelWidget(QWidget):
     def draw_well_panel(self):
 
 
-        redraw_requested = self.well_panel_settings.get("redraw_requested",None)
+        redraw_requested = self.panel_settings.get("redraw_requested",None)
 
         LOG.debug(f"redraw requested: {self.visible_wells}")
 
@@ -255,12 +256,12 @@ class WellPanelWidget(QWidget):
 
             self.canvas.draw()
 
-    def update_well_panel(self,tracks, wells, stratigraphy, well_panel_settings):
+    def update_well_panel(self,tracks, wells, stratigraphy, panel_settings):
         self.tracks = tracks
         self.n_tracks = len(tracks)
         self.wells = wells
         self.stratigraphy = stratigraphy
-        self.well_panel_settings = well_panel_settings
+        self.panel_settings = panel_settings
         LOG.debug(f"stratigraphy: {stratigraphy}")
         self.draw_well_panel()
 
@@ -1199,7 +1200,7 @@ class WellPanelWidget(QWidget):
         #self.current_depth_window = None  # optional: reset zoom as well
         self.draw_well_panel()
         
-    def set_well_panel_settings(self, settings):
+    def set_panel_settings(self, settings):
         self.well_gap_factor = settings["well_gap_factor"]
         self.track_gap_factor = settings["track_gap_factor"]
         self.track_width = settings["track_width"]
@@ -1220,7 +1221,7 @@ class WellPanelWidget(QWidget):
         self.draw_well_panel()
 
     def set_draw_well_panel(self, state = True):
-        self.well_panel_settings["redraw_requested"] = state
+        self.panel_settings["redraw_requested"] = state
         return state
 
     def arm_bitmap_pick(self, dialog, well_name: str, bitmap_key: str, which: str):
@@ -1464,7 +1465,7 @@ class WellPanelDock(QDockWidget):
 
     _counter = 1
 
-    def __init__(self, parent, wells, tracks, stratigraphy, well_panel_settings):
+    def __init__(self, parent, wells, tracks, stratigraphy, panel_settings):
         title = f"Well_Section_{WellPanelDock._counter}"
         super().__init__(title, parent)
         WellPanelDock._counter += 1
@@ -1490,7 +1491,7 @@ class WellPanelDock(QDockWidget):
 
  #       self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
-        self.well_panel = WellPanelWidget(wells, tracks, stratigraphy, well_panel_settings, title)
+        self.well_panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings, title)
         self.setWidget(self.well_panel)
         self.well_panel.draw_well_panel()
 
