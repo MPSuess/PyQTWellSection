@@ -7,6 +7,12 @@ from PyQt5.QtWidgets import (
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
     QPushButton, QWidget, QListWidget, QGroupBox,
 )
+
+from PyQt5.QtCore import Qt
+
+
+
+
 # from PyQt5.QtWidgets import (
 #     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
 #     QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit,
@@ -1986,13 +1992,22 @@ class SingleWellSettingsDialog(QDialog):
         self.spin_x = QDoubleSpinBox(self)
         self.spin_x.setRange(-1e9, 1e9)
         self.spin_x.setDecimals(3)
-        self.spin_x.setValue(float(well.get("x", 0.0)))
+        if well.get("x", 0.0):
+            self.spin_x.setValue(float(well.get("x", -999.25)))
+        else:
+            well.setdefault("x", 0.0)
+            self.spin_x.setValue(-999.25)
         form.addRow("Surface X (m):", self.spin_x)
 
         self.spin_y = QDoubleSpinBox(self)
         self.spin_y.setRange(-1e9, 1e9)
         self.spin_y.setDecimals(3)
-        self.spin_y.setValue(float(well.get("y", 0.0)))
+        if well.get("y",0.0):
+            self.spin_y.setValue(float(well.get("y", -999.25)))
+        else:
+            well.setdefault("x", -999.25)
+            self.spin_x.setValue(-999.25)
+
         form.addRow("Surface Y (m):", self.spin_y)
 
         # Reference type
@@ -3633,13 +3648,6 @@ class TrackSettingsDialog(QDialog):
             self.track["name"] = name
         self.accept()
 
-import numpy as np
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit
-)
-from PyQt5.QtCore import Qt
-
 
 class EditWellLogTableDialog_old(QDialog):
     """
@@ -3826,9 +3834,6 @@ class EditWellLogTableDialog_old(QDialog):
     def result_arrays(self):
         """Return (depth, data) as lists after OK, else (None, None)."""
         return self._result_depth, self._result_data
-
-
-
 
 class EditWellLogTableDialog(QDialog):
     """
@@ -4295,3 +4300,208 @@ class EditWellLogTableDialog(QDialog):
 
     def result_arrays(self):
         return self._result_depth, self._result_data
+
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QDialogButtonBox, QMessageBox, QAbstractItemView,
+    QComboBox, QLabel
+)
+from PyQt5.QtCore import Qt
+
+
+class EditWellPanelOrderDialog(QDialog):
+    """
+    Edit the wells shown in ONE well section panel:
+      - reorder by moving rows up/down
+      - remove selected wells
+      - add wells from project list via dropdown
+    Applies by setting panel.visible_wells (names list) and redrawing.
+    """
+
+    def __init__(self, parent, panel, project_wells):
+        """
+        panel: WellPanelWidget (or panel-like object) containing:
+          - wells: list[well dict] (current project wells)
+          - visible_wells: Optional[list[str]] filter; if None => "all"
+          - draw_panel()
+        project_wells: list[well dict] for add dropdown
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Edit Wells in Section")
+        self.resize(600, 420)
+
+        self.panel = panel
+        self.project_wells = project_wells or []
+
+        # current displayed wells (names in order)
+        current = self._get_current_displayed_well_names()
+
+        layout = QVBoxLayout(self)
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(1)
+        self.table.setHorizontalHeaderLabels(["Well"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setDragDropMode(QAbstractItemView.NoDragDrop)  # keep simple (buttons)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table, 1)
+
+        self._set_rows(current)
+
+        # row controls
+        row_btns = QHBoxLayout()
+        self.btn_up = QPushButton("Move up", self)
+        self.btn_down = QPushButton("Move down", self)
+        self.btn_remove = QPushButton("Remove", self)
+        row_btns.addWidget(self.btn_up)
+        row_btns.addWidget(self.btn_down)
+        row_btns.addWidget(self.btn_remove)
+        row_btns.addStretch(1)
+        layout.addLayout(row_btns)
+
+        # add controls
+        add_row = QHBoxLayout()
+        add_row.addWidget(QLabel("Add well:", self))
+        self.cmb_add = QComboBox(self)
+        add_row.addWidget(self.cmb_add, 1)
+        self.btn_add = QPushButton("Add", self)
+        add_row.addWidget(self.btn_add)
+        layout.addLayout(add_row)
+
+        self._refresh_add_combo()
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        # connections
+        self.btn_up.clicked.connect(self._move_up)
+        self.btn_down.clicked.connect(self._move_down)
+        self.btn_remove.clicked.connect(self._remove_selected)
+        self.btn_add.clicked.connect(self._add_selected_from_combo)
+
+    # -------------------------
+    # helpers
+    # -------------------------
+    def _get_current_displayed_well_names(self):
+        # If panel has explicit ordering state, prefer it
+        order = getattr(self.panel, "well_order", None)
+        if isinstance(order, list) and order:
+            return list(order)
+
+        vw = getattr(self.panel, "visible_wells", None)
+        if vw is None:
+            # all wells in current panel order
+            wells = getattr(self.panel, "wells", []) or []
+            return [w.get("name", "") for w in wells if w.get("name")]
+        else:
+            # visible_wells already defines list/order
+            return list(vw)
+
+    def _set_rows(self, names):
+        self.table.setRowCount(0)
+        for nm in names:
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            it = QTableWidgetItem(nm)
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(r, 0, it)
+        if self.table.rowCount() > 0:
+            self.table.selectRow(0)
+
+    def _row_names(self):
+        out = []
+        for r in range(self.table.rowCount()):
+            it = self.table.item(r, 0)
+            nm = it.text().strip() if it else ""
+            if nm:
+                out.append(nm)
+        return out
+
+    def _selected_row(self):
+        idxs = self.table.selectionModel().selectedRows()
+        if not idxs:
+            return None
+        return idxs[0].row()
+
+    def _swap_rows(self, r1, r2):
+        if r1 < 0 or r2 < 0 or r1 >= self.table.rowCount() or r2 >= self.table.rowCount():
+            return
+        t1 = self.table.item(r1, 0).text()
+        t2 = self.table.item(r2, 0).text()
+        self.table.item(r1, 0).setText(t2)
+        self.table.item(r2, 0).setText(t1)
+        self.table.selectRow(r2)
+
+    def _refresh_add_combo(self):
+        existing = set(self._row_names())
+        self.cmb_add.clear()
+        for w in self.project_wells:
+            nm = w.get("name", "")
+            if nm and nm not in existing:
+                self.cmb_add.addItem(nm)
+
+        self.btn_add.setEnabled(self.cmb_add.count() > 0)
+
+    # -------------------------
+    # actions
+    # -------------------------
+    def _move_up(self):
+        r = self._selected_row()
+        if r is None or r == 0:
+            return
+        self._swap_rows(r, r - 1)
+        self._refresh_add_combo()
+
+    def _move_down(self):
+        r = self._selected_row()
+        if r is None or r >= self.table.rowCount() - 1:
+            return
+        self._swap_rows(r, r + 1)
+        self._refresh_add_combo()
+
+    def _remove_selected(self):
+        r = self._selected_row()
+        if r is None:
+            return
+        self.table.removeRow(r)
+        if self.table.rowCount() > 0:
+            self.table.selectRow(min(r, self.table.rowCount() - 1))
+        self._refresh_add_combo()
+
+    def _add_selected_from_combo(self):
+        nm = self.cmb_add.currentText().strip()
+        if not nm:
+            return
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        it = QTableWidgetItem(nm)
+        it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+        self.table.setItem(r, 0, it)
+        self.table.selectRow(r)
+        self._refresh_add_combo()
+
+    def _on_ok(self):
+        names = self._row_names()
+        if not names:
+            res = QMessageBox.question(
+                self, "Empty selection",
+                "No wells selected for this panel.\n\nContinue?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if res != QMessageBox.Yes:
+                return
+
+        # Apply ordering & visibility to panel
+        # We store explicit order on panel so draw uses that order.
+        self.panel.well_order = list(names)
+        self.panel.visible_wells = list(names)
+
+        if hasattr(self.panel, "draw_panel"):
+            self.panel.draw_panel()
+
+        self.accept()
