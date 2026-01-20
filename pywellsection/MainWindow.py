@@ -548,10 +548,10 @@ class MainWindow(QMainWindow):
             #add all remaining windows back in
             for window in window_dict[1:]:
                 if (window["type"] == "WellSection"):
-                    if window["well_panel_settings"]:
+                    if window.get("well_panel_settings", None):
                         panel_setting = window["well_panel_settings"]
                     else:
-                        panel_setting = window["well_panel_settings"]
+                        panel_setting = window["panel_settings"]
                     dock = self._add_well_panel_dock(window["window_title"], window["visible_tops"],
                                                      window["visible_logs"], window["visible_tracks"],
                                                      window["visible_wells"], panel_setting)

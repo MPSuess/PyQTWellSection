@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from PyQt5.QtCore import Qt, pyqtSignal, QEvent, QSize
-from scipy.stats import false_discovery_control
+#from scipy.stats import false_discovery_control
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
 from .multi_wells_panel import add_tops_and_correlations
