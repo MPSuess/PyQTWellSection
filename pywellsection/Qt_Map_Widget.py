@@ -25,6 +25,8 @@ class MapPanelWidget(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self.canvas)
 
+
+
         self.wells = wells
         self.profiles = profiles
         self.layout_settings = map_panel_settings
@@ -34,6 +36,11 @@ class MapPanelWidget(QWidget):
         self.tabified = False
         self.setObjectName(title)
         self.setWindowTitle(title.replace("_", " "))
+
+        self.use_fixed_limits = False
+        self.fixed_limits = None  # (xmin, xmax, ymin, ymax)
+        self.ax = None
+
 
     # -------------------------
     # Data / redraw interface
@@ -65,7 +72,7 @@ class MapPanelWidget(QWidget):
                 pass
 
         if xs:
-            ax.scatter(xs, ys, s=30)
+            ax.scatter(xs, ys, s=30 )
             if show_labels:
                 for x, y, nm in zip(xs, ys, names):
                     if nm:
@@ -90,6 +97,14 @@ class MapPanelWidget(QWidget):
 
         if show_grid:
             ax.grid(True, linestyle="--", alpha=0.3)
+
+        # apply limits
+        if self.use_fixed_limits and self.fixed_limits:
+            xmin, xmax, ymin, ymax = self.fixed_limits
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+
+        ax.set_aspect("equal", adjustable="box")
 
         self.canvas.draw_idle()
 
@@ -172,5 +187,8 @@ class MapDockWindow(QDockWidget):
 
     def get_panel(self):
         return self.panel
+
+    def set_layout_settings(self, settings):
+        self.layout_settings = settings
 
 

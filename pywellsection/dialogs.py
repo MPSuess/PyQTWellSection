@@ -962,7 +962,7 @@ class LayoutSettingsDialog(QDialog):
                 float(self.spin_max_fac.value())
                 )
 
-
+1
 
 class LogDisplaySettingsDialog(QDialog):
     """
@@ -4503,5 +4503,187 @@ class EditWellPanelOrderDialog(QDialog):
 
         if hasattr(self.panel, "draw_panel"):
             self.panel.draw_panel()
+
+        self.accept()
+
+class ImportTopsAssignWellDialog(QDialog):
+    def __init__(
+        self,
+        parent,
+        *,
+        sheet_names,
+        existing_well_names,
+        default_new_name,
+        td_preview=None,
+        n_tops_preview=None,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Import Well Tops")
+        self.resize(560, 260)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # --- Sheet selection ---
+        self.cmb_sheet = QComboBox(self)
+        self.cmb_sheet.addItems(sheet_names)
+        form.addRow("Worksheet:", self.cmb_sheet)
+
+        # --- Preview (updated later) ---
+        self.lbl_preview = QLabel("Select sheet to preview", self)
+        form.addRow("Preview:", self.lbl_preview)
+
+        # --- Well assignment ---
+        self.cmb_well = QComboBox(self)
+        self.cmb_well.addItems(existing_well_names or [])
+        form.addRow("Assign to existing well:", self.cmb_well)
+
+        self.chk_new = QCheckBox("Create new well", self)
+        form.addRow(self.chk_new)
+
+        self.ed_new_name = QLineEdit(self)
+        self.ed_new_name.setText(default_new_name or "")
+        form.addRow("New well name:", self.ed_new_name)
+
+        self.chk_set_td = QCheckBox("Set well total_depth from TD in file", self)
+        self.chk_set_td.setChecked(True)
+        form.addRow(self.chk_set_td)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_new.toggled.connect(self._update_enabled)
+        self._update_enabled(False)
+
+    def _update_enabled(self, is_new: bool):
+        self.cmb_well.setEnabled(not is_new)
+        self.ed_new_name.setEnabled(is_new)
+
+    def set_preview(self, n_tops: int, td: float):
+        self.lbl_preview.setText(f"{n_tops} tops, TD={td:.2f} m")
+
+    def selected_sheet(self) -> str:
+        return self.cmb_sheet.currentText()
+
+    def result_selection(self):
+        return {
+            "sheet": self.selected_sheet(),
+            "create_new": self.chk_new.isChecked(),
+            "existing_name": self.cmb_well.currentText().strip(),
+            "new_name": self.ed_new_name.text().strip(),
+            "set_td": self.chk_set_td.isChecked(),
+        }
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QDoubleSpinBox, QDialogButtonBox, QCheckBox, QLabel, QMessageBox
+)
+from PyQt5.QtCore import Qt
+
+
+class MapLimitsDialog(QDialog):
+    """
+    Dialog to set map axis limits (xmin/xmax/ymin/ymax) for a MapPanelWidget.
+    Supports:
+      - manual limits
+      - "auto from data" reset
+    """
+    def __init__(self, parent, map_panel):
+        super().__init__(parent)
+        self.setWindowTitle("Map View Limits")
+        self.resize(420, 220)
+
+        self.map_panel = map_panel
+        ax = getattr(map_panel, "ax", None)
+
+        # If ax not stored, infer from fig
+        if ax is None and hasattr(map_panel, "fig"):
+            try:
+                ax = map_panel.fig.axes[0] if map_panel.fig.axes else None
+            except Exception:
+                ax = None
+
+        # default limits (fallback)
+        xmin = ymin = -1000.0
+        xmax = ymax = 1000.0
+        if ax is not None:
+            try:
+                xmin, xmax = ax.get_xlim()
+                ymin, ymax = ax.get_ylim()
+            except Exception:
+                pass
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.chk_fixed = QCheckBox("Use fixed limits (disable auto-fit)", self)
+        self.chk_fixed.setChecked(bool(getattr(map_panel, "use_fixed_limits", False)))
+        form.addRow(self.chk_fixed)
+
+        # Spinboxes
+        self.sp_xmin = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmin, xmin)
+        self.sp_xmax = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmax, xmax)
+        self.sp_ymin = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymin, ymin)
+        self.sp_ymax = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymax, ymax)
+
+        form.addRow("X min:", self.sp_xmin)
+        form.addRow("X max:", self.sp_xmax)
+        form.addRow("Y min:", self.sp_ymin)
+        form.addRow("Y max:", self.sp_ymax)
+
+        # Buttons row with "Auto" helper
+        row = QHBoxLayout()
+        self.btn_auto = QLabel("Tip: click OK with fixed unchecked to auto-fit from data.", self)
+        self.btn_auto.setStyleSheet("color: gray;")
+        row.addWidget(self.btn_auto)
+        layout.addLayout(row)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_fixed.toggled.connect(self._update_enabled)
+        self._update_enabled(self.chk_fixed.isChecked())
+
+    def _cfg_spin(self, sp: QDoubleSpinBox, v: float):
+        sp.setDecimals(3)
+        sp.setRange(-1e12, 1e12)
+        sp.setSingleStep(10.0)
+        sp.setValue(float(v))
+
+    def _update_enabled(self, enabled: bool):
+        self.sp_xmin.setEnabled(enabled)
+        self.sp_xmax.setEnabled(enabled)
+        self.sp_ymin.setEnabled(enabled)
+        self.sp_ymax.setEnabled(enabled)
+
+    def _on_ok(self):
+        fixed = bool(self.chk_fixed.isChecked())
+
+        if fixed:
+            xmin = float(self.sp_xmin.value())
+            xmax = float(self.sp_xmax.value())
+            ymin = float(self.sp_ymin.value())
+            ymax = float(self.sp_ymax.value())
+
+            if xmax <= xmin or ymax <= ymin:
+                QMessageBox.warning(self, "Invalid limits", "Max must be greater than Min for both axes.")
+                return
+
+            # store on panel
+            self.map_panel.use_fixed_limits = True
+            self.map_panel.fixed_limits = (xmin, xmax, ymin, ymax)
+        else:
+            # auto-fit
+            self.map_panel.use_fixed_limits = False
+            self.map_panel.fixed_limits = None
+
+        # redraw
+        if hasattr(self.map_panel, "draw_panel"):
+            self.map_panel.draw_panel()
 
         self.accept()

@@ -31,6 +31,8 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from pywellsection.sample_data import Wells # The new class for wells
 
+from pywellsection.pws_project import PWSProject
+
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
@@ -41,6 +43,7 @@ from pywellsection.Qt_Map_Widget import MapDockWindow, MapPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
+from pywellsection.io_utils import import_schichtenverzeichnis
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
@@ -66,6 +69,8 @@ from pywellsection.dialogs import BitmapPlacementDialog
 from pywellsection.dialogs import TrackSettingsDialog
 from pywellsection.dialogs import EditWellLogTableDialog
 from pywellsection.dialogs import EditWellPanelOrderDialog
+from pywellsection.dialogs import MapLimitsDialog
+
 from pathlib import Path
 from collections import OrderedDict
 
@@ -96,6 +101,8 @@ class MainWindow(QMainWindow):
         self.resize(1200, 1000)
         self.redraw_requested = False
         self.current_project_path = None
+
+        self.project = PWSProject(name="My Project", crs="EPSG:32632", units={"xy": "m", "depth": "m"})
 
         # The Windows
         ### central widget ----
@@ -282,6 +289,10 @@ class MainWindow(QMainWindow):
         act_import_discrete.triggered.connect(self._file_import_discrete_logs_csv)
         import_menu.addAction(act_import_discrete)
 
+        act_import_sv = QAction("Import BGR Schichtenverzeichnis", self)
+        act_import_sv.triggered.connect(self._file_import_sv_tops)
+        import_menu.addAction(act_import_sv)
+
         act_import_facies = QAction("Facies intervals from CSV…", self)
         act_import_facies.triggered.connect(self._file_import_facies_intervals_csv)
         import_menu.addAction(act_import_facies)
@@ -449,6 +460,7 @@ class MainWindow(QMainWindow):
             self.all_discrete_logs = []
             self.all_tracks = tracks
             self.all_wells = wells
+            self.project.all_wells = wells
 
             # ---- normalize stratigraphy ----
             # Ensure it's an ordered mapping of name -> dict(meta)
@@ -483,6 +495,8 @@ class MainWindow(QMainWindow):
             else:
                 self.all_stratigraphy.update(stratigraphy)
 
+            self.project.all_stratigraphy = self.all_stratigraphy
+
             for well in wells:
                 logs = well.get("logs")
                 if logs:
@@ -494,6 +508,7 @@ class MainWindow(QMainWindow):
                         else:
                             # LOG.debug("appending log:" , log)
                             self.all_logs = self.all_logs | {log}
+                    self.project.all_logs = self.all_logs
                 else:
                     LOG.debug("No logs found")
 
@@ -510,6 +525,8 @@ class MainWindow(QMainWindow):
                             "depth": tops.tolist(),
                             "values": values.tolist(),
                         }
+                self.project.all_discrete_logs = self.all_discrete_logs
+
             for well in wells:
                 bitmaps = well.get("bitmaps", None)
                 # if bitmaps:
@@ -531,6 +548,7 @@ class MainWindow(QMainWindow):
                                 self.all_bitmaps.append(bitmap)
                                 well[bitmap] = bitmap_cfg
                                 print (bitmap_cfg)
+                    self.project.all_bitmaps = self.all_bitmaps
 
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
             self.panel.visible_tops = window_dict[0]["visible_tops"]
@@ -1202,6 +1220,23 @@ class MainWindow(QMainWindow):
             return
 
         import_discrete_logs_from_csv(self, path)
+
+    def _file_import_sv_tops(self):
+        ### This import filter has been developed to load BGR Schichtenverzeichnis (SV) tops from a .xlsx file.
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import BGR Schichtenverzeichnis (XLSX)", "", "Excel (*.xlsx);;All files (*.*)"
+        )
+        if not path:
+            return
+        ok = import_schichtenverzeichnis(self, self.project, path)
+        if ok:
+            print (self.project.all_stratigraphy)
+            self.all_stratigraphy = self.project.all_stratigraphy
+            self.all_wells = self.project.all_wells
+            self._populate_well_tops_tree()
+            self._populate_well_tree()
+#            self._refresh_all_panels()
+#            self._populate_well_tree()
 
     def _build_well_tree_dock(self):
         """Left dock: tree with checkboxes to toggle wells."""
@@ -2179,6 +2214,7 @@ class MainWindow(QMainWindow):
 
     def _action_layout_settings(self):
         """Open dialog to adjust distance between wells and track width."""
+        """ This only works if the current panel is a well_panel."""
         if not hasattr(self, "panel"):
             return
 
@@ -2951,6 +2987,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
+    def _action_edit_map_settings(self, map_dock):
+        dlg = MapLimitsDialog(self, map_dock.panel)
+        dlg.exec_()
 
     def _ensure_bitmap_track_exists(self):
         """
@@ -3602,15 +3641,25 @@ class MainWindow(QMainWindow):
             if type == "WellSection":
                 act_edit_window = menu.addAction(f"Edit wells in section '{window_name}'...")
 
+            if type == "MapWindow":
+                act_edit_window = menu.addAction(f"Edit map settings for '{window_name}'...")
+
             chosen = menu.exec_(global_pos)
             if chosen == act_delete_window:
                 #print("Delete window...")
                 dock = self.get_dock_by_title(item.text(0))
                 self._remove_well_panel_dock(dock)
                 self._populate_window_tree()
-            elif chosen == act_edit_window:
-                dock = self.get_dock_by_title(item.text(0))
-                self._action_edit_panel_wells(dock)
+
+            if type == "WellSection":
+                if chosen == act_edit_window:
+                    dock = self.get_dock_by_title(item.text(0))
+                    self._action_edit_panel_wells(dock)
+            elif type == "MapWindow":
+                if chosen == act_edit_window:
+                    dock = self.get_dock_by_title(item.text(0))
+                    self._action_edit_map_settings(dock)
+
 
         parent = item.parent()
 #        chosen = self.window_tree.contextMenuEvent(QContextMenuEvent(global_pos))
