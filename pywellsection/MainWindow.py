@@ -231,12 +231,12 @@ class MainWindow(QMainWindow):
 
         self.redraw_requested = True
 
-        self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
-                               "track_width": self.track_width, "redraw_requested": self.redraw_requested,
-                               "well_panel_title":self.dock.title}
+        #self.panel_settings = {"well_gap_factor": self.well_gap_factor, "track_gap_factor": self.track_gap_factor,
+        #                       "track_width": self.track_width, "redraw_requested": self.redraw_requested,
+        #                       "well_panel_title":self.dock.title}
 
         self.panel.set_visible_wells(None)
-        self.panel.update_well_panel(tracks, wells, stratigraphy, self.panel_settings)
+        #self.panel.update_well_panel(tracks, wells, stratigraphy, self.panel_settings)
         self.panel.draw_well_panel()
 
         # ---- build menu bar ----

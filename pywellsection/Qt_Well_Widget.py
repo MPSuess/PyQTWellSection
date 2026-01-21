@@ -1489,6 +1489,7 @@ class WellPanelDock(QDockWidget):
             QDockWidget.DockWidgetFloatable
         )
 
+ #        self.setStyleSheet("background-color: yellow")
  #       self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
         self.well_panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings, title)
