@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QDialog, QFormLayout, QLabel,
     QDoubleSpinBox, QPushButton, QDialogButtonBox

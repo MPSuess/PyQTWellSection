@@ -12,12 +12,13 @@ from os import removedirs
 # Move all stratigraphy functions into a separate class.
 # Move all log functions into a separate class. etc ... .
 
-from PyQt5.QtWidgets import (
-    QMainWindow, QAction, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
+from PySide6.QtWidgets import (
+    QMainWindow, QFileDialog, QMessageBox, QDockWidget, QWidget, QVBoxLayout, QTreeWidget,
     QTreeWidgetItem, QPushButton, QHBoxLayout, QSizePolicy, QLineEdit, QTextEdit, QTableWidget,
     QTableWidgetItem, QDialog, QInputDialog, QMenu)
-from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, QPoint, QEvent, QByteArray
+from PySide6 import QtCore
+from PySide6.QtCore import Qt, QPoint, QEvent, QByteArray
+from PySide6.QtGui import QAction
 
 import base64
 import numpy as np
@@ -27,14 +28,14 @@ import csv
 import json
 import shutil
 from datetime import datetime
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from pywellsection.sample_data import Wells # The new class for wells
 
 from pywellsection.pws_project import PWSProject
 
 
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
 
 from pywellsection.Qt_Well_Widget import WellPanelWidget, WellPanelDock

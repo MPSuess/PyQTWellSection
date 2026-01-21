@@ -1,8 +1,9 @@
 import logging
 
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal
-from PyQt5.QtWidgets import QPlainTextEdit, QDockWidget
+from PySide6.QtGui import QFont
+from PySide6.QtCore import (Qt, QAbstractTableModel, QModelIndex)
+from PySide6.QtCore import Signal as pyqtSignal
+from PySide6.QtWidgets import QPlainTextEdit, QDockWidget
 
 from pandas import DataFrame
 

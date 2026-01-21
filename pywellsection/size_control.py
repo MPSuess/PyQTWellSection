@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QScrollArea,
