@@ -8,13 +8,14 @@ from matplotlib.figure import Figure
 
 import sys
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QScrollArea, QDialog, QMenu, QVBoxLayout, QMessageBox,
     QDockWidget
 )
 
-from PyQt5.QtCore import Qt, pyqtSignal, QEvent, QSize
+from PySide6.QtCore import (Qt, QEvent, QSize)
+from PySide6.QtCore import Signal as pyqtSignal
 #from scipy.stats import false_discovery_control
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
@@ -758,7 +759,7 @@ class WellPanelWidget(QWidget):
         Open the edit dialog for a specific top of a specific well.
         Keeps all dialog + pick-on-plot behaviour in one place.
         """
-        from PyQt5.QtWidgets import QDialog
+        from PySide6.QtWidgets import QDialog
 
         well = self.wells[well_index]
         tops = well["tops"]

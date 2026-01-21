@@ -82,7 +82,7 @@ class QIPythonWidget(RichJupyterWidget):
 
     def enable_dark_mode(self, state):
         if state:
-            self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+            self.setStyleSheet(qdarkstyle.load_stylesheet_PySide6())
         else:
             self.setStyleSheet(self.default_style_sheet)
 

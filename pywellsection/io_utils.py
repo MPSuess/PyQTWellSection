@@ -8,7 +8,7 @@ import csv
 
 from collections import defaultdict
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QComboBox, QLineEdit, QPushButton, QFileDialog,
     QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox, QLabel
@@ -984,7 +984,7 @@ class LoadCoreBitmapDialog(QDialog):
 
 import os
 import json
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 
 SUPPORTED_PROJECT_FILE_VERSIONS = {1,2}

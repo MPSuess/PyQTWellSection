@@ -1,9 +1,9 @@
 import numpy as np
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import QDockWidget
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import QDockWidget
+from PySide6.QtCore import Qt
 
 
 class MapPanelWidget(QWidget):

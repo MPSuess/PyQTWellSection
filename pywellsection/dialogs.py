@@ -1,6 +1,6 @@
 import numpy as np
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
@@ -8,12 +8,12 @@ from PyQt5.QtWidgets import (
     QPushButton, QWidget, QListWidget, QGroupBox,
 )
 
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 
 
 
 
-# from PyQt5.QtWidgets import (
+# from PySide6.QtWidgets import (
 #     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
 #     QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit,
 #     QPlainTextEdit, QCheckBox, QSpinBox, QGroupBox, QFormLayout
@@ -22,7 +22,7 @@ import numpy as np
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-from PyQt5.QtGui import QPixmap, QImage, QIcon
+from PySide6.QtGui import QPixmap, QImage, QIcon
 
 import matplotlib.cm as cm
 
@@ -30,12 +30,12 @@ from matplotlib import colormaps
 
 from collections import OrderedDict
 
-from PyQt5.QtGui import QColor
+from PySide6.QtGui import QColor
 
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 
-from PyQt5.QtCore import QUrl
-from PyQt5.QtCore import QSize
+from PySide6.QtCore import QUrl
+from PySide6.QtCore import QSize
 
 import os
 
@@ -4156,7 +4156,7 @@ class EditWellLogTableDialog(QDialog):
     def _paste_from_clipboard(self):
         cb = self.parent().clipboard() if hasattr(self.parent(), "clipboard") else None
         if cb is None:
-            from PyQt5.QtWidgets import QApplication
+            from PySide6.QtWidgets import QApplication
             cb = QApplication.clipboard()
 
         text = cb.text()
@@ -4301,12 +4301,12 @@ class EditWellLogTableDialog(QDialog):
     def result_arrays(self):
         return self._result_depth, self._result_data
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QDialogButtonBox, QMessageBox, QAbstractItemView,
     QComboBox, QLabel
 )
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 
 
 class EditWellPanelOrderDialog(QDialog):
@@ -4576,11 +4576,11 @@ class ImportTopsAssignWellDialog(QDialog):
             "new_name": self.ed_new_name.text().strip(),
             "set_td": self.chk_set_td.isChecked(),
         }
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QDoubleSpinBox, QDialogButtonBox, QCheckBox, QLabel, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 
 
 class MapLimitsDialog(QDialog):

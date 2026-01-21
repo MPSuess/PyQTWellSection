@@ -2,11 +2,11 @@ import sys
 from multi_wells_panel import draw_multi_wells_panel_on_figure
 from sample_data import create_dummy_data
 import matplotlib.pyplot as plt
-from PyQt5 import QtGui
-from PyQt5.QtWidgets import QAction
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import QEvent
-from PyQt5.QtWidgets import (
+from PySide6 import QtGui
+from PySide6.QtWidgets import QAction
+from PySide6 import QtWidgets, QtCore
+from PySide6.QtCore import QEvent
+from PySide6.QtWidgets import (
     QInputDialog, QMessageBox, QHBoxLayout, QPushButton, QComboBox, QLabel,
     QDialog, QFormLayout, QDialogButtonBox, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QMenu, QDoubleSpinBox, QTreeWidget, QTreeWidgetItem, QDockWidget,
@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 
 import numpy as np
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
@@ -33,7 +33,7 @@ from matplotlib.figure import Figure
 class WellLogWindow(QMainWindow):
     def __init__(self, wells, tracks, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Multi-Well Log Panel (PyQt5)")
+        self.setWindowTitle("Multi-Well Log Panel (PySide6)")
 
         # Central widget + layout
         central = QWidget(self)

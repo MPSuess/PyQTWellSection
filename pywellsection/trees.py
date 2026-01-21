@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDockWidget, QTreeWidget,
     QTreeWidgetItem, )
 
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def setup_window_tree(self):
     self.window_root.setFlags(
         self.window_root.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -46,7 +46,7 @@ def setup_well_widget_tree(self):
     self.well_root_item.setFlags(
         self.well_root_item.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -59,7 +59,7 @@ def setup_well_widget_tree(self):
     self.well_tops_folder.setFlags(
         self.well_tops_folder.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -71,7 +71,7 @@ def setup_well_widget_tree(self):
     self.stratigraphy_root.setFlags(
         self.stratigraphy_root.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -82,7 +82,7 @@ def setup_well_widget_tree(self):
     self.faults_root.setFlags(
         self.faults_root.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -93,7 +93,7 @@ def setup_well_widget_tree(self):
     self.other_root.setFlags(
         self.other_root.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -105,7 +105,7 @@ def setup_well_widget_tree(self):
     self.well_logs_folder.setFlags(
         self.well_logs_folder.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -118,7 +118,7 @@ def setup_well_widget_tree(self):
     self.continous_logs_folder.setFlags(
         self.continous_logs_folder.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -129,7 +129,7 @@ def setup_well_widget_tree(self):
     self.discrete_logs_folder.setFlags(
         self.discrete_logs_folder.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -140,7 +140,7 @@ def setup_well_widget_tree(self):
     self.bitmaps_folder.setFlags(
         self.bitmaps_folder.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
@@ -155,7 +155,7 @@ def setup_well_widget_tree(self):
     self.track_root_item.setFlags(
         self.track_root_item.flags()
         | Qt.ItemIsUserCheckable
-        | Qt.ItemIsTristate
+        | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )

@@ -1,8 +1,8 @@
 #from sample_data import create_dummy_data
 #from Qt_Well_Widget import WellPanelWidget
-from PyQt5 import QtWidgets, QtCore
+from PySide6 import QtWidgets, QtCore
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication
 )
 import sys
