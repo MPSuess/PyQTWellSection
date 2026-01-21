@@ -5219,14 +5219,14 @@
       "bitmaps": {
         "cp001": {
           "name": "bitmap",
-          "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp001.png",
+          "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp001.png",
           "top_depth": 0.0,
           "base_depth": 100.0,
           "track": "core"
         },
         "cp002": {
           "name": "bitmap2",
-          "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp002.png",
+          "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp002.png",
           "top_depth": 100.0,
           "base_depth": 300.0,
           "track": "core"
@@ -5234,14 +5234,14 @@
       },
       "cp001": {
         "name": "bitmap",
-        "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp001.png",
+        "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp001.png",
         "top_depth": 0.0,
         "base_depth": 100.0,
         "track": "core"
       },
       "cp002": {
         "name": "bitmap2",
-        "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp002.png",
+        "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp002.png",
         "top_depth": 100.0,
         "base_depth": 300.0,
         "track": "core"
@@ -8334,7 +8334,7 @@
       "name": "Well C",
       "UWI": "5603200234",
       "x": 658500.0,
-      "y": 5236600.0,
+      "y": 5225600.0,
       "reference_type": "RL",
       "reference_depth": 0.0,
       "total_depth": 1500.0,
@@ -11416,7 +11416,8 @@
           "color": "#000000"
         }
       },
-      "facies_intervals": []
+      "facies_intervals": [],
+      "uwi": ""
     }
   ],
   "tracks": [
@@ -11619,64 +11620,34 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": {
-        "Upper Formation A": {
-          "level": "sequence",
-          "color": "#ff0000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Formation A": {
-          "level": "formation",
-          "color": "#ffcc00",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Sequence 1": {
-          "level": "sequence",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Member A1": {
-          "level": "member",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Carboniferous": {
-          "level": "formation",
-          "color": "#000000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Lower Formation A": {
-          "level": "sequence",
-          "color": "#0000ff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        }
-      },
+      "visible_tops": [
+        "Formation A",
+        "Member A1",
+        "Lower Formation A",
+        "Upper Formation A",
+        "Sequence 1",
+        "Carboniferous"
+      ],
       "visible_logs": [
         "CAL",
-        "PHI",
+        "RHOB",
         "RT",
         "GR",
-        "RHOB"
+        "PHI"
       ],
       "visible_tracks": [
-        "RHOB-PHI",
-        "RT-RHOB",
         "GR-CAL",
+        "RT-RHOB",
         "Facies",
+        "RHOB-PHI",
+        "core",
         "f3",
-        "LithoFacies",
-        "core"
+        "LithoFacies"
       ],
       "visible_wells": [
+        "Well C",
         "Well A",
-        "Well B",
-        "Well C"
+        "Well B"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
@@ -17006,14 +16977,14 @@
           "bitmaps": {
             "cp001": {
               "name": "bitmap",
-              "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp001.png",
+              "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp001.png",
               "top_depth": 0.0,
               "base_depth": 100.0,
               "track": "core"
             },
             "cp002": {
               "name": "bitmap2",
-              "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp002.png",
+              "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp002.png",
               "top_depth": 100.0,
               "base_depth": 300.0,
               "track": "core"
@@ -17021,14 +16992,14 @@
           },
           "cp001": {
             "name": "bitmap",
-            "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp001.png",
+            "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp001.png",
             "top_depth": 0.0,
             "base_depth": 100.0,
             "track": "core"
           },
           "cp002": {
             "name": "bitmap2",
-            "path": "/Users/suess/PythonProject/PyQTWellSection/P5.pdj/Well A_cp002.png",
+            "path": "/Users/suess/PythonProject/PyQTWellSection/p6.pdj/Well A_cp002.png",
             "top_depth": 100.0,
             "base_depth": 300.0,
             "track": "core"
@@ -20121,7 +20092,7 @@
           "name": "Well C",
           "UWI": "5603200234",
           "x": 658500.0,
-          "y": 5236600.0,
+          "y": 5225600.0,
           "reference_type": "RL",
           "reference_depth": 0.0,
           "total_depth": 1500.0,
@@ -23203,14 +23174,15 @@
               "color": "#000000"
             }
           },
-          "facies_intervals": []
+          "facies_intervals": [],
+          "uwi": ""
         }
       ]
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAAByQAAAVKAAAABwAAADUAAAckAAAFSgAAAAAAAAAACgAAAAAHAAAANQAAByQAAAVK",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAWKAAAE/vwCAAAAAfwAAAAYAAAE/gAAASQA/////AEAAAAC/AAAAAAAAAGGAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAABhwAABAMAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAARTAAAArgD////8AAAEbAAAAKoAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAABkwAABP78AgAAAAf7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAD7AAAAGABNAGEAcABfAFcAaQBuAGQAbwB3AF8AMQEAAAAYAAAE/gAAACAA////AAAAAAAABP4AAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAACcQAAAVKAAAABwAAADUAAAnEAAAFSgAAAAAAAAAACgAAAAAHAAAANQAACcQAAAVK",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAE/vwCAAAAAfwAAAAYAAAE/gAAASQA/////AEAAAAC/AAAAAAAAACiAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAAowAABnsAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAARTAAAArgD////8AAAEbAAAAKoAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACnwAABP78AgAAAAf7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAD7AAAAGABNAGEAcABfAFcAaQBuAGQAbwB3AF8AMQEAAAAYAAAE/gAAACAA////AAAAAAAABP4AAAAEAAAABAAAAAgAAAAI/AAAAAA=",
     "tab_groups": [
       [
         "Console",
@@ -23218,8 +23190,8 @@
         "Log"
       ],
       [
-        "Windows",
-        "Input"
+        "Input",
+        "Windows"
       ]
     ]
   }

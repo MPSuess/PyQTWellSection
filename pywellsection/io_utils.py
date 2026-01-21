@@ -11,8 +11,14 @@ from collections import defaultdict
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QComboBox, QLineEdit, QPushButton, QFileDialog,
-    QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox
+    QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox, QLabel
 )
+
+from typing import Dict, Any, List, Tuple, Optional
+
+import openpyxl
+
+from pywellsection.dialogs import ImportTopsAssignWellDialog
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -1166,3 +1172,468 @@ def _normalize_loaded_project(wells: list, tracks: list, stratigraphy: dict):
     # Stratigraphy is a dict (as you noted); no enforced schema here.
     if stratigraphy is None:
         stratigraphy = {}
+
+
+
+
+# ============================================================
+# 1) Role inference from Hauptformation (full) and abbreviation
+# ============================================================
+
+def infer_role_from_hauptformation(full_name: str, abbr: str) -> str:
+    """
+    Rules requested:
+      - "Lücke" or "L*"  => role="other"
+      - "Störung" or "*ST" => role="fault"
+      - "Transgression" or "*TRSGR" => role="other"
+      - otherwise => role="stratigraphy"
+    """
+    fn = (full_name or "").strip().lower()
+    ab = (abbr or "").strip().upper()
+
+    # Missing section
+    if "lücke" in fn:
+        return "other"
+    if ab.startswith("L*") or ab.startswith("*L") or re.match(r"^\*?L\*$", ab):
+        return "other"
+
+    # Fault
+    if "störung" in fn:
+        return "fault"
+    if ab.startswith("*ST") or re.match(r"^\*?ST\b", ab):
+        return "fault"
+
+    # Transgression
+    if "transgression" in fn:
+        return "other"
+    if ab.startswith("*TRSGR") or "TRSGR" in ab:
+        return "other"
+
+    return "stratigraphy"
+
+def default_level_for_role(role: str) -> str:
+    if role == "fault":
+        return "fault"
+    if role == "other":
+        return "other"
+    return "formation"
+
+# ============================================================
+# 2) XLSX parser (UPDATED)
+#    - Reads from sheet with the header (RWE_Dea-DEA-WinDEA)
+#    - Uses Column E (2nd "Hauptformation") as top KEY
+#    - Adds stratigraphy updates with "Full Name"
+# ============================================================
+
+def parse_geolprofile_xlsx_to_tops_v2(
+    xlsx_path: str,
+    sheet_name: str,
+) -> Tuple[List[Dict[str, Any]], float, Dict[str, Dict[str, Any]]]:
+    """
+    Returns:
+      tops_list: [
+          {"key": <abbr>, "full_name": <full>, "depth": <top_depth>, "role": <role>}, ...
+      ]
+      td: float
+      strat_updates: { <abbr>: {"Full Name": <full>, "role": <role>, "level": <level>} , ... }
+
+    Notes:
+      - KEY is Column E (2nd 'Hauptformation', abbreviation).
+      - If abbreviation is blank, falls back to a generated key:
+          fault -> "*ST_<depth>"
+          other -> "*OTHER_<depth>"
+          else -> "<full>_<depth>"
+      - "Endteufe" row is treated as TD only (not a top).
+      - Top depth uses Toptiefe if present, else previous row base depth.
+    """
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+
+    ws = None
+
+    if sheet_name not in wb.sheetnames:
+        raise ValueError(f"Sheet '{sheet_name}' not found in workbook")
+    if sheet_name:
+        ws = wb[sheet_name]
+    else:
+        # Pick the first non-empty sheet that contains "Profil_ID" header
+        #ws = None
+        for name in wb.sheetnames:
+            cand = wb[name]
+            first = next(cand.iter_rows(values_only=True), None)
+            if first and "Profil_ID" in list(first):
+                ws = cand
+                break
+    if ws is None:
+        raise ValueError("No sheet with 'Profil_ID' header found.")
+
+    rows = [r for r in ws.iter_rows(values_only=True)]
+    if not rows or len(rows) < 2:
+        return [], 0.0, {}
+
+    header = list(rows[0])
+
+    # indices
+    idx_top = header.index("Toptiefe") if "Toptiefe" in header else 1
+    idx_base = header.index("Basistiefe") if "Basistiefe" in header else 2
+
+    hf_idxs = [i for i, h in enumerate(header) if h == "Hauptformation"]
+    # Column D = first Hauptformation (full name)
+    # Column E = second Hauptformation (abbrev) (requested)
+    idx_full = hf_idxs[0] if len(hf_idxs) >= 1 else 3
+    idx_abbr = hf_idxs[1] if len(hf_idxs) >= 2 else 4
+
+    tops: List[Dict[str, Any]] = []
+    strat_updates: Dict[str, Dict[str, Any]] = {}
+
+    prev_base = 0.0
+    td = 0.0
+
+    for r in rows[1:]:
+        if r is None:
+            continue
+
+        base_v = r[idx_base] if idx_base < len(r) else None
+        if base_v is None or base_v == "":
+            continue
+        try:
+            base_d = float(base_v)
+        except Exception:
+            continue
+
+        td = max(td, base_d)
+
+        top_v = r[idx_top] if idx_top < len(r) else None
+        if top_v is None or top_v == "":
+            top_d = prev_base
+        else:
+            try:
+                top_d = float(top_v)
+            except Exception:
+                top_d = prev_base
+
+        full = r[idx_full] if idx_full < len(r) else ""
+        abbr = r[idx_abbr] if idx_abbr < len(r) else ""
+
+        full_name = (str(full).strip() if full not in (None, "") else "")
+        abbr_key = (str(abbr).strip() if abbr not in (None, "") else "")
+
+        # "Endteufe" row: TD only
+        if full_name.lower() == "endteufe":
+            prev_base = base_d
+            continue
+
+        role = infer_role_from_hauptformation(full_name, abbr_key)
+        level = default_level_for_role(role)
+
+        # Required: Use abbreviation as top key
+        key = abbr_key
+
+        # If abbreviation is missing: generate deterministic key
+        if not key:
+            if role == "fault":
+                key = f"*ST_{top_d:.2f}"
+            elif role == "other":
+                key = f"*OTHER_{top_d:.2f}"
+            else:
+                # keep a readable fallback
+                fn = full_name if full_name else "TOP"
+                key = f"{fn}_{top_d:.2f}"
+
+        # Track stratigraphy update:
+        # - store "Full Name" (requested exact field)
+        # - store role/level
+        if key not in strat_updates:
+            strat_updates[key] = {"Full Name": full_name, "role": role, "level": level, "color": random_strat_color(),
+                                  "hatch": "-"}
+        else:
+            # keep first full name if already set; but fill if missing
+            if not strat_updates[key].get("Full Name"):
+                strat_updates[key]["Full Name"] = full_name
+            strat_updates[key].setdefault("role", role)
+            strat_updates[key].setdefault("level", level)
+            strat_updates[key].setdefault("color", random_strat_color())
+            strat_updates[key].setdefault("hatch", "-")
+
+        tops.append({"key": key, "full_name": full_name, "depth": top_d, "role": role, "color": random_strat_color(),
+                     "hatch": "-"})
+
+        prev_base = base_d
+
+    # Deduplicate tops by key: keep shallowest occurrence
+    dedup: Dict[str, Dict[str, Any]] = {}
+    for t in tops:
+        k = t["key"]
+        if k not in dedup or float(t["depth"]) < float(dedup[k]["depth"]):
+            dedup[k] = t
+    tops = list(dedup.values())
+    tops.sort(key=lambda x: float(x["depth"]))
+
+    return tops, float(td), strat_updates
+
+import random
+
+def random_strat_color(seed=None):
+    """
+    Generate a random, visually pleasant color for stratigraphic units.
+
+    Parameters
+    ----------
+    seed : Optional[int]
+        If provided, color generation becomes reproducible.
+
+    Returns
+    -------
+    str
+        Hex color string, e.g. '#7fbf7f'
+    """
+    if seed is not None:
+        random.seed(seed)
+
+    # avoid extremes (too dark / too bright)
+    r = random.randint(60, 220)
+    g = random.randint(60, 220)
+    b = random.randint(60, 220)
+
+    return f"#{r:02x}{g:02x}{b:02x}"
+# ============================================================
+# 4) Import routine (UPDATED)
+#    - applies tops using abbreviation keys
+#    - updates project.stratigraphy with "Full Name" field
+# ============================================================
+
+def import_schichtenverzeichnisv1(parent,project, xlsx_path: str,): # PWSProject or app container with .all_wells/.all_stratigraphy
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
+        return False
+
+    try:
+        parsed_tops, td, strat_updates = parse_geolprofile_xlsx_to_tops_v2(xlsx_path)
+    except Exception as e:
+        QMessageBox.critical(parent, "Import", f"Failed to parse file:\n{e}")
+        return False
+
+    if not parsed_tops:
+        QMessageBox.information(parent, "Import", "No tops found in this file.")
+        return False
+
+    wells = getattr(project, "all_wells", None)
+    if wells is None:
+        wells = getattr(project, "wells", []) or []
+
+    existing_names = [w.get("name", "") for w in wells if w.get("name")]
+    default_new_name = os.path.splitext(os.path.basename(xlsx_path))[0]
+
+    dlg = ImportTopsAssignWellDialog(
+        parent,
+        existing_well_names=existing_names,
+        default_new_name=default_new_name,
+        td=td,
+        n_tops=len(parsed_tops),
+    )
+    if dlg.exec_() != QDialog.Accepted:
+        return False
+
+    sel = dlg.result_selection()
+
+    # Resolve target well
+    target_well = None
+    if sel["create_new"]:
+        new_name = sel["new_name"]
+        if not new_name:
+            QMessageBox.warning(parent, "Import", "Please provide a name for the new well.")
+            return False
+
+        target_well = {
+            "name": new_name,
+            "UWI": "",
+            "x": None,
+            "y": None,
+            "reference_type": "KB",
+            "reference_depth": 0.0,
+            "total_depth": float(sel["td"]) if sel["set_td"] else 0.0,
+            "logs": {},
+            "discrete_logs": {},
+            "tops": {},
+            "facies_intervals": [],
+            "bitmaps": {},
+        }
+        wells.append(target_well)
+    else:
+        nm = sel["existing_name"]
+        for w in wells:
+            if w.get("name") == nm:
+                target_well = w
+                break
+        if target_well is None:
+            QMessageBox.warning(parent, "Import", "Selected well not found.")
+            return False
+
+        if sel["set_td"]:
+            ref = float(target_well.get("reference_depth", 0.0) or 0.0)
+            target_well["total_depth"] = max(float(target_well.get("total_depth", 0.0) or 0.0), float(td - ref))
+
+    # Update project stratigraphy with "Full Name" and roles
+    strat = getattr(project, "all_stratigraphy", None)
+    if strat is None:
+        strat = getattr(project, "stratigraphy", None)
+        if strat is None:
+            strat = {}
+            # attach if possible
+            if hasattr(project, "all_stratigraphy"):
+                project.all_stratigraphy = strat
+            elif hasattr(project, "stratigraphy"):
+                project.stratigraphy = strat
+
+    # strat is expected to be dict
+    if not isinstance(strat, dict):
+        strat = {}
+
+    # merge updates (do not overwrite existing styling)
+    for key, upd in strat_updates.items():
+        if key not in strat:
+            strat[key] = dict(upd)
+        else:
+            # ensure Full Name exists (requested)
+            if "Full Name" not in strat[key] or not strat[key].get("Full Name"):
+                strat[key]["Full Name"] = upd.get("Full Name", "")
+            strat[key].setdefault("role", upd.get("role", "stratigraphy"))
+            strat[key].setdefault("level", upd.get("level", "formation"))
+
+    # Apply tops to the well using abbreviation keys
+    tops_dict = target_well.setdefault("tops", {})
+
+    added = 0
+    updated = 0
+    for t in parsed_tops:
+        key = t["key"]
+        depth = float(t["depth"])
+
+        meta = strat.get(key, {}) if isinstance(strat, dict) else {}
+        role = meta.get("role", t.get("role", "stratigraphy"))
+        level = meta.get("level", default_level_for_role(role))
+
+        if key in tops_dict and isinstance(tops_dict[key], dict):
+            tops_dict[key]["depth"] = depth
+            tops_dict[key].setdefault("role", role)
+            tops_dict[key].setdefault("level", level)
+            updated += 1
+        else:
+            tops_dict[key] = {"depth": depth, "role": role, "level": level}
+            # if you keep color/hatch in stratigraphy, you can copy defaults once:
+            if isinstance(meta, dict):
+                if "color" in meta:
+                    tops_dict[key].setdefault("color", meta["color"])
+                if "hatch" in meta:
+                    tops_dict[key].setdefault("hatch", meta["hatch"])
+            added += 1
+
+    QMessageBox.information(
+        parent,
+        "Import",
+        f"Imported tops into '{target_well.get('name','')}'.\n\nAdded: {added}\nUpdated: {updated}\n"
+        f"Stratigraphy updated/extended: {len(strat_updates)} keys\n\n"
+        "Note: Top keys use the abbreviation (2nd Hauptformation / Column E)."
+    )
+    return True
+
+def import_schichtenverzeichnis(parent, project, xlsx_path):
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
+        return False
+
+    # --- Load workbook first ---
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    sheet_names = wb.sheetnames
+
+    if not sheet_names:
+        QMessageBox.warning(parent, "Import", "No worksheets found in file.")
+        return False
+
+    wells = project.all_wells
+    existing_names = [w["name"] for w in wells if w.get("name")]
+
+    dlg = ImportTopsAssignWellDialog(
+        parent,
+        sheet_names=sheet_names,
+        existing_well_names=existing_names,
+        default_new_name=os.path.splitext(os.path.basename(xlsx_path))[0],
+    )
+
+    # --- Live preview update when sheet changes ---
+    def update_preview():
+        try:
+            tops, td, _ = parse_geolprofile_xlsx_to_tops_v2(
+                xlsx_path,
+                dlg.selected_sheet(),
+            )
+            dlg.set_preview(len(tops), td)
+        except Exception as e:
+            dlg.lbl_preview.setText(f"Preview error: {e}")
+
+    dlg.cmb_sheet.currentIndexChanged.connect(update_preview)
+    update_preview()
+
+    if dlg.exec_() != QDialog.Accepted:
+        return False
+
+    sel = dlg.result_selection()
+
+    # --- Parse selected sheet ---
+    tops, td, strat_updates = parse_geolprofile_xlsx_to_tops_v2(
+        xlsx_path,
+        sel["sheet"],
+    )
+
+    if not tops:
+        QMessageBox.information(parent, "Import", "No tops found in selected sheet.")
+        return False
+
+    # --- Resolve well (unchanged logic) ---
+    if sel["create_new"]:
+        target_well = {
+            "name": sel["new_name"],
+            "reference_type": "KB",
+            "reference_depth": 0.0,
+            "total_depth": td if sel["set_td"] else 0.0,
+            "logs": {},
+            "discrete_logs": {},
+            "tops": {},
+            "facies_intervals": [],
+            "bitmaps": {},
+        }
+        wells.append(target_well)
+    else:
+        target_well = next(
+            (w for w in wells if w.get("name") == sel["existing_name"]), None
+        )
+        if target_well is None:
+            QMessageBox.warning(parent, "Import", "Selected well not found.")
+            return False
+
+        if sel["set_td"]:
+            ref = float(target_well.get("reference_depth", 0.0))
+            target_well["total_depth"] = max(
+                float(target_well.get("total_depth", 0.0)),
+                td - ref,
+            )
+
+    # --- Apply stratigraphy + tops (unchanged) ---
+    strat = project.all_stratigraphy
+    for key, meta in strat_updates.items():
+        strat.setdefault(key, {}).update(meta)
+
+    tops_dict = target_well.setdefault("tops", {})
+    for t in tops:
+        tops_dict[t["key"]] = {
+            "depth": t["depth"],
+            "role": t["role"],
+            "level": strat.get(t["key"], {}).get("level", "formation"),
+        }
+
+    QMessageBox.information(
+        parent,
+        "Import",
+        f"Imported {len(tops)} tops from sheet '{sel['sheet']}' into '{target_well['name']}'."
+    )
+
+    return True
