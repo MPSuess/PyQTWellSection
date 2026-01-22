@@ -6,6 +6,7 @@ from matplotlib.backends.backend_qt5agg import (
 )
 from matplotlib.figure import Figure
 
+from string import Template
 import sys
 
 from PySide6.QtWidgets import (
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import (Qt, QEvent, QSize)
 from PySide6.QtCore import Signal as pyqtSignal
 #from scipy.stats import false_discovery_control
+from PySide6.QtGui import QPalette
 
 from .multi_wells_panel import draw_multi_wells_panel_on_figure
 from .multi_wells_panel import add_tops_and_correlations
@@ -1471,6 +1473,7 @@ class WellPanelDock(QDockWidget):
         super().__init__(title, parent)
         WellPanelDock._counter += 1
 
+
         self.title = title
         self.type = "WellSection"
         self.visible = True
@@ -1490,12 +1493,20 @@ class WellPanelDock(QDockWidget):
             QDockWidget.DockWidgetFloatable
         )
 
- #        self.setStyleSheet("background-color: yellow")
+
  #       self.tabifiedDockWidgetActivated.connect(self.window_activate)
 
         self.well_panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings, title)
         self.setWidget(self.well_panel)
         self.well_panel.draw_well_panel()
+
+        self.title_background_color = None
+        self.window_activated()
+
+        self.background_template = Template('QDockWidget::title{background-color: $title_bgc; '
+                                            'padding: 3px; spacing: 4px; border: none;}')
+
+
 
         # Detect “activation” by focus/click inside well_panel
         self.installEventFilter(self)
@@ -1504,13 +1515,24 @@ class WellPanelDock(QDockWidget):
         if obj is self:
             if event.type() in (QEvent.MouseButtonPress, QEvent.FocusIn):
                 self.activated.emit(self)
+                #self.window_activated()
             if event.type() == QEvent.Resize:
                 #print("resizing")
                 self.well_panel.update_canvas_size_from_layout()
+            # if event.type() == QEvent.WindowActivate:
+            #     self.window_activated()
         return super().eventFilter(obj, event)
 
     def draw_well_panel(self):
         self.well_panel.draw_well_panel()
+
+    def window_activated(self):
+        palette = self.palette()
+        self.title_background_color = palette.color(QPalette.ColorGroup.Active, QPalette.Window)
+        self.setStyleSheet('QDockWidget::title{background-color: grey ;  padding: 3px; spacing: 4px; border: none;}')
+
+    def window_deactivated(self):
+        self.setStyleSheet(self.background_template.substitute(title_bgc=self.title_background_color))
 
     def window_activate(self,dockwidget):
         if isinstance(dockwidget,bool):
@@ -1518,14 +1540,10 @@ class WellPanelDock(QDockWidget):
         else:
             name=dockwidget.objectName()
             children=dockwidget.children()
+            dockwidget.window_activated()
             for child in children:
                 LOG.debug(f'We try to activate {child}')
-
         return
-
-#    def self.set_tabify (self):
-#        self.tabified = self.isfloating()
-
 
     def set_visible(self, state):
         if state:
