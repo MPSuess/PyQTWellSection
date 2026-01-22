@@ -3,7 +3,11 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PySide6.QtWidgets import QDockWidget
-from PySide6.QtCore import Qt
+
+from PySide6.QtCore import (Qt, QEvent, QSize)
+from PySide6.QtCore import Signal as pyqtSignal
+from string import Template
+from PySide6.QtGui import QPalette
 
 
 class MapPanelWidget(QWidget):
@@ -118,6 +122,8 @@ class MapDockWindow(QDockWidget):
       - provides a minimal interface to set data / redraw
     """
     _counter = 1
+    activated = pyqtSignal(object)  # emits self when activated
+
 
     def __init__(self, parent, wells, profiles, map_layout_settings = None, title="Map"):
         title = f"Map_Window_{MapDockWindow._counter}"
@@ -150,6 +156,31 @@ class MapDockWindow(QDockWidget):
 
         self.panel = MapPanelWidget(wells, profiles, map_layout_settings, title)
         self.setWidget(self.panel)
+
+        self.title_background_color = None
+        self.window_activated()
+
+        self.background_template = Template('QDockWidget::title{background-color: $title_bgc; '
+                                            'padding: 3px; spacing: 4px; border: none;}')
+
+
+        # Detect “activation” by focus/click inside well_panel
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj is self:
+            if event.type() in (QEvent.MouseButtonPress, QEvent.FocusIn):
+                print("focus in")
+                self.activated.emit(self)
+#                self.window_activate(obj)
+            if event.type() == QEvent.Resize:
+
+                print("resizing")
+#                self.well_panel.update_canvas_size_from_layout()
+            # if event.type() == QEvent.WindowActivate:
+            #     self.window_activated()
+        return super().eventFilter(obj, event)
+
 
     # pass-through convenience methods
     def set_data(self, wells, profiles):
@@ -190,5 +221,24 @@ class MapDockWindow(QDockWidget):
 
     def set_layout_settings(self, settings):
         self.layout_settings = settings
+
+    def window_activated(self):
+        palette = self.palette()
+        self.title_background_color = palette.color(QPalette.ColorGroup.Active, QPalette.Window)
+        self.setStyleSheet('QDockWidget::title{background-color: grey ;  padding: 3px; spacing: 4px; border: none;}')
+
+    def window_deactivated(self):
+        self.setStyleSheet(self.background_template.substitute(title_bgc=self.title_background_color))
+
+    def window_activate(self,dockwidget):
+        if isinstance(dockwidget,bool):
+            return
+        else:
+            name=dockwidget.objectName()
+            children=dockwidget.children()
+            dockwidget.window_activated()
+            for child in children:
+                LOG.debug(f'We try to activate {child}')
+        return
 
 

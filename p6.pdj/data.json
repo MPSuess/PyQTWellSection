@@ -8334,7 +8334,7 @@
       "name": "Well C",
       "UWI": "5603200234",
       "x": 658500.0,
-      "y": 5225600.0,
+      "y": 5236600.0,
       "reference_type": "RL",
       "reference_depth": 0.0,
       "total_depth": 1500.0,
@@ -11416,8 +11416,7 @@
           "color": "#000000"
         }
       },
-      "facies_intervals": [],
-      "uwi": ""
+      "facies_intervals": []
     }
   ],
   "tracks": [
@@ -11620,41 +11619,76 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": [
-        "Formation A",
-        "Member A1",
-        "Lower Formation A",
-        "Upper Formation A",
-        "Sequence 1",
-        "Carboniferous"
-      ],
+      "visible_tops": {
+        "Upper Formation A": {
+          "level": "sequence",
+          "color": "#ff0000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Formation A": {
+          "level": "formation",
+          "color": "#ffcc00",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Sequence 1": {
+          "level": "sequence",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Member A1": {
+          "level": "member",
+          "color": "#000fff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Carboniferous": {
+          "level": "formation",
+          "color": "#000000",
+          "hatch": "-",
+          "role": "stratigraphy"
+        },
+        "Lower Formation A": {
+          "level": "sequence",
+          "color": "#0000ff",
+          "hatch": "-",
+          "role": "stratigraphy"
+        }
+      },
       "visible_logs": [
-        "CAL",
-        "RHOB",
-        "RT",
         "GR",
-        "PHI"
+        "CAL",
+        "PHI",
+        "RHOB",
+        "RT"
       ],
       "visible_tracks": [
         "GR-CAL",
-        "RT-RHOB",
-        "Facies",
-        "RHOB-PHI",
         "core",
+        "LithoFacies",
         "f3",
-        "LithoFacies"
+        "RHOB-PHI",
+        "RT-RHOB",
+        "Facies"
       ],
       "visible_wells": [
-        "Well C",
         "Well A",
-        "Well B"
+        "Well B",
+        "Well C"
       ],
       "panel_settings": {
         "well_gap_factor": 3.0,
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "well_panel_title": "Well_Section_1"
+        "vertical_scale": 2.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     },
     {
@@ -11676,7 +11710,12 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "well_panel_title": "Well_Section_1"
+        "vertical_scale": 2.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     },
     {
@@ -11699,7 +11738,12 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "well_panel_title": "Well_Section_1"
+        "vertical_scale": 2.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     },
     {
@@ -20092,7 +20136,7 @@
           "name": "Well C",
           "UWI": "5603200234",
           "x": 658500.0,
-          "y": 5225600.0,
+          "y": 5236600.0,
           "reference_type": "RL",
           "reference_depth": 0.0,
           "total_depth": 1500.0,
@@ -23174,15 +23218,14 @@
               "color": "#000000"
             }
           },
-          "facies_intervals": [],
-          "uwi": ""
+          "facies_intervals": []
         }
       ]
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAACcQAAAVKAAAABwAAADUAAAnEAAAFSgAAAAAAAAAACgAAAAAHAAAANQAACcQAAAVK",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAE/vwCAAAAAfwAAAAYAAAE/gAAASQA/////AEAAAAC/AAAAAAAAACiAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAAowAABnsAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAARTAAAArgD////8AAAEbAAAAKoAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACnwAABP78AgAAAAf7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAD7AAAAGABNAGEAcABfAFcAaQBuAGQAbwB3AF8AMQEAAAAYAAAE/gAAACAA////AAAAAAAABP4AAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "geometry_b64": "AdnQywADAAAAAAQ6AAACaQAACLYAAATcAAAEOgAAAoUAAAi2AAAE3AAAAAAAAAAACgAAAAQ6AAAChQAACLYAAATc",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAMPAAACQPwCAAAAAfwAAAAYAAACQAAAASEA/////AEAAAAC/AAAAAAAAADXAAAAYQD////6AAAAAQEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAA2AAAAjcAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAHKAAAAqwD////8AAAB4wAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAABbQAAAkD8AgAAAAf7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAGxAAAAqwD////6AAAAAQEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAD7AAAAGABNAGEAcABfAFcAaQBuAGQAbwB3AF8AMQEAAAHKAAAAjgAAACAA////AAAAAAAAAkAAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
     "tab_groups": [
       [
         "Console",

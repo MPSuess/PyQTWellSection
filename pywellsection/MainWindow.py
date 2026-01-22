@@ -161,9 +161,7 @@ class MainWindow(QMainWindow):
             panel_settings=self.panel_settings
         )
         self.dock.activated.connect(self._on_well_panel_activated)
-
-        #self.tabifiedDockWidgetActivated.connect(self.window_activate)
-
+        self.dock.window_deactivated()
         self.dock.well_panel.active_well_panel = True
         self.panel = self.dock.well_panel
 
@@ -577,9 +575,12 @@ class MainWindow(QMainWindow):
 
                     dock.set_title(window["window_title"])
                     if window["visible"]:
+
                         dock.setVisible(True)
+                        dock.set_visible(True)
                     else:
                         dock.setVisible(False)
+                        dock.set_visible(False)
 
                 elif (window["type"] == "MapWindow"):
                     layout_settings = {}
@@ -592,11 +593,15 @@ class MainWindow(QMainWindow):
                                          map_layout_settings=layout_settings,
                                          title=window["window_title"])
                     self.addDockWidget(Qt.RightDockWidgetArea, dock)
+                    dock.activated.connect(self._on_panel_activated)
+
                     self.WindowList.append(dock)
                     if window["visible"]:
                         dock.setVisible(True)
+                        dock.set_visible(True)
                     else:
                         dock.setVisible(False)
+                        dock.set_visible(False)
 
             self.redraw_requested = False
             self.panel_settings["redraw_requested"] = False
@@ -608,6 +613,7 @@ class MainWindow(QMainWindow):
             self._populate_well_track_tree()
             self._populate_window_tree()
             self._dock_layout_restore(ui_layout)
+            self._populate_window_tree()
 
             #            self.panel.update_well_panel(tracks, wells, stratigraphy, self.panel_settings)
 
@@ -3036,6 +3042,12 @@ class MainWindow(QMainWindow):
             panel_settings=panel_settings
         )
         dock.activated.connect(self._on_well_panel_activated)
+        for w in self.WindowList:
+            w.window_deactivated()
+
+        dock.window_activated()
+
+
 
         dock.well_panel.visible_tops = visible_tops
         dock.well_panel.visible_logs = visible_logs
@@ -3083,6 +3095,7 @@ class MainWindow(QMainWindow):
                 return
 
         # Detach widget safely
+        self.dock.window_deactivated()
         self.removeDockWidget(dock)
 
         # Clean up tracking
@@ -3097,6 +3110,44 @@ class MainWindow(QMainWindow):
 
         dock.deleteLater()
 
+    def _on_panel_activated(self, dock):
+        """
+        Called whenever a docked well_panel is clicked/focused.
+        Sets active well_panel and rebuilds tree (and anything else you want).
+        """
+        print(f"_on_panel_activated: {dock}")
+
+        if dock is None:
+            return
+
+        for w in self.WindowList:
+            w.window_deactivated()
+
+        self.dock.window_deactivated()
+
+        self.dock = dock
+        self.dock.window_activated()
+
+        self.active_window = dock
+
+        # LOG.debug(f"Activated new window")
+
+        if dock.get_type() == "WellSection":
+            self.panel = dock.well_panel
+
+            self._populate_stratigraphy_tree()
+            self.panel.set_draw_well_panel(False)
+            self._set_tree_from_well_panel()
+            self.panel.set_draw_well_panel(True)
+        # self.panel.draw_well_panel()
+
+        # Optionally bring dock to front/tab
+        dock.raise_()
+
+        # LOG.debug ("Activated new window")
+
+        # If you need the tree to reflect active_well_panel view filters, do that here.
+
     def _on_well_panel_activated(self, dock: WellPanelDock):
         """
         Called whenever a docked well_panel is clicked/focused.
@@ -3105,7 +3156,18 @@ class MainWindow(QMainWindow):
         if dock is None or dock.well_panel is None:
             return
 
+        for w in self.WindowList:
+            w.window_deactivated()
+
+        self.dock.window_deactivated()
+
+        self.dock = dock
+        self.dock.window_activated()
+
+        self.active_window = dock
         self.panel = dock.well_panel
+
+
 
         #LOG.debug(f"Activated new window")
 
@@ -4177,9 +4239,13 @@ class MainWindow(QMainWindow):
                              map_layout_settings =  self.map_panel_settings,
                              title=f"Map {len(self.WindowList) + 1}")
 
+        dock.activated.connect(self._on_panel_activated)
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
         self.WindowList.append(dock)
         self._update_map_windows()
+
+
+
 
         if hasattr(self, "_populate_window_tree"):
             self._populate_window_tree()
