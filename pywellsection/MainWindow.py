@@ -599,6 +599,7 @@ class MainWindow(QMainWindow):
                     if window["visible"]:
                         dock.setVisible(True)
                         dock.set_visible(True)
+                        dock.window_deactivated()
                     else:
                         dock.setVisible(False)
                         dock.set_visible(False)
@@ -1793,7 +1794,7 @@ class MainWindow(QMainWindow):
 
         self.panel.panel_settings["redraw_requested"] = True
         self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
-        self.panel.draw_well_panel()
+        #self.panel.draw_well_panel()
 
     def do_nothing(self):
         return
@@ -3120,10 +3121,7 @@ class MainWindow(QMainWindow):
         if dock is None:
             return
 
-        for w in self.WindowList:
-            w.window_deactivated()
-
-        self.dock.window_deactivated()
+        self._deactivate_all_windows()
 
         self.dock = dock
         self.dock.window_activated()
@@ -3135,8 +3133,8 @@ class MainWindow(QMainWindow):
         if dock.get_type() == "WellSection":
             self.panel = dock.well_panel
 
-            self._populate_stratigraphy_tree()
             self.panel.set_draw_well_panel(False)
+            self._populate_stratigraphy_tree()
             self._set_tree_from_well_panel()
             self.panel.set_draw_well_panel(True)
         # self.panel.draw_well_panel()
@@ -3156,10 +3154,7 @@ class MainWindow(QMainWindow):
         if dock is None or dock.well_panel is None:
             return
 
-        for w in self.WindowList:
-            w.window_deactivated()
-
-        self.dock.window_deactivated()
+        self._deactivate_all_windows()
 
         self.dock = dock
         self.dock.window_activated()
@@ -3653,15 +3648,22 @@ class MainWindow(QMainWindow):
 
         print (f"Window item changed: {win_name}")
 
+        self._deactivate_all_windows()
+
         state = item.checkState(0)
 
         for win in self.WindowList:
             if win.title == win_name:
                 if state == Qt.Checked:
                     win.setVisible(True)
+                    win.set_visible(True)
+                    win.window_activated()
                 #            _on_well_panel_activated(self.WindowList[win_name])
                 else:
                     win.setVisible(False)
+                    win.set_visible(False)
+                    win.window_deactivated()
+                    self.dock.window_activated()
 
         win_title = item.data(0, Qt.UserRole)
         new_title = item.text(0).strip()
@@ -4261,3 +4263,7 @@ class MainWindow(QMainWindow):
                     d.draw_map()
             except Exception:
                 pass
+
+    def _deactivate_all_windows(self):
+        for w in self.WindowList:
+            w.window_deactivated()
