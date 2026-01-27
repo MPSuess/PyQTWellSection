@@ -48,7 +48,7 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
-from pywellsection.trees import setup_well_widget_tree, setup_window_tree
+from pywellsection.trees import setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -75,6 +75,9 @@ from pywellsection.dialogs import MapLimitsDialog
 from pathlib import Path
 from collections import OrderedDict
 
+from Import_LBEG_xlsx import load_LBEG_SV
+from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
+
 import logging
 import os
 
@@ -97,6 +100,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+
         self.installEventFilter(self)
         self.setWindowTitle("PyQTWellSection")
         self.resize(1200, 1000)
@@ -109,7 +113,7 @@ class MainWindow(QMainWindow):
         ### central widget ----
         wells, tracks, stratigraphy = create_dummy_data()
 
-        wells.test_class()
+        #wells.test_class()
 
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
@@ -299,6 +303,10 @@ class MainWindow(QMainWindow):
         act_import_bitmap = QAction("Import bitmaps...", self)
         act_import_bitmap.triggered.connect(self._action_load_core_bitmap_to_well)
         import_menu.addAction(act_import_bitmap)
+
+        act_import_test = QAction("Import test...", self)
+        act_import_test.triggered.connect(self._file_load_test)
+        import_menu.addAction(act_import_test)
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
@@ -783,7 +791,6 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "Project saved", f"Saved:\n{path}\n\nData:\n{data_json_path}")
 
-
     def _file_import_petrel(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -1037,6 +1044,22 @@ class MainWindow(QMainWindow):
             return
 
         self._file_load_tops_from_csv(path)
+
+    def _file_load_test(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import test",
+            "",
+            "xls files (*.xlsx);;All files (*.*)",
+        )
+        if not path:
+            return
+
+        #load_LBEG_SV(path)
+        strat = _load_BEEE_stratigraphy(path)
+        build_stratigraphic_column_tree(self.well_tree,strat)
+
+
 
     def _file_load_tops_from_csv(self, path: str):
         """
