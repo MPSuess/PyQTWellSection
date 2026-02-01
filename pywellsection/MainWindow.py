@@ -4290,3 +4290,4 @@ class MainWindow(QMainWindow):
     def _deactivate_all_windows(self):
         for w in self.WindowList:
             w.window_deactivated()
+

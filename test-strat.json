@@ -1,0 +1,4695 @@
+{
+  "stratigraphy": [
+    {
+      "acronym": "-",
+      "name": null,
+      "rank": "unknown",
+      "level": null,
+      "age_ma": {
+        "from": 0.0,
+        "to": null
+      },
+      "type": null,
+      "members": [
+        {
+          "acronym": "NE",
+          "name": "Kaenozoikum",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 0.0,
+            "to": 65.0
+          },
+          "type": "CH",
+          "members": [
+            {
+              "acronym": "Q",
+              "name": "Quartaer",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 0.0,
+                "to": 1.6500000000000001
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "QH",
+                  "name": "Holozaen",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 0.0,
+                    "to": 0.0103
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "QH.J",
+                      "name": "J.Holozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.0,
+                        "to": 0.0047
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "QH.M",
+                      "name": "M.Holozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.0047,
+                        "to": 0.0088
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "QH.A",
+                      "name": "A.Holozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.0088,
+                        "to": 0.0103
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "QP",
+                  "name": "Pleistozaen",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 0.0103,
+                    "to": 1.6500000000000001
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "QP.J",
+                      "name": "Jungpleistozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.0103,
+                        "to": 0.1
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "QP.M",
+                      "name": "Mittelpleistozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.1,
+                        "to": 0.35000000000000003
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "QP.A",
+                      "name": "Altpleistozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.35000000000000003,
+                        "to": 0.8
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "QP.AA",
+                      "name": "Aeltestpleistozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 0.8,
+                        "to": 1.6500000000000001
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "acronym": "T",
+              "name": "Tertiaer",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 1.6500000000000001,
+                "to": 65.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "T.H",
+                  "name": "H.Tertiaer",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 1.6500000000000001,
+                    "to": 5.2
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "T.O",
+                  "name": "O.Tertiaer",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 1.6500000000000001,
+                    "to": 25.2
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TJ",
+                  "name": "Neogen(Jungtertiaer)",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 1.6500000000000001,
+                    "to": 25.2
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "TJ:2",
+                      "name": "Jungtertiaer 2",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 1.6500000000000001,
+                        "to": 12.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "TM,PON",
+                      "name": "PONTIUM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 1.6500000000000001,
+                        "to": 10.200000000000001
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "TP",
+                      "name": "Pliozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 1.6500000000000001,
+                        "to": 5.2
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TP,MK",
+                          "name": "Merksem-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 1.6500000000000001,
+                            "to": 3.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,PL",
+                          "name": "Plaisancien",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 1.6500000000000001,
+                            "to": 5.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,RE",
+                          "name": "Reuver-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 1.6500000000000001,
+                            "to": 2.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP.O",
+                          "name": "O.Pliozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 1.6500000000000001,
+                            "to": 3.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,BR",
+                          "name": "Brunssum-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 2.4,
+                            "to": 3.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,SC",
+                          "name": "Scaldis-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 3.0,
+                            "to": 4.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,SU",
+                          "name": "Sustern-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 3.0,
+                            "to": 4.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "T,MO",
+                          "name": "MORSUM-STUFE",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 3.4,
+                            "to": 5.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP.U",
+                          "name": "U.Pliozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 3.5,
+                            "to": 5.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,MO",
+                          "name": "MORSUM-STUFE(TM)",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 4.0,
+                            "to": 5.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TP,MO",
+                          "name": "Morsum-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 4.0,
+                            "to": 5.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "TM",
+                      "name": "Miozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 5.2,
+                        "to": 25.2
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TM,SY",
+                          "name": "Sylt-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 5.2,
+                            "to": 6.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM.O",
+                          "name": "O.Miozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 5.2,
+                            "to": 10.200000000000001
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,G",
+                          "name": "Gram-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 6.3,
+                            "to": 7.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,L",
+                          "name": "Langenfelde-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 7.4,
+                            "to": 13.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM.M",
+                          "name": "M.Miozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 10.200000000000001,
+                            "to": 16.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,R",
+                          "name": "Reinbek-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 13.3,
+                            "to": 16.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,HE",
+                          "name": "Hemmoor-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 16.2,
+                            "to": 19.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM.U",
+                          "name": "U.Miozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 16.2,
+                            "to": 25.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TMOT",
+                          "name": "Ottnang-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 16.2,
+                            "to": 18.6
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TME",
+                          "name": "Eggenburg-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 18.6,
+                            "to": 22.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TM,V",
+                          "name": "Vierlande-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 19.3,
+                            "to": 25.2
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "TJ:1",
+                      "name": "Jungtertiaer 1",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 16.2,
+                        "to": 25.2
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "T,OEG",
+                  "name": "O.Eger-Stufe",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 22.0,
+                    "to": 25.2
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TEG",
+                  "name": "Eger-Stufe",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 22.0,
+                    "to": 30.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TAT",
+                  "name": "Palaeogen (Alttert.)",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 25.2,
+                    "to": 65.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "TO",
+                      "name": "Oligozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 25.2,
+                        "to": 36.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TO.O",
+                          "name": "O.Oligozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 25.2,
+                            "to": 30.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TO.U",
+                          "name": "U.Oligozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 30.0,
+                            "to": 36.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "TE",
+                      "name": "Eozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 36.0,
+                        "to": 54.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TE.O",
+                          "name": "O.Eozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 36.0,
+                            "to": 39.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TO,TON",
+                          "name": "TONGRIUM",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 36.0,
+                            "to": 40.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TE.M",
+                          "name": "M.Eozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 39.4,
+                            "to": 49.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TE.U",
+                          "name": "U.Eozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 49.0,
+                            "to": 54.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "TA",
+                      "name": "Palaeozaen",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 54.0,
+                        "to": 65.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TA.O",
+                          "name": "O.Palaeozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 54.0,
+                            "to": 60.2
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TA,M",
+                          "name": "MONTIUM S.S.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 60.0,
+                            "to": 65.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TA.U",
+                          "name": "U.Palaeozaen",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 60.2,
+                            "to": 65.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "T.T",
+                  "name": "T.Tertiaer",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 54.0,
+                    "to": 65.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "acronym": "RTSLZ",
+          "name": "Diff.Drehtisch-MLWS",
+          "rank": "level_0",
+          "level": 0,
+          "age_ma": {
+            "from": 0.0,
+            "to": 0.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "WTZ",
+          "name": "Wassertiefe",
+          "rank": "level_0",
+          "level": 0,
+          "age_ma": {
+            "from": 0.0,
+            "to": 0.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": ">T",
+          "name": "Praetertiaer",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 65.0,
+            "to": 4000.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "ME",
+          "name": "Mesozoikum",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 65.0,
+            "to": 251.0
+          },
+          "type": "CH",
+          "members": [
+            {
+              "acronym": "KR",
+              "name": "Kreide",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 65.0,
+                "to": 145.5
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "KRO",
+                  "name": "O.Kreide",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 65.0,
+                    "to": 97.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "KRM",
+                      "name": "Maastricht",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 65.0,
+                        "to": 74.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRM.O",
+                          "name": "O.Maastricht",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 65.0,
+                            "to": 70.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRM.U",
+                          "name": "U.Maastricht",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 70.0,
+                            "to": 74.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRO,S",
+                      "name": "SENON",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 65.0,
+                        "to": 85.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRO,SM",
+                          "name": "MUCRONATEN-SENON",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 65.0,
+                            "to": 79.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRO,SL",
+                          "name": "LANCEOLATEN-SENON",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 70.0,
+                            "to": 74.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRO,SQ",
+                          "name": "QUADARATEN-SENON",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 79.0,
+                            "to": 83.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRO,SG",
+                          "name": "GRANULATEN-SENON",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 83.0,
+                            "to": 85.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRO.H",
+                      "name": "H. O.Kreide",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 65.0,
+                        "to": 88.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRCA",
+                      "name": "Campan",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 74.0,
+                        "to": 83.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRCA.O",
+                          "name": "O.Campan",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 74.0,
+                            "to": 79.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRCA.U",
+                          "name": "U.Campan",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 79.0,
+                            "to": 83.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRS",
+                      "name": "Santon",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 83.0,
+                        "to": 86.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRS.O",
+                          "name": "O.Santon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 83.0,
+                            "to": 84.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRS.M",
+                          "name": "M.Santon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 84.0,
+                            "to": 86.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRS.U",
+                          "name": "U.Santon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 86.0,
+                            "to": 86.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRO,EM",
+                      "name": "EMSCHER",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 85.0,
+                        "to": 88.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRC",
+                      "name": "Coniac",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 86.5,
+                        "to": 88.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRC.O",
+                          "name": "O.Coniac",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 86.5,
+                            "to": 87.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRC.U",
+                          "name": "U.Coniac",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 87.5,
+                            "to": 88.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRO.T",
+                      "name": "T. O.Kreide",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 88.5,
+                        "to": 97.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRT",
+                      "name": "Turon",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 88.5,
+                        "to": 90.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRT.O",
+                          "name": "O.Turon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 88.5,
+                            "to": 89.10000000000001
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRT.M",
+                          "name": "M.Turon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 89.10000000000001,
+                            "to": 90.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRT.U",
+                          "name": "U.Turon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 90.0,
+                            "to": 90.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRCE",
+                      "name": "Cenoman",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 90.5,
+                        "to": 97.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRCE.O",
+                          "name": "O.Cenoman",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 90.5,
+                            "to": 92.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRCE.M",
+                          "name": "M.Cenoman",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 92.0,
+                            "to": 95.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRCE.U",
+                          "name": "U.Cenoman",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 95.0,
+                            "to": 97.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "KRU",
+                  "name": "U.Kreide",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 97.0,
+                    "to": 145.5
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "KRL",
+                      "name": "Alb",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 97.0,
+                        "to": 112.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRL.O",
+                          "name": "O.Alb",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 97.0,
+                            "to": 103.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRL.M",
+                          "name": "M.Alb",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 103.0,
+                            "to": 107.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRL.U",
+                          "name": "U.Alb",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 107.0,
+                            "to": 112.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRU,G",
+                      "name": "GAULT",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 97.0,
+                        "to": 115.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRU.H",
+                      "name": "H.U.Kreide",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 97.0,
+                        "to": 132.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRU,GL",
+                      "name": "Gault",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 102.5,
+                        "to": 117.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRP",
+                      "name": "Apt",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 112.0,
+                        "to": 124.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRP.O",
+                          "name": "O.Apt",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 112.0,
+                            "to": 121.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRP.U",
+                          "name": "U.Apt",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 120.0,
+                            "to": 124.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRB",
+                      "name": "Barreme",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 124.5,
+                        "to": 132.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRB,UR",
+                          "name": "URGONIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 124.5,
+                            "to": 132.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRB.O",
+                          "name": "O.Barreme",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 124.5,
+                            "to": 128.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRB.M",
+                          "name": "M.Barreme",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 128.0,
+                            "to": 130.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRB.U",
+                          "name": "U.Barreme",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 130.5,
+                            "to": 132.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRH",
+                      "name": "Hauterive",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 132.0,
+                        "to": 135.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRH.O",
+                          "name": "O.Hauterive",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 132.0,
+                            "to": 134.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRH.U",
+                          "name": "U.Hauterive",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 134.0,
+                            "to": 135.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRHS",
+                      "name": "HAUTERIVIEN",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 132.0,
+                        "to": 135.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRU,N",
+                      "name": "NEOKOM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 132.0,
+                        "to": 145.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRU.T",
+                      "name": "T.U.Kreide",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 132.0,
+                        "to": 145.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRV",
+                      "name": "VALENDIS (DEUTSCH)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 135.0,
+                        "to": 139.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRVL",
+                      "name": "Valangin (internat.)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 135.0,
+                        "to": 140.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KRVL.O",
+                          "name": "O.Valangin",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 135.0,
+                            "to": 137.6
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRVL.U",
+                          "name": "U.Valangin",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 137.6,
+                            "to": 140.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KRVS",
+                      "name": "VALANGINIEN",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 135.5,
+                        "to": 145.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRWD",
+                      "name": "WEALDEN",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 139.0,
+                        "to": 144.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "WD",
+                      "name": "WEALDEN(WD)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 139.0,
+                        "to": 144.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KRBE",
+                      "name": "Berrias",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 140.5,
+                        "to": 145.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JOPB",
+                          "name": "PURBECK",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 140.5,
+                            "to": 145.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRBE.O",
+                          "name": "O.Berrias",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 140.5,
+                            "to": 144.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRPU",
+                          "name": "Purbeck /SR",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 142.0,
+                            "to": 145.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRPB",
+                          "name": "Purbeck",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 142.5,
+                            "to": 145.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRBE,VG",
+                          "name": "Wolga-Unterstufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 144.0,
+                            "to": 145.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KRBE.U",
+                          "name": "U.Berrias",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 144.0,
+                            "to": 145.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "acronym": "J",
+              "name": "Jura",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 145.5,
+                "to": 208.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "JO",
+                  "name": "Malm",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 145.5,
+                    "to": 157.1
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "JO,POR",
+                      "name": "PORTLAND",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 145.5,
+                        "to": 152.1
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JOPE",
+                      "name": "Portlandian/Engl.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 145.5,
+                        "to": 147.20000000000002
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JOPO",
+                      "name": "Portland",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 145.5,
+                        "to": 157.1
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JOTI",
+                      "name": "Tithon",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 145.5,
+                        "to": 152.1
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JO,Z",
+                          "name": "Malm Zeta",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 145.5,
+                            "to": 152.1
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JOWO",
+                      "name": "Volgian/Engl.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 145.5,
+                        "to": 152.1
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JOKE",
+                      "name": "Kimmeridgian/Engl.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 147.20000000000002,
+                        "to": 154.70000000000002
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JOKI",
+                      "name": "Kimmeridge",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 152.1,
+                        "to": 154.70000000000002
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JO,E",
+                          "name": "Malm Epsilon",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.1,
+                            "to": 152.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI.H",
+                          "name": "H. Kimmeridge",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.1,
+                            "to": 153.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI.O",
+                          "name": "O.Kimmeridge",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.1,
+                            "to": 153.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI:3",
+                          "name": "O.KIMMERIDGE(MM3)",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.1,
+                            "to": 152.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,D",
+                          "name": "Malm Delta",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.5,
+                            "to": 153.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,VI",
+                          "name": "VIRGULIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.5,
+                            "to": 153.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI:2",
+                          "name": "M.KIMMERIDGE(MM2)",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 152.5,
+                            "to": 153.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,G",
+                          "name": "Malm Gamma",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.0,
+                            "to": 154.70000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,PT",
+                          "name": "PTEROCERIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.0,
+                            "to": 154.70000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI.M",
+                          "name": "M.Kimmeridge",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.0,
+                            "to": 153.8
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI:1",
+                          "name": "U.KIMMERIDGE(MM1)",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.0,
+                            "to": 154.70000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI.T",
+                          "name": "T.Kimmeridge",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.5,
+                            "to": 154.70000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOKI.U",
+                          "name": "U.Kimmeridge",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 153.8,
+                            "to": 154.70000000000002
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JOOX",
+                      "name": "Oxford",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 154.70000000000002,
+                        "to": 157.1
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JO,B",
+                          "name": "Malm Beta",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 154.70000000000002,
+                            "to": 155.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,SE",
+                          "name": "SEQUANIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 154.70000000000002,
+                            "to": 155.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOOX.H",
+                          "name": "H. Oxford",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 154.70000000000002,
+                            "to": 156.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOOX.O",
+                          "name": "O.Oxford",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 154.70000000000002,
+                            "to": 155.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOOX.M",
+                          "name": "M.Oxford",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 155.0,
+                            "to": 156.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,A",
+                          "name": "Malm Alpha",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 155.3,
+                            "to": 157.1
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JOOX.U",
+                          "name": "U.Oxford",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 155.3,
+                            "to": 157.1
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,AR",
+                          "name": "ARGOVIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 155.5,
+                            "to": 156.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JO,RA",
+                          "name": "RAURACIEN",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 155.5,
+                            "to": 156.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JO.T",
+                      "name": "T.Malm",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 155.3,
+                        "to": 157.1
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "JM",
+                  "name": "Dogger",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 157.1,
+                    "to": 178.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "JM,Z",
+                      "name": "DOGGER ZETA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 157.1,
+                        "to": 161.3
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,ZN",
+                      "name": "Dogger Zeta/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 157.1,
+                        "to": 159.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM.H",
+                      "name": "H.Dogger",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 157.1,
+                        "to": 161.3
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM.O",
+                      "name": "O.Dogger",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 157.1,
+                        "to": 173.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JMCL",
+                      "name": "Callov-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 157.1,
+                        "to": 161.3
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,ZB",
+                          "name": "Dogger Zeta/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 157.1,
+                            "to": 159.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,ZBW",
+                          "name": "Dogger Zeta/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 157.1,
+                            "to": 161.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMCL.O",
+                          "name": "O.Callov-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 157.1,
+                            "to": 158.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMCL.M",
+                          "name": "M.Callov-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 158.0,
+                            "to": 159.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMCL.U",
+                          "name": "U.Callov-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 159.0,
+                            "to": 161.3
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JM,E",
+                      "name": "DOGGER EPSILON",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 159.0,
+                        "to": 167.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,EB",
+                      "name": "Dogger Epsilon/Bay.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 159.0,
+                        "to": 167.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,EN",
+                      "name": "Dogger Epsilon/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 159.0,
+                        "to": 167.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,EN7",
+                          "name": "Dogger Epsilon 7",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 159.0,
+                            "to": 161.3
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,EN6",
+                          "name": "Dogger Epsilon 6",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 161.3,
+                            "to": 163.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,EN5",
+                          "name": "Dogger Epsilon 5",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 163.0,
+                            "to": 164.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,EN4",
+                          "name": "Dogger Epsilon 4",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 164.5,
+                            "to": 166.1
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,E31",
+                          "name": "Dogger Epsilon 3-1",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 166.1,
+                            "to": 167.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JMBT",
+                      "name": "Bathon-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 161.3,
+                        "to": 166.1
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,EBW",
+                          "name": "Dogger Epsilon/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 161.3,
+                            "to": 166.1
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBT.O",
+                          "name": "O.Bathon-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 161.3,
+                            "to": 162.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBT.M",
+                          "name": "M.Bathon-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 162.4,
+                            "to": 163.6
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBT.U",
+                          "name": "U.Bathon-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 163.6,
+                            "to": 166.1
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JMBJ",
+                      "name": "Bajoc-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 166.1,
+                        "to": 173.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,DBW",
+                          "name": "Dogger Delta/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 166.1,
+                            "to": 172.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,OB",
+                          "name": "O.Bajoc-Stufe/S",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 166.1,
+                            "to": 170.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBJ.O",
+                          "name": "O.Bajoc-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 166.1,
+                            "to": 170.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBJ.M",
+                          "name": "M.Bajoc-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 170.0,
+                            "to": 172.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,GBW",
+                          "name": "Dogger Gamma/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 172.4,
+                            "to": 173.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMBJ.U",
+                          "name": "U.Bajoc-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 172.4,
+                            "to": 173.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JM,D",
+                      "name": "DOGGER DELTA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 166.6,
+                        "to": 172.4
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,DB",
+                      "name": "Dogger Delta/Bay.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 167.0,
+                        "to": 171.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,DN",
+                      "name": "Dogger Delta/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 167.0,
+                        "to": 172.4
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,DN:2",
+                          "name": "Dogger Delta 2",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 167.0,
+                            "to": 170.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,DN:1",
+                          "name": "Dogger Delta 1",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 170.0,
+                            "to": 172.4
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JM,G",
+                      "name": "DOGGER GAMMA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 171.0,
+                        "to": 173.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,GB",
+                      "name": "Dogger Gamma/Bay.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 171.0,
+                        "to": 173.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,GN",
+                      "name": "Dogger Gamma/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 172.4,
+                        "to": 173.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,B",
+                      "name": "DOGGER BETA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 173.5,
+                        "to": 177.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,BN",
+                      "name": "Dogger Beta/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 173.5,
+                        "to": 177.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,BN.O",
+                          "name": "O.Dogger Beta/N",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 173.5,
+                            "to": 175.25
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,BN:4",
+                          "name": "Dogger Beta 4",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 173.5,
+                            "to": 174.20000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,BN:3",
+                          "name": "Dogger Beta 3",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 174.20000000000002,
+                            "to": 174.8
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,BN:2",
+                          "name": "Dogger Beta 2",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 174.8,
+                            "to": 176.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,BN.U",
+                          "name": "U.Dogger Beta/N",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 175.25,
+                            "to": 177.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JM.U",
+                      "name": "U.Dogger",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 173.5,
+                        "to": 178.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JMAL",
+                      "name": "Aalen-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 173.5,
+                        "to": 178.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JM,BB",
+                          "name": "Dogger Beta/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 173.5,
+                            "to": 177.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,BBW",
+                          "name": "Dogger Beta/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 173.5,
+                            "to": 177.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMAL.O",
+                          "name": "O.Aalen-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 173.5,
+                            "to": 177.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,AB",
+                          "name": "Dogger Alpha/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 177.0,
+                            "to": 178.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JM,ABW",
+                          "name": "Dogger Alpha/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 177.0,
+                            "to": 178.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JMAL.U",
+                          "name": "U.Aalen-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 177.0,
+                            "to": 178.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JM,A",
+                      "name": "DOGGER ALPHA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 177.0,
+                        "to": 178.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JM,AN",
+                      "name": "Dogger Alpha/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 177.0,
+                        "to": 178.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "JU",
+                  "name": "Lias",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 178.0,
+                    "to": 208.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "JU,Z",
+                      "name": "Lias Zeta",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 178.0,
+                        "to": 182.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU.O",
+                      "name": "O.Lias",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 178.0,
+                        "to": 187.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JUTC",
+                      "name": "Toarc-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 178.0,
+                        "to": 187.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JUTC.O",
+                          "name": "O.Toarc-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 178.0,
+                            "to": 182.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JUTC.U",
+                          "name": "U.Toarc-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 182.0,
+                            "to": 187.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,E",
+                      "name": "Lias Epsilon",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 182.0,
+                        "to": 187.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,E:3",
+                          "name": "Lias Epsilon 3",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 182.0,
+                            "to": 183.6
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,E:2",
+                          "name": "Lias Epsilon 2",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 183.6,
+                            "to": 185.20000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,E:1",
+                          "name": "Lias Epsilon 1",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 185.20000000000002,
+                            "to": 187.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,EA",
+                      "name": "Lias Epsilon-Alpha",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 182.0,
+                        "to": 208.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU,D",
+                      "name": "Lias Delta",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 187.0,
+                        "to": 190.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,D:2",
+                          "name": "Lias Delta 2",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 187.0,
+                            "to": 188.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,D:1",
+                          "name": "Lias Delta 1",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 188.5,
+                            "to": 190.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU.M",
+                      "name": "M.Lias",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 187.0,
+                        "to": 194.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JUPL",
+                      "name": "Pliensbach-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 187.0,
+                        "to": 194.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,DOM",
+                          "name": "DOMER-UNTERSTUFE",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 187.0,
+                            "to": 190.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JUPL.O",
+                          "name": "O.Pliensbach-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 187.0,
+                            "to": 190.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,CAX",
+                          "name": "CARIX-UNTERSTUFE",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 190.0,
+                            "to": 194.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JUPL.U",
+                          "name": "U.Pliensbach-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 190.0,
+                            "to": 194.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,G",
+                      "name": "Lias Gamma",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 190.0,
+                        "to": 194.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU,B",
+                      "name": "LIAS BETA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 201.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU,BB",
+                      "name": "Lias Beta/Bay.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 201.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU,BNR",
+                      "name": "Lias Beta",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 199.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,BNR:3",
+                          "name": "Lias Beta 3",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 194.5,
+                            "to": 196.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,BNR:2",
+                          "name": "Lias Beta 2",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 196.0,
+                            "to": 197.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,BNR:1",
+                          "name": "Lias Beta 1",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 197.0,
+                            "to": 199.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU.U",
+                      "name": "U.Lias",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 208.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JUSH",
+                      "name": "SINEMUR+HETTANG-ST.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 208.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JUSI",
+                      "name": "Sinemur-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 194.5,
+                        "to": 203.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JUSI.O",
+                          "name": "O.Sinemur-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 194.5,
+                            "to": 201.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JUSI.U",
+                          "name": "U.Sinemur-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 201.0,
+                            "to": 203.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,A",
+                      "name": "LIAS ALPHA",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 199.0,
+                        "to": 208.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "JU,ABW",
+                      "name": "Lias Alpha/BW",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 199.0,
+                        "to": 207.20000000000002
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,ABW:3",
+                          "name": "Lias Alpha 3/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 199.0,
+                            "to": 203.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,ABW:2",
+                          "name": "Lias Alpha 2/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 203.5,
+                            "to": 204.8
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,ABW:1",
+                          "name": "Lias Alpha 1/BW",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 204.8,
+                            "to": 207.2
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,AB",
+                      "name": "Lias Alpha/Bay.",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 201.0,
+                        "to": 207.20000000000002
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,AB:3",
+                          "name": "Lias Alpha 3/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 201.0,
+                            "to": 203.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,AB:2",
+                          "name": "Lias Alpha 2/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 203.5,
+                            "to": 206.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JU,AB:1",
+                          "name": "Lias Alpha 1/Bay.",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 206.0,
+                            "to": 207.2
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JU,AND",
+                      "name": "Lias Alpha/N",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 201.0,
+                        "to": 208.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JU,AND:1",
+                          "name": "Lias Alpha 1/N",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 205.5,
+                            "to": 208.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "JUHE",
+                      "name": "Hettang-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 203.5,
+                        "to": 208.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "JUHE.O",
+                          "name": "O.Hettang-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 203.5,
+                            "to": 205.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "JUHE.U",
+                          "name": "U.Hettang-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 205.5,
+                            "to": 208.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "acronym": "ME,RL",
+              "name": "Rhaetolias",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 178.0,
+                "to": 210.0
+              },
+              "type": "CH"
+            },
+            {
+              "acronym": "TR",
+              "name": "Trias",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 208.0,
+                "to": 251.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "K",
+                  "name": "Keuper",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 208.0,
+                    "to": 232.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "KO",
+                      "name": "O.Keuper (Rhaet)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 208.0,
+                        "to": 213.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KO.O",
+                          "name": "O.Rhaet",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 208.0,
+                            "to": 208.5
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KO.M",
+                          "name": "M.Rhaet",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 208.5,
+                            "to": 210.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KO.U",
+                          "name": "U.Rhaet",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 210.0,
+                            "to": 213.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "KOR",
+                      "name": "Rhaet  (O. Keuper)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 208.0,
+                        "to": 213.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KM",
+                      "name": "M.Keuper",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 213.0,
+                        "to": 230.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "K.T",
+                      "name": "T.Keuper",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 220.0,
+                        "to": 232.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "KU",
+                      "name": "U.Keuper/Lettenkohle",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 230.0,
+                        "to": 232.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "KU.O",
+                          "name": "O.Lettenkohlenkeuper",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 230.0,
+                            "to": 230.4
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KU.M",
+                          "name": "M.Lettenkohlenkeuper",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 230.4,
+                            "to": 231.20000000000002
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "KU.U",
+                          "name": "U.Lettenkohlenkeuper",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 231.20000000000002,
+                            "to": 232.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "TRR",
+                  "name": "Alpines Rhaet",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 208.0,
+                    "to": 212.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRN",
+                  "name": "Nor",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 212.0,
+                    "to": 222.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRK",
+                  "name": "Karn",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 222.0,
+                    "to": 229.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRL",
+                  "name": "Ladin",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 229.0,
+                    "to": 234.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "M",
+                  "name": "Muschelkalk",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 232.0,
+                    "to": 240.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "MO",
+                      "name": "O.Muschelkalk",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 232.0,
+                        "to": 235.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "MM",
+                      "name": "M.Muschelkalk",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 235.5,
+                        "to": 237.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "MU",
+                      "name": "U.Muschelkalk",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 237.0,
+                        "to": 240.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "TR,MA",
+                  "name": "Alpiner Muschelkalk",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 234.0,
+                    "to": 241.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRA",
+                  "name": "Anis",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 234.0,
+                    "to": 241.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "S",
+                  "name": "Buntsandstein",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 240.0,
+                    "to": 251.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "SO",
+                      "name": "O.Buntsandstein",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 240.0,
+                        "to": 242.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "SM",
+                      "name": "M.Buntsandstein",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 242.0,
+                        "to": 247.70000000000002
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "SM.O",
+                          "name": "O.M.Buntsandstein",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 242.0,
+                            "to": 243.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "SM.M",
+                          "name": "M.M.Buntsandstein",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 243.0,
+                            "to": 246.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "SM.U",
+                          "name": "U.M.Buntsandstein",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 246.0,
+                            "to": 247.70000000000002
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "SU",
+                      "name": "U.Buntsandstein",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 247.70000000000002,
+                        "to": 251.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "TR,AL",
+                  "name": "Alpiner Buntsdst.",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 241.0,
+                    "to": 251.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRS",
+                  "name": "Skyth",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 241.0,
+                    "to": 251.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "TRSO",
+                      "name": "OLENEKIUM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 241.0,
+                        "to": 242.70000000000002
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "TRNA",
+                      "name": "NAMMALIUM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 242.0,
+                        "to": 243.5
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TRSS",
+                          "name": "SMITHIUM",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 242.0,
+                            "to": 242.75
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TRSD",
+                          "name": "DIENERIUM",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 242.75,
+                            "to": 243.5
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "TRSJ",
+                      "name": "JAKUTIUM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 242.0,
+                        "to": 242.75
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "TRSB",
+                      "name": "BRAHMANIUM",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 242.75,
+                        "to": 245.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "TRGR",
+                      "name": "Griesbach-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 243.5,
+                        "to": 245.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "TRSE",
+                          "name": "ELLESMERIUM",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 243.5,
+                            "to": 244.25
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "TRGA",
+                          "name": "GANGETIUM",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 244.25,
+                            "to": 245.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "TRSP",
+                  "name": "Spath",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 241.0,
+                    "to": 242.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRCH",
+                  "name": "CHANGXING",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 245.0,
+                    "to": 247.70000000000002
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "TRLO",
+                  "name": "LONGTAN",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 247.70000000000002,
+                    "to": 250.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "acronym": "TRPE",
+          "name": "Permotrias",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 208.0,
+            "to": 296.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "PL",
+          "name": "Palaeozoikum",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 251.0,
+            "to": 570.0
+          },
+          "type": "CH",
+          "members": [
+            {
+              "acronym": "PE",
+              "name": "Perm",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 251.0,
+                "to": 296.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "PEDO",
+                  "name": "DORASHAM",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 251.0,
+                    "to": 256.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PETA",
+                  "name": "Tartar",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 251.0,
+                    "to": 267.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "Z",
+                  "name": "Zechstein",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 251.0,
+                    "to": 258.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "Z,SW",
+                      "name": "\"UNT. BUNTSDST.\" (SW)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 251.0,
+                        "to": 252.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z8",
+                      "name": "Z8-Serie",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 251.0,
+                        "to": 251.25
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z7",
+                      "name": "Moelln-Serie(z7)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 251.25,
+                        "to": 251.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z6",
+                      "name": "Friesland Serie(z6)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 251.5,
+                        "to": 252.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z5",
+                      "name": "Ohre-Serie(z5)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 252.0,
+                        "to": 252.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z4",
+                      "name": "Aller-Serie(z4)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 252.5,
+                        "to": 253.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z3",
+                      "name": "Leine-Serie(z3)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 253.0,
+                        "to": 254.5
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z2",
+                      "name": "Stassfurt-Serie(z2)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 254.5,
+                        "to": 256.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "Z1",
+                      "name": "Werra-Serie(z1)",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 256.0,
+                        "to": 258.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "PEDJ",
+                  "name": "DJULFIN",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 256.0,
+                    "to": 261.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PESA",
+                  "name": "Saxon",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 258.0,
+                    "to": 266.9
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PESX",
+                  "name": "SAXON",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 258.0,
+                    "to": 266.9
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "R",
+                  "name": "Rotliegend",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 258.0,
+                    "to": 296.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "R,SD",
+                      "name": "sedim. Rotliegend",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 258.0,
+                        "to": 286.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "RO",
+                      "name": "O.ROTLIEGEND",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 258.0,
+                        "to": 286.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "RU",
+                      "name": "U.ROTLIEGEND",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 286.0,
+                        "to": 296.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "PEPU",
+                  "name": "PUNJAB",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 261.0,
+                    "to": 267.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEAU",
+                  "name": "Autun",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 266.9,
+                    "to": 296.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEKA",
+                  "name": "Kazan",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 267.0,
+                    "to": 272.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEUF",
+                  "name": "Ufa",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 272.0,
+                    "to": 274.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEKU",
+                  "name": "Kungur",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 274.0,
+                    "to": 277.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEAR",
+                  "name": "Artinsk",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 277.0,
+                    "to": 283.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PESK",
+                  "name": "Sakmar",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 283.0,
+                    "to": 290.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "PEAS",
+                  "name": "Assel",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 290.0,
+                    "to": 296.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            },
+            {
+              "acronym": "PEC",
+              "name": "Permokarbon",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 251.0,
+                "to": 362.5
+              },
+              "type": "CH"
+            },
+            {
+              "acronym": "C",
+              "name": "Karbon",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 296.0,
+                "to": 362.5
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "CO",
+                  "name": "O.Karbon (Siles)",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 296.0,
+                    "to": 333.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "CST",
+                      "name": "Stefan",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 296.0,
+                        "to": 303.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "CST,C",
+                          "name": "Stefan C",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 296.0,
+                            "to": 298.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CST,B",
+                          "name": "Stefan B",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 298.0,
+                            "to": 300.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CST,A",
+                          "name": "Stefan A",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 300.0,
+                            "to": 303.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "CW",
+                      "name": "Westfal",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 303.0,
+                        "to": 318.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "CW,D",
+                          "name": "Westfal D",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 303.0,
+                            "to": 306.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CW,C",
+                          "name": "Westfal C",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 306.0,
+                            "to": 308.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CW,B",
+                          "name": "Westfal B",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 308.0,
+                            "to": 311.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CW,A",
+                          "name": "Westfal A",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 311.0,
+                            "to": 318.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "CN",
+                      "name": "Namur",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 318.0,
+                        "to": 333.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "CN,C",
+                          "name": "Namur C",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 318.0,
+                            "to": 322.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CN,B",
+                          "name": "Namur B",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 322.0,
+                            "to": 327.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "CN,A",
+                          "name": "Namur A",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 327.0,
+                            "to": 333.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "CU",
+                  "name": "U.Karbon (Dinant)",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 333.0,
+                    "to": 362.5
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "CV",
+                      "name": "Vise",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 333.0,
+                        "to": 350.0
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "CT",
+                      "name": "Tournai",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 350.0,
+                        "to": 362.5
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "acronym": "D",
+              "name": "Devon",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 362.5,
+                "to": 408.5
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "DO",
+                  "name": "O.Devon",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 362.5,
+                    "to": 377.40000000000003
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "DFA",
+                      "name": "Famenne-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 362.5,
+                        "to": 367.0
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "DW",
+                          "name": "Wocklum-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 362.5,
+                            "to": 363.6
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "DD",
+                          "name": "Dasberg-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 363.6,
+                            "to": 364.8
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "DH",
+                          "name": "Hemberg-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 364.8,
+                            "to": 366.0
+                          },
+                          "type": "CH"
+                        },
+                        {
+                          "acronym": "DN",
+                          "name": "Nehden-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 366.0,
+                            "to": 367.0
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    },
+                    {
+                      "acronym": "DFR",
+                      "name": "Frasne-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 367.0,
+                        "to": 377.40000000000003
+                      },
+                      "type": "CH",
+                      "members": [
+                        {
+                          "acronym": "DA",
+                          "name": "Adorf-Stufe",
+                          "rank": "bed_L5",
+                          "level": 5,
+                          "age_ma": {
+                            "from": 367.0,
+                            "to": 377.40000000000003
+                          },
+                          "type": "CH"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "acronym": "DM",
+                  "name": "M.Devon",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 377.40000000000003,
+                    "to": 386.0
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "DV",
+                      "name": "Givet-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 377.40000000000003,
+                        "to": 380.8
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "DE",
+                      "name": "Eifel-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 380.8,
+                        "to": 386.0
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                },
+                {
+                  "acronym": "DU",
+                  "name": "U.Devon",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 386.0,
+                    "to": 408.5
+                  },
+                  "type": "CH",
+                  "members": [
+                    {
+                      "acronym": "DZ",
+                      "name": "Ems-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 386.0,
+                        "to": 390.40000000000003
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "DS",
+                      "name": "Siegen-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 390.40000000000003,
+                        "to": 396.3
+                      },
+                      "type": "CH"
+                    },
+                    {
+                      "acronym": "DG",
+                      "name": "Gedinne-Stufe",
+                      "rank": "member_L4",
+                      "level": 4,
+                      "age_ma": {
+                        "from": 396.3,
+                        "to": 408.5
+                      },
+                      "type": "CH"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "acronym": "SI",
+              "name": "Silur (Gotland)",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 408.5,
+                "to": 439.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "SIO",
+                  "name": "O.Silur",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 408.5,
+                    "to": 424.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SIP",
+                  "name": "Pridoli",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 408.5,
+                    "to": 410.7
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SID",
+                  "name": "Ludlow",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 410.7,
+                    "to": 424.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SIM",
+                  "name": "M.Silur",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 424.0,
+                    "to": 430.40000000000003
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SIW",
+                  "name": "Wenlock",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 424.0,
+                    "to": 430.40000000000003
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SIU",
+                  "name": "U.Silur",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 430.40000000000003,
+                    "to": 439.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "SIV",
+                  "name": "Llandovery",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 430.40000000000003,
+                    "to": 439.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            },
+            {
+              "acronym": "O",
+              "name": "Ordovizium",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 439.0,
+                "to": 510.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "OA",
+                  "name": "Ashgill",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 439.0,
+                    "to": 443.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OO",
+                  "name": "O.Ordovizium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 439.0,
+                    "to": 445.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OC",
+                  "name": "Caradoc",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 443.0,
+                    "to": 464.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OM",
+                  "name": "M.Ordovizium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 445.0,
+                    "to": 472.5
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OLD",
+                  "name": "Llandeilo",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 464.0,
+                    "to": 469.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OLV",
+                  "name": "Llanvirn",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 469.0,
+                    "to": 476.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OU",
+                  "name": "U.Ordovizium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 472.5,
+                    "to": 510.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OR",
+                  "name": "Arenig",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 476.0,
+                    "to": 493.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "OT",
+                  "name": "Tremadoc",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 493.0,
+                    "to": 510.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            },
+            {
+              "acronym": "CB",
+              "name": "Kambrium",
+              "rank": "level_2",
+              "level": 2,
+              "age_ma": {
+                "from": 510.0,
+                "to": 570.0
+              },
+              "type": "CH",
+              "members": [
+                {
+                  "acronym": "CBO",
+                  "name": "O.Kambrium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 510.0,
+                    "to": 517.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "CBM",
+                  "name": "M.Kambrium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 517.0,
+                    "to": 536.0
+                  },
+                  "type": "CH"
+                },
+                {
+                  "acronym": "CBU",
+                  "name": "U.Kambrium",
+                  "rank": "level_3",
+                  "level": 3,
+                  "age_ma": {
+                    "from": 536.0,
+                    "to": 570.0
+                  },
+                  "type": "CH"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "acronym": ">PE",
+          "name": "Praeperm",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 296.0,
+            "to": 570.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "PC",
+          "name": "Praekambrium",
+          "rank": "level_1",
+          "level": 1,
+          "age_ma": {
+            "from": 570.0,
+            "to": 4560.0
+          },
+          "type": "CH"
+        }
+      ]
+    },
+    {
+      "acronym": "JO.O",
+      "name": null,
+      "rank": "unknown",
+      "level": null,
+      "age_ma": {
+        "from": 145.5,
+        "to": null
+      },
+      "type": null,
+      "members": [
+        {
+          "acronym": "JO,OM41",
+          "name": "O.MALM 4-1",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 145.5,
+            "to": 152.1
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "JO.O:4",
+          "name": "O.Malm 4",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 145.5,
+            "to": 147.20000000000002
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "JO,O3",
+          "name": "O.MALM 3",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 147.20000000000002,
+            "to": 149.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "JO.O:3",
+          "name": "O.Malm 3",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 147.20000000000002,
+            "to": 149.0
+          },
+          "type": "CH"
+        }
+      ]
+    },
+    {
+      "acronym": "Z,UBS",
+      "name": null,
+      "rank": "unknown",
+      "level": null,
+      "age_ma": {
+        "from": 251.0,
+        "to": null
+      },
+      "type": null,
+      "members": [
+        {
+          "acronym": "Z,8AQ",
+          "name": "Z8-Aequivalent",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 251.0,
+            "to": 251.25
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "Z,SU",
+          "name": "U.BUNTSANDSTEIN",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 251.0,
+            "to": 252.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "Z,7AQ",
+          "name": "Z7-Aequivalent",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 251.25,
+            "to": 251.5
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "Z,6AQ",
+          "name": "Z6-Aequivalent",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 251.5,
+            "to": 252.0
+          },
+          "type": "CH"
+        },
+        {
+          "acronym": "Z,5AQ",
+          "name": "Z5-Aequivalent",
+          "rank": "bed_L5",
+          "level": 5,
+          "age_ma": {
+            "from": 252.0,
+            "to": 252.5
+          },
+          "type": "CH"
+        }
+      ]
+    }
+  ]
+}
