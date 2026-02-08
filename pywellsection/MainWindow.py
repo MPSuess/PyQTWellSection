@@ -3849,7 +3849,7 @@ class MainWindow(QMainWindow):
 
         # Optional: if you also want to enforce tab groups explicitly,
         # you can apply them after restore (usually not needed).
-        # self._apply_tab_groups(layout.get("tab_groups", []))
+        # self._apply_tab_groups(layout.get("tab_groups", [])
 
         return bool(ok_geom and ok_state)
 
