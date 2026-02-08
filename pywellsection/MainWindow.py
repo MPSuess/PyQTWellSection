@@ -3492,7 +3492,7 @@ class MainWindow(QMainWindow):
             if chosen == act_delete_well:
                 self._delete_well_from_project(well_name, confirm = True)
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
+        if isinstance(data, list) and len(data) == 3 and data[0] == "Bitmap":
             #menu = QMenu(self)
             _, well_name, bitmap_key = data
             act_del = menu.addAction(f"Delete bitmap from well {well_name}")
@@ -3505,7 +3505,7 @@ class MainWindow(QMainWindow):
                         self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
             return
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "well_log":
+        if isinstance(data, list) and len(data) == 3 and data[0] == "well_log":
             _, well_name, log_name = data
 
             act_edit = menu.addAction("Edit log data (table)…")
