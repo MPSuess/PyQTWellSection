@@ -80,7 +80,6 @@ from collections import OrderedDict
 
 from Import_LBEG_xlsx import load_LBEG_SV
 from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
-from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 
 import logging
 import os
@@ -897,8 +896,6 @@ class MainWindow(QMainWindow):
         self._populate_well_tree()
         #self._populate_well_log_tree()
         self._populate_well_track_tree()
-        #self.project.all_wells = self.all_wells
-        #self.project.all_logs = self.all_logs
 
         QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
 
@@ -1071,14 +1068,8 @@ class MainWindow(QMainWindow):
             return
 
         #load_LBEG_SV(path)
-        #strat = _load_BEEE_stratigraphy(path)
-        #build_stratigraphic_column_tree(self.well_tree,strat)
-
-        bgr_data = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", path)
-
-        print (bgr_data)
-
-        return
+        strat = _load_BEEE_stratigraphy(path)
+        build_stratigraphic_column_tree(self.well_tree,strat)
 
 
 
@@ -1669,6 +1660,7 @@ class MainWindow(QMainWindow):
                 )
                 log_item.setData(0, Qt.UserRole, ("track_log",track_name , log_name))
                 track_item.addChild(log_item)
+
             root.addChild(track_item)
 
         self.well_tree.blockSignals(False)
@@ -1724,8 +1716,6 @@ class MainWindow(QMainWindow):
 
         if item.data(0, Qt.UserRole) is None:
             return 0
-
-        print ("_on_well_tree_item_changed",item.data(0, Qt.UserRole))
 
         p = item.parent()
         if item is self.well_root_item or p is self.well_root_item:
@@ -2095,9 +2085,6 @@ class MainWindow(QMainWindow):
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
-
-        print (self)
-
         dlg = AddLogToTrackDialog(self, self.all_tracks, self.all_wells)
         if dlg.exec_() != QDialog.Accepted:
             return
@@ -2268,9 +2255,6 @@ class MainWindow(QMainWindow):
     def _action_edit_stratigraphy(self):
         """Open table dialog to edit/add stratigraphy for the project."""
         # Make sure we have a stratigraphy dict
-
-
-
         strat = getattr(self, "all_stratigraphy", None)
         if strat is None:
             strat = {}
@@ -2285,10 +2269,9 @@ class MainWindow(QMainWindow):
         self.panel.draw_well_panel()
 
         if new_strat is None:
-             print ("no strat")
-             return
+            return
 
-        # # 1) update project-level stratigraphy
+        # 1) update project-level stratigraphy
         self.stratigraphy = new_strat
         self.all_stratigraphy = new_strat
         #
@@ -3561,15 +3544,12 @@ class MainWindow(QMainWindow):
         item = self.well_tree.itemAt(pos)
         menu = QMenu(self)
         if item is None:
-            print ("_on_tree_context_menu: no item at pos", pos)
             return
 
         global_pos = self.well_tree.viewport().mapToGlobal(pos)
         parent = item.parent()
         data = item.data(0, Qt.UserRole)
         parent_data = parent.data(0, Qt.UserRole) if parent else None
-
-        if not data: return
 
         print (item, data)
         print (parent, parent_data)
@@ -3670,6 +3650,7 @@ class MainWindow(QMainWindow):
             if chosen == act_del:
                 for well in self.all_wells:
                     self._delete_bitmap_from_well(well.get("name"), bitmap_name, confirm=True)
+
         if item is self.well_tops_folder:
             #menu = QMenu(self)
 
@@ -3679,6 +3660,7 @@ class MainWindow(QMainWindow):
             if chosen == act_edit_stratigraphy:
                 self._action_edit_stratigraphy()
             return
+
         if item is self.track_root_item:
             track_name = item.text(0)
 
@@ -3715,7 +3697,6 @@ class MainWindow(QMainWindow):
 
             #menu = QMenu(self)
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
-
             if track.get("type") == "discrete":
                 #menu = QMenu(self)
                 act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
