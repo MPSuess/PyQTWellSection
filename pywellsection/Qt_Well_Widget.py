@@ -44,7 +44,7 @@ import numpy as np
 
 #from mpl_interactions import panhandler
 
-class WellPanelWidget(QWidget):
+class  WellPanelWidget(QWidget):
     def __init__(self, wells, tracks, stratigraphy, panel_settings, well_panel_title = None, parent=None):
         super().__init__(parent)
 
