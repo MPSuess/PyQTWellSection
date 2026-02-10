@@ -273,7 +273,7 @@ def build_stratigraphic_column_tree(tree_widget, strat_data):
     tree_widget.expandItem(root_item)
 
 class CheckableTree(QtWidgets.QTreeWidget):
-    leafToggled = QtCore.Signal(str, bool)
+    leafToggled = QtCore.Signal(object, str, bool)
     parentToggled = QtCore.Signal(str, bool)
     contextAction = QtCore.Signal(str, str)  # (path, action_name)
     structureChanged = QtCore.Signal(str, str, str)  # (moved_path, action, new_parent_path)
@@ -302,33 +302,48 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # ----------------------------
     # Public API: build / mutate
     # ----------------------------
-    def build_tree(self, data, root_label=None):
-        self.clear()
+    # def build_tree(self, data, root_label=None):
+    #     self.clear()
+    #
+    #     if root_label is not None:
+    #         root = self._make_item(str(root_label), parent=None, checkable=True)
+    #         self.addTopLevelItem(root)
+    #         self._add_children(root, data)
+    #     else:
+    #         if isinstance(data, dict):
+    #             for k, v in data.items():
+    #                 node = self._make_item(str(k), parent=None, checkable=True)
+    #                 self.addTopLevelItem(node)
+    #                 self._add_children(node, v)
+    #         else:
+    #             for elem in (data if isinstance(data, (list, tuple, set)) else [data]):
+    #                 node = self._make_item(self._label(elem), parent=None, checkable=True)
+    #                 self.addTopLevelItem(node)
+    #                 self._add_children(node, elem)
+    #
+    #     self.expandAll()
 
-        if root_label is not None:
-            root = self._make_item(str(root_label), parent=None)
-            self.addTopLevelItem(root)
-            self._add_children(root, data)
-        else:
-            if isinstance(data, dict):
-                for k, v in data.items():
-                    node = self._make_item(str(k), parent=None)
-                    self.addTopLevelItem(node)
-                    self._add_children(node, v)
-            else:
-                for elem in (data if isinstance(data, (list, tuple, set)) else [data]):
-                    node = self._make_item(self._label(elem), parent=None)
-                    self.addTopLevelItem(node)
-                    self._add_children(node, elem)
+    def clear_tree(self):
+        """
+        Clear the entire tree safely.
 
-        self.expandAll()
+        This:
+          - removes all items (roots + children)
+          - suppresses itemChanged / checkbox logic
+          - leaves the tree ready for rebuild
+        """
+        try:
+            self._updating = True
+            self.clear()
+        finally:
+            self._updating = False
 
     def add_root(self, text: str) -> QtWidgets.QTreeWidgetItem:
         """
         Add a new root (top-level) item.
         Returns the created root item.
         """
-        root = self._make_item(text, parent=None)
+        root = self._make_item(text, parent=None, checkable=False)
         self.addTopLevelItem(root)
 
         # ensure consistent check state visuals
@@ -340,46 +355,42 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         return root
 
-    def add_parent(self, parent_item, text: str) -> QtWidgets.QTreeWidgetItem:
+    def add_parent(self, parent_item, text: str, checkable : bool) -> QtWidgets.QTreeWidgetItem:
         """
         Add a new parent node under parent_item (or as top-level if parent_item is None).
         Returns the created item.
         """
-        new_item = self._make_item(text, parent=None)
+
+        print(f"ADD PARENT: {parent_item} {text}, {checkable}")
+
+        new_item = self._make_item(text, parent=None, checkable=checkable)
 
         if parent_item is None:
             self.addTopLevelItem(new_item)
         else:
             parent_item.addChild(new_item)
-            parent_item.setExpanded(True)
+            parent_item.setExpanded(False)
 
         # keep parents consistent (tri-state display)
         self._refresh_upwards(new_item)
         return new_item
 
-    def add_leaf(self, parent_item, text: str) -> QtWidgets.QTreeWidgetItem:
-        """
-        Add a new leaf node under parent_item (must not be None).
-        The new leaf inherits parent's checked state if parent is Checked/Unchecked.
-        Returns the created leaf item.
-        """
+    def add_leaf(
+        self,
+        parent_item: QtWidgets.QTreeWidgetItem,
+        text: str,
+        checkable : bool = True
+    ) -> QtWidgets.QTreeWidgetItem:
         if parent_item is None:
-            raise ValueError("add_leaf requires a non-None parent_item")
+            raise ValueError("add_leaf requires a parent item")
 
-        leaf = self._make_item(text, parent=parent_item)
-
-        # Inherit parent's check state if it's not partial
-        pstate = parent_item.checkState(0)
-        if pstate in (QtCore.Qt.Checked, QtCore.Qt.Unchecked):
-            try:
-                self._updating = True
-                leaf.setCheckState(0, pstate)
-            finally:
-                self._updating = False
+        leaf = self._make_item(text, parent=parent_item, checkable=False)
 
         parent_item.setExpanded(True)
         self._refresh_upwards(leaf)
+
         return leaf
+
 
     def remove_item(self, item: QtWidgets.QTreeWidgetItem) -> bool:
         """
@@ -593,6 +604,27 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # ----------------------------
     # Build helpers
     # ----------------------------
+
+    def _ensure_folder_checkable(self, item: QtWidgets.QTreeWidgetItem):
+        """
+        If an item has children, it must be checkable.
+        """
+        if item.childCount() > 0:
+            flags = item.flags()
+            if not (flags & QtCore.Qt.ItemIsUserCheckable):
+                flags |= QtCore.Qt.ItemIsUserCheckable
+                item.setFlags(flags)
+                item.setCheckState(0, QtCore.Qt.Unchecked)
+
+    def _ensure_leaf_not_checkable(self, item: QtWidgets.QTreeWidgetItem):
+        """
+        If an item has no children, it must NOT be checkable.
+        """
+        if item.childCount() == 0:
+            flags = item.flags()
+            if flags & QtCore.Qt.ItemIsUserCheckable:
+                flags &= ~QtCore.Qt.ItemIsUserCheckable
+                item.setFlags(flags)
 
     # ---- Drop flags (bitmask stored on items) ----
     DROP_ACCEPT_CHILDREN = 0x01   # item can accept drops ONTO it (become parent)
@@ -848,31 +880,170 @@ class CheckableTree(QtWidgets.QTreeWidget):
             new_parent_path = self._item_path(dragged.parent()) if dragged.parent() else ""
             self.structureChanged.emit(moved_path_before, "moved", new_parent_path)
 
-    def _add_children(self, parent_item, subtree):
-        if isinstance(subtree, dict):
-            for k, v in subtree.items():
-                child = self._make_item(str(k), parent=parent_item)
-                self._add_children(child, v)
-            return
-        if isinstance(subtree, (list, tuple, set)):
-            for elem in subtree:
-                child = self._make_item(self._label(elem), parent=parent_item)
-                self._add_children(child, elem)
-            return
-        return
+    # def _add_children(self, parent_item, subtree):
+    #     if isinstance(subtree, dict):
+    #         for k, v in subtree.items():
+    #             child = self._make_item(str(k), parent=parent_item, checkable=True)
+    #             self._add_children(child, v)
+    #             self._add_children(child, v)
+    #         return
+    #     if isinstance(subtree, (list, tuple, set)):
+    #         for elem in subtree:
+    #             child = self._make_item(self._label(elem), parent=parent_item, checkable=True)
+    #             self._add_children(child, elem)
+    #         return
+    #     return
+
+    def remove_all_children(self, parent_item: QtWidgets.QTreeWidgetItem) -> bool:
+        """
+        Remove all children of the given parent item, but keep the parent itself.
+
+        Returns True if children were removed,
+        False if parent_item is None or has no children.
+        """
+        if parent_item is None or parent_item.childCount() == 0:
+            return False
+
+        try:
+            self._updating = True
+            parent_item.takeChildren()
+        finally:
+            self._updating = False
+
+        # Recompute parent check / partial state upwards
+        self._refresh_upwards(parent_item)
+
+        return True
 
     def _label(self, x):
         if isinstance(x, tuple) and len(x) == 2 and isinstance(x[0], (str, int, float)):
             return str(x[0])
         return str(x)
 
-    def _make_item(self, text: str, parent):
+    def _make_itemo(
+        self,
+        text: str,
+        parent: QtWidgets.QTreeWidgetItem | None,
+        checkable: bool = True,
+    ) -> QtWidgets.QTreeWidgetItem:
         item = QtWidgets.QTreeWidgetItem([text])
-        item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEditable)
-        item.setCheckState(0, QtCore.Qt.Unchecked)
+
+        if not checkable:
+            item.setFlags(
+                item.flags()
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+            )
+        else:
+            item.setFlags(
+                item.flags()
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEnabled
+                | Qt.ItemIsUserCheckable
+            )
+
+
+
+        # item.setFlags(
+        #     item.flags()
+        #     | Qt.ItemIsEnabled
+        # )
+        #
+#        print (f"this item: {item} is checkable: {checkable}")
+#         flags = item.flags()
+#         if checkable:
+#             flags |= QtCore.Qt.ItemIsUserCheckable
+#             item.setCheckState(0, QtCore.Qt.Unchecked)
+        # #else:
+        #     #flags &= ~QtCore.Qt.ItemIsUserCheckable
+        #
+        #
+        # item.setFlags(flags | QtCore.Qt.ItemIsSelectable)
+
         if parent is not None:
             parent.addChild(item)
+
         return item
+
+    def _make_item(
+        self,
+        text: str,
+        parent: QtWidgets.QTreeWidgetItem | None,
+        checkable: bool = True,
+    ) -> QtWidgets.QTreeWidgetItem:
+        item = QtWidgets.QTreeWidgetItem([text])
+
+        flags = item.flags() | QtCore.Qt.ItemIsEditable
+
+        if checkable:
+            flags |= QtCore.Qt.ItemIsUserCheckable
+            item.setCheckState(0, QtCore.Qt.Unchecked)
+        else:
+            flags &= ~QtCore.Qt.ItemIsUserCheckable
+
+        item.setFlags(flags)
+
+        if parent is not None:
+            parent.addChild(item)
+
+            # Parent is a folder → must be checkable
+            self._ensure_folder_checkable(parent)
+
+        return item
+
+
+    def set_item_checkable(
+        self,
+        item: QtWidgets.QTreeWidgetItem,
+        checkable: bool,
+        recursive: bool = False,
+        clear_state: bool = True,
+    ) -> bool:
+        """
+        Enable or disable the checkbox for an item.
+
+        Args:
+            item: target item
+            checkable: True = show checkbox, False = remove checkbox
+            recursive: apply to all descendants
+            clear_state: when disabling, force Unchecked state
+
+        Returns:
+            True if applied, False if item is None
+        """
+        if item is None:
+            return False
+
+        try:
+            self._updating = True
+
+            flags = item.flags()
+            if checkable:
+                flags |= QtCore.Qt.ItemIsUserCheckable
+            else:
+                flags &= ~QtCore.Qt.ItemIsUserCheckable
+
+            item.setFlags(flags)
+
+            if not checkable and clear_state:
+                item.setCheckState(0, QtCore.Qt.Unchecked)
+
+            if recursive:
+                for i in range(item.childCount()):
+                    self.set_item_checkable(
+                        item.child(i),
+                        checkable,
+                        recursive=True,
+                        clear_state=clear_state,
+                    )
+
+        finally:
+            self._updating = False
+
+        # Refresh parent partial state if needed
+        self._refresh_upwards(item)
+
+        return True
 
     # ----------------------------
     # Check logic + signals
@@ -897,10 +1068,10 @@ class CheckableTree(QtWidgets.QTreeWidget):
                 self._updating = False
 
             for leaf in self._iter_leaves(item):
-                self.leafToggled.emit(self._item_path(leaf), checked)
+                self.leafToggled.emit(item,self._item_path(leaf), checked)
             return
 
-        self.leafToggled.emit(self._item_path(item), checked)
+        self.leafToggled.emit(item,self._item_path(item), checked)
         try:
             self._updating = True
             self._update_parents(item)
@@ -918,7 +1089,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
     def _update_parents(self, item):
         parent = item.parent()
         while parent is not None:
-            parent.setCheckState(0, self._aggregate_state(parent))
+            #parent.setCheckState(0, self._aggregate_state(parent))
             parent = parent.parent()
 
     def _aggregate_state(self, parent):
@@ -975,18 +1146,27 @@ def setup_input_tree(self, root_label=None):
     self.input_tree = CheckableTree(self)
     self.input_tree.setHeaderHidden(True)
 
+
     self.input_tree.parentToggled.connect(self.on_parent_toggled)
     self.input_tree.leafToggled.connect(self.on_leaf_toggled)
+    self.input_tree.contextAction.connect(self.on_context_action)
+    #self.input_tree.structureChanged.connect(self.on_structure_changed)
 
     self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
     self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
 
+    setup_test_tree(self)
+    #self.input_tree.clear_tree()
+    #setup_test_tree(self)
+
+def setup_test_tree(self):
+
     self.c_well_root_item = self.input_tree.add_root("Wells")
 
     self.c_well_tops_folder = self.input_tree.add_root("Tops")
-    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder,"Stratigraphy")
-    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder,"Faults")
-    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder,"Other")
+    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder,"Stratigraphy", True)
+    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder,"Faults", True)
+    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder,"Other", True)
 
     self.c_logs_folder = self.input_tree.add_root("Logs")
 

@@ -48,7 +48,8 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
-from pywellsection.trees import setup_input_tree, setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
+from pywellsection.trees import (setup_input_tree, setup_well_widget_tree, setup_window_tree,
+                                 build_stratigraphic_column_tree, setup_test_tree)
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -625,6 +626,7 @@ class MainWindow(QMainWindow):
             # populate well tree
             self._populate_well_tree()
             self._populate_input_tree()
+            #self.setup_test_tree()
             self._populate_well_tops_tree()
             #self._populate_well_log_tree()
             self._populate_well_track_tree()
@@ -1309,6 +1311,28 @@ class MainWindow(QMainWindow):
         self.well_dock.setWidget(self.well_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
 
+    def setup_test_tree(self):
+
+        self.c_well_root_item = self.input_tree.add_root("Wells")
+
+        self.c_well_tops_folder = self.input_tree.add_root("Tops")
+        self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
+        self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
+        self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
+
+        self.c_logs_folder = self.input_tree.add_root("Logs")
+
+        self.c_tracks_folder = self.input_tree.add_root("Tracks")
+
+        self.input_tree.set_accept_children_drop(self.c_well_root_item, False)
+        self.input_tree.set_accept_children_drop(self.c_logs_folder, False)
+        self.input_tree.set_accept_children_drop(self.c_tracks_folder, False)
+        self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
+        self.input_tree.set_accept_children_drop(self.c_faults_root, False)
+        self.input_tree.set_accept_children_drop(self.c_other_root, False)
+
+
+
     def _populate_input_tree(self):
 
         prev_selected = set()
@@ -1318,53 +1342,95 @@ class MainWindow(QMainWindow):
             if it.checkState(0) == Qt.Checked:
                 prev_selected.add(it.data(0, Qt.UserRole))
 
-        self.input_tree.blockSignals(True)
-        root.takeChildren()
+        self.input_tree.remove_all_children(root)
+        #root.clear()
+        #self.input_tree.clear_tree()
+
+        # self.input_tree.parentToggled.connect(self.on_parent_toggled)
+        # self.input_tree.leafToggled.connect(self.on_leaf_toggled)
+        # self.input_tree.contextAction.connect(self.on_context_action)
+        # # self.input_tree.structureChanged.connect(self.on_structure_changed)
+        #
+        # self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        # self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+        #
+        #self.c_well_root_item = self.input_tree.add_root("Wells")
+        #
+        # self.c_well_tops_folder = self.input_tree.add_root("Tops")
+        # self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
+        # self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
+        # self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
+        #
+        # self.c_logs_folder = self.input_tree.add_root("Logs")
+        #
+        # self.c_tracks_folder = self.input_tree.add_root("Tracks")
+        #
+        # self.input_tree.set_accept_children_drop(self.c_well_root_item, False)
+        # self.input_tree.set_accept_children_drop(self.c_logs_folder, False)
+        # self.input_tree.set_accept_children_drop(self.c_tracks_folder, False)
+        # self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
+        # self.input_tree.set_accept_children_drop(self.c_faults_root, False)
+        # self.input_tree.set_accept_children_drop(self.c_other_root, False)
+
+        # Rebuild the well tree
 
         for w in self.all_wells:
             well_name = w.get("name") or "UNKNOWN"
-            it = self.input_tree.add_parent(root,well_name)
+            it = self.input_tree.add_parent(root,well_name, True)
             #it.setData(0, Qt.UserRole, well_name)
-            state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
+            #state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
             #it.setCheckState(0, state)
             #self.input_tree.set_accept_children_drop(it, False)
 
             # --- subfolders ---
-            logs_folder = self.input_tree.add_parent(it, "Logs")
-            completions_folder = self.input_tree.add_parent(it, "Completions")
-            cont_folder = self.input_tree.add_parent (logs_folder,"continuous")
-            disc_folder = self.input_tree.add_parent (logs_folder,"discrete")
-            bmp_folder = self.input_tree.add_parent (logs_folder,"bitmap")
+            logs_folder = self.input_tree.add_parent(it, "Logs", False)
+            completions_folder = self.input_tree.add_parent(it, "Completions", False)
+            cont_folder = self.input_tree.add_parent(logs_folder,"continuous", False)
+            disc_folder = self.input_tree.add_parent(logs_folder,"discrete", False)
+            bmp_folder = self.input_tree.add_parent(logs_folder,"bitmap", False)
 
-            # logs_folder.setExpanded(False)
-            # cont_folder.setExpanded(False)
-            # #lith_folder.setExpanded(True)
-            # disc_folder.setExpanded(False)
-            # bmp_folder.setExpanded(False)
+            logs_folder.setExpanded(False)
+            self.input_tree.set_accept_children_drop(logs_folder, False)
+            cont_folder.setExpanded(False)
+            #lith_folder.setExpanded(False)
+            disc_folder.setExpanded(False)
+            bmp_folder.setExpanded(False)
 
             # --- log leaves (informational, not checkable) ---
             logs_dict = w.get("logs", {}) or {}
             if logs_dict:
-                parent_for_logs = cont_folder  # direct children of the well
-
                 for log_name in sorted(logs_dict.keys()):
-                    self.input_tree.add_leaf(parent_for_logs, log_name)
-                    #
-                    # log_item = QTreeWidgetItem([log_name])
-                    # # selectable but not user-checkable
-                    # log_item.setFlags(
-                    #     log_item.flags()
-                    #     | Qt.ItemIsSelectable
-                    #     | Qt.ItemIsEnabled
-                    # )
-                    # # store mnemonic for possible future actions
-                    # log_item.setData(0, Qt.UserRole, ("well_log", well_name, log_name))
-                    # parent_for_logs.addChild(log_item)
+                    l=self.input_tree.add_leaf(cont_folder, log_name, False)
+                    l.setFlags(
+                        l.flags()
+                        | Qt.ItemIsSelectable
+                        | Qt.ItemIsEnabled
+                    )
+                    l.setData(0, Qt.UserRole, ("well_log", well_name, log_name))
+                    #print(l.data(0, Qt.UserRole))
 
-            #for l  in self.input_tree._iter_leaves(root):
+            # --- discrete logs ---
+            dlogs = (w.get("discrete_logs") or {})
+            if dlogs:
+                for dlog_name in sorted(dlogs.keys(), key=str):
+                    dlog_item = self.input_tree.add_leaf(disc_folder, dlog_name, False)
+                    dlog_item.setData(0, Qt.UserRole, ("Discrete", well_name, dlog_name))
+
+            # --- bitmaps ---
+            blogs = (w.get("bitmaps", None) or {})
+            if blogs:
+                for blog_name in sorted(blogs.keys(), key=str):
+                    blog_item = self.input_tree.add_leaf(bmp_folder, blog_name, False)
+                    blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
+
+            # for l  in self.input_tree._iter_leaves(logs_folder):
             #    self.input_tree.set_accept_children_drop(l, False)
             #    l.setExpanded(False)
 
+            #self.input_tree.set_item_checkable(logs_folder, False)
+            self.input_tree.set_accept_children_drop(logs_folder, False)
+
+        self.input_tree.blockSignals(False)
 
         return
 
@@ -1763,7 +1829,7 @@ class MainWindow(QMainWindow):
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
-        #LOG.debug(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
+        print(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
         #self.panel.set_draw_well_panel(False)
 
         if item.data(0, Qt.UserRole) is None:
@@ -4365,10 +4431,12 @@ class MainWindow(QMainWindow):
         print(msg)
         self.statusBar().showMessage(msg)
 
-    @QtCore.Slot(str, bool)
-    def on_leaf_toggled(self, path, checked):
+    @QtCore.Slot(object, str, bool)
+    def on_leaf_toggled(self, object, path, checked):
         msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
         print(msg)
+        print(object)
+        self._on_well_tree_item_changed(object,0)
         self.statusBar().showMessage(msg)
 
     @QtCore.Slot(str, str)
