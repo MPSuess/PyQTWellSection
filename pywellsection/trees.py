@@ -11,6 +11,12 @@ import logging
 LOG = logging.getLogger(__name__)
 LOG.setLevel("INFO")
 
+# ---- Checkability policy ----
+LEAF_ALWAYS_CHECKABLE = 1
+LEAF_NEVER_CHECKABLE = 2
+
+_CHECK_POLICY_ROLE = QtCore.Qt.UserRole + 200
+
 def setup_window_tree(self):
     self.window_tree = QTreeWidget(self)
     self.window_tree.setHeaderHidden(True)
@@ -605,6 +611,16 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # Build helpers
     # ----------------------------
 
+    def set_check_policy(self, item: QtWidgets.QTreeWidgetItem, policy: int):
+        """
+        Store checkability policy on the item.
+        """
+        item.setData(0, self._CHECK_POLICY_ROLE, policy)
+
+    def check_policy(self, item: QtWidgets.QTreeWidgetItem) -> int | None:
+        return item.data(0, self._CHECK_POLICY_ROLE)
+
+
     def _ensure_folder_checkable(self, item: QtWidgets.QTreeWidgetItem):
         """
         If an item has children, it must be checkable.
@@ -1078,7 +1094,26 @@ class CheckableTree(QtWidgets.QTreeWidget):
         finally:
             self._updating = False
 
-    def _set_subtree_checkstate(self, root, state):
+    def _set_subtree_checkstate(self, root: QtWidgets.QTreeWidgetItem, state: QtCore.Qt.CheckState):
+        """
+        Apply check state only to folders (items with children).
+        Leaves never get a check state.
+        """
+        if state == QtCore.Qt.PartiallyChecked:
+            return
+
+        for i in range(root.childCount()):
+            child = root.child(i)
+
+            if child.childCount() > 0:
+                # child is a folder -> can be checked
+                child.setCheckState(0, state)
+                self._set_subtree_checkstate(child, state)
+            else:
+                # child is a leaf -> ensure no checkbox / state role exists
+                self._ensure_leaf_not_checkable(child)
+
+    def _set_subtree_checkstateo(self, root, state):
         if state == QtCore.Qt.PartiallyChecked:
             return
         for i in range(root.childCount()):
