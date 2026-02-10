@@ -1,8 +1,11 @@
 from PySide6.QtWidgets import (
     QDockWidget, QTreeWidget,
-    QTreeWidgetItem, )
+    QTreeWidgetItem)
+
+from PySide6 import QtWidgets, QtCore, QtGui
 
 from PySide6.QtCore import Qt
+
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -27,7 +30,6 @@ def setup_window_tree(self):
     )
     self.window_root.setCheckState(0, Qt.Unchecked)
     self.window_tree.addTopLevelItem(self.window_root)
-
 
 def setup_well_widget_tree(self):
     ### --- Define the Input Tree ###
@@ -174,7 +176,6 @@ def setup_well_widget_tree(self):
     )
     self.stratigraphy_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.stratigraphy_root_item)
-
 
 def build_stratigraphic_column_tree(tree_widget, strat_data):
     """
@@ -990,7 +991,6 @@ def setup_checkable_tree(self, root_label=None):
     self.c_logs_folder = self.checkable_tree.add_root("Logs")
 
     self.c_tracks_folder = self.checkable_tree.add_root("Tracks")
-
 
     self.checkable_tree.set_accept_children_drop(self.c_well_root_item, False)
     self.checkable_tree.set_accept_children_drop(self.c_logs_folder, False)

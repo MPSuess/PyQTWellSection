@@ -48,7 +48,7 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
-from pywellsection.trees import setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
+from pywellsection.trees import setup_checkable_tree, setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -200,6 +200,7 @@ class MainWindow(QMainWindow):
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
         setup_well_widget_tree(self)
+        setup_checkable_tree(self)
         setup_window_tree(self)
 
         ### Setup the Dock
