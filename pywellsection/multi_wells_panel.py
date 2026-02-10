@@ -512,7 +512,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             spine.set_visible(spine_name == "top")
 
         # Stack multiple logs upwards
-        offset_spine = 1.0 + j * 0.08
+        offset_spine = 1.0 + j * 0.05
         twin_ax.spines["top"].set_position(("axes", offset_spine))
 
         xscale = log_cfg.get("xscale", "linear")
@@ -1056,7 +1056,7 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
                         continue
                     if stratigraphy[name_upper]['role']=='stratigraphy':
                         for ti in range(n_tracks):
-                            col_idx = first_track_idx + ti
+                            col_idx = first_track_idx + ti +1
                             base_ax = axes[col_idx]
                             base_ax.axhspan(
                                 d1,
