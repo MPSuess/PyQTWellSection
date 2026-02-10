@@ -278,7 +278,6 @@ def build_stratigraphic_column_tree(tree_widget, strat_data):
     root_item.setExpanded(True)
     tree_widget.expandItem(root_item)
 
-
 class CheckableTree(QtWidgets.QTreeWidget):
     """
     QTreeWidget with:
@@ -445,6 +444,19 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         self._refresh_upwards(item)
         return item
+
+    def add_checkable_folder(
+        self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str
+    ) -> QtWidgets.QTreeWidgetItem:
+        """
+        Add a folder with NO checkbox (but can contain checkable descendants).
+        """
+        folder = self.add_parent(parent_item, text)
+        #self.set_check_policy(folder, self.FOLDER_NEVER_CHECKABLE)
+        #self._apply_check_policy(folder)
+        self._refresh_upwards(folder)
+        return folder
+
 
     def add_noncheckable_folder(
         self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str
@@ -976,7 +988,9 @@ class CheckableTree(QtWidgets.QTreeWidget):
     def _on_item_changed(self, item: QtWidgets.QTreeWidgetItem, column: int):
         if column != 0 or self._updating:
             return
+        self.blockSignals(True)
         self._handle_user_toggle(item)
+        self.blockSignals(False)
 
     def _handle_user_toggle(self, item: QtWidgets.QTreeWidgetItem):
         # Enforce policy and ignore non-checkable items
@@ -2057,13 +2071,12 @@ def setup_input_tree(self, root_label=None):
 
 def setup_test_tree(self):
 
-    self.input_tree.blockSignals(True)
     self.c_well_root_item = self.input_tree.add_root("Wells")
 
-    self.c_well_tops_folder = self.input_tree.add_root("Tops")
-    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder,"Stratigraphy")
-    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder,"Faults")
-    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder,"Other")
+    self.c_well_tops_folder = self.input_tree.add_root("Wells Tops")
+    self.c_stratigraphy_root = self.input_tree.add_checkable_folder(self.c_well_tops_folder,"Stratigraphy")
+    self.c_faults_root = self.input_tree.add_checkable_folder(self.c_well_tops_folder,"Faults")
+    self.c_other_root = self.input_tree.add_checkable_folder(self.c_well_tops_folder,"Other")
 
     self.c_logs_folder = self.input_tree.add_root("Logs")
 
@@ -2078,7 +2091,6 @@ def setup_test_tree(self):
 
     #self.input_tree.setCurrentItem(c_wells_root)
 
-    self.input_tree.blockSignals(False)
     # Build from external demo data
 
     self.statusBar().showMessage("Toggle a checkbox...")
