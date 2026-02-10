@@ -48,7 +48,7 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
-from pywellsection.trees import setup_checkable_tree, setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
+from pywellsection.trees import setup_input_tree, setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
         setup_well_widget_tree(self)
-        setup_checkable_tree(self)
+        setup_input_tree(self)
         setup_window_tree(self)
 
         ### Setup the Dock
@@ -215,6 +215,11 @@ class MainWindow(QMainWindow):
         self.window_dock.setWidget(self.window_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.window_dock)
 
+        self.Input_Dock = QDockWidget("New Input", self)
+        self.Input_Dock.setObjectName("New Input")
+        self.Input_Dock.setWidget(self.input_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.Input_Dock)
+
         self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
         self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
         self.resizeDocks([self.dock, self.dock_console], [4, 1], Qt.Vertical)
@@ -222,6 +227,7 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(self.dock_console, self.dock_commands)
         self.tabifyDockWidget(self.dock_commands, self.dock_logger)
         self.tabifyDockWidget(self.well_dock, self.window_dock)
+        self.tabifyDockWidget(self.window_dock, self.Input_Dock)
         self.dock_console.raise_()
         self.well_dock.raise_()
 
@@ -618,6 +624,7 @@ class MainWindow(QMainWindow):
 
             # populate well tree
             self._populate_well_tree()
+            self._populate_input_tree()
             self._populate_well_tops_tree()
             #self._populate_well_log_tree()
             self._populate_well_track_tree()
@@ -1060,8 +1067,6 @@ class MainWindow(QMainWindow):
         strat = _load_BEEE_stratigraphy(path)
         build_stratigraphic_column_tree(self.well_tree,strat)
 
-
-
     def _file_load_tops_from_csv(self, path: str):
         """
         Load formation / fault tops from a CSV file with columns:
@@ -1303,6 +1308,67 @@ class MainWindow(QMainWindow):
 
         self.well_dock.setWidget(self.well_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+
+    def _populate_input_tree(self):
+
+        prev_selected = set()
+        root = self.c_well_root_item
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        self.input_tree.blockSignals(True)
+        root.takeChildren()
+
+        for w in self.all_wells:
+            well_name = w.get("name") or "UNKNOWN"
+            it = self.input_tree.add_parent(root,well_name)
+            #it.setData(0, Qt.UserRole, well_name)
+            state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
+            #it.setCheckState(0, state)
+            #self.input_tree.set_accept_children_drop(it, False)
+
+            # --- subfolders ---
+            logs_folder = self.input_tree.add_parent(it, "Logs")
+            completions_folder = self.input_tree.add_parent(it, "Completions")
+            cont_folder = self.input_tree.add_parent (logs_folder,"continuous")
+            disc_folder = self.input_tree.add_parent (logs_folder,"discrete")
+            bmp_folder = self.input_tree.add_parent (logs_folder,"bitmap")
+
+            # logs_folder.setExpanded(False)
+            # cont_folder.setExpanded(False)
+            # #lith_folder.setExpanded(True)
+            # disc_folder.setExpanded(False)
+            # bmp_folder.setExpanded(False)
+
+            # --- log leaves (informational, not checkable) ---
+            logs_dict = w.get("logs", {}) or {}
+            if logs_dict:
+                parent_for_logs = cont_folder  # direct children of the well
+
+                for log_name in sorted(logs_dict.keys()):
+                    self.input_tree.add_leaf(parent_for_logs, log_name)
+                    #
+                    # log_item = QTreeWidgetItem([log_name])
+                    # # selectable but not user-checkable
+                    # log_item.setFlags(
+                    #     log_item.flags()
+                    #     | Qt.ItemIsSelectable
+                    #     | Qt.ItemIsEnabled
+                    # )
+                    # # store mnemonic for possible future actions
+                    # log_item.setData(0, Qt.UserRole, ("well_log", well_name, log_name))
+                    # parent_for_logs.addChild(log_item)
+
+            #for l  in self.input_tree._iter_leaves(root):
+            #    self.input_tree.set_accept_children_drop(l, False)
+            #    l.setExpanded(False)
+
+
+        return
+
+
 
     def _populate_well_tree(self):
         """Rebuild wells subtree from self.all_wells, with log leaves under each well."""
@@ -4292,3 +4358,35 @@ class MainWindow(QMainWindow):
         for w in self.WindowList:
             w.window_deactivated()
 
+
+    @QtCore.Slot(str, bool)
+    def on_parent_toggled(self, path, checked):
+        msg = f"PARENT toggled: {path} -> {'checked' if checked else 'unchecked'}"
+        print(msg)
+        self.statusBar().showMessage(msg)
+
+    @QtCore.Slot(str, bool)
+    def on_leaf_toggled(self, path, checked):
+        msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
+        print(msg)
+        self.statusBar().showMessage(msg)
+
+    @QtCore.Slot(str, str)
+    def on_context_action(self, path, action):
+        if path:
+            print(f"CONTEXT action: {action} on {path}")
+        else:
+            print(f"CONTEXT action: {action}")
+
+    @QtCore.Slot(str, str)
+    def on_context_action(self, path, action):
+        # Optional: observe context menu actions
+        if path:
+            print(f"CONTEXT action: {action} on {path}")
+        else:
+            print(f"CONTEXT action: {action}")
+        # keep status bar useful but not too spammy
+        if path:
+            self.statusBar().showMessage(f"{action}: {path}")
+        else:
+            self.statusBar().showMessage(f"{action}")

@@ -971,41 +971,41 @@ class CheckableTree(QtWidgets.QTreeWidget):
         finally:
             self._updating = False
 
-def setup_checkable_tree(self, root_label=None):
-    self.checkable_tree = CheckableTree(self)
-    self.checkable_tree.setHeaderHidden(True)
+def setup_input_tree(self, root_label=None):
+    self.input_tree = CheckableTree(self)
+    self.input_tree.setHeaderHidden(True)
 
-    self.checkable_tree.parentToggled.connect(self.on_parent_toggled)
-    self.checkable_tree.leafToggled.connect(self.on_leaf_toggled)
+    self.input_tree.parentToggled.connect(self.on_parent_toggled)
+    self.input_tree.leafToggled.connect(self.on_leaf_toggled)
 
-    self.checkable_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-    self.checkable_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+    self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
 
-    self.c_well_root_item = self.checkable_tree.add_root("Wells")
+    self.c_well_root_item = self.input_tree.add_root("Wells")
 
-    self.c_well_tops_folder = self.checkable_tree.add_root("Tops")
-    self.c_stratigraphy_root = self.checkable_tree.add_parent(self.c_well_tops_folder,"Stratigraphy")
-    self.c_faults_root = self.checkable_tree.add_parent(self.c_well_tops_folder,"Faults")
-    self.c_other_root = self.checkable_tree.add_parent(self.c_well_tops_folder,"Other")
+    self.c_well_tops_folder = self.input_tree.add_root("Tops")
+    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder,"Stratigraphy")
+    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder,"Faults")
+    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder,"Other")
 
-    self.c_logs_folder = self.checkable_tree.add_root("Logs")
+    self.c_logs_folder = self.input_tree.add_root("Logs")
 
-    self.c_tracks_folder = self.checkable_tree.add_root("Tracks")
+    self.c_tracks_folder = self.input_tree.add_root("Tracks")
 
-    self.checkable_tree.set_accept_children_drop(self.c_well_root_item, False)
-    self.checkable_tree.set_accept_children_drop(self.c_logs_folder, False)
-    self.checkable_tree.set_accept_children_drop(self.c_tracks_folder, False)
-    self.checkable_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
-    self.checkable_tree.set_accept_children_drop(self.c_faults_root, False)
-    self.checkable_tree.set_accept_children_drop(self.c_other_root, False)
+    self.input_tree.set_accept_children_drop(self.c_well_root_item, False)
+    self.input_tree.set_accept_children_drop(self.c_logs_folder, False)
+    self.input_tree.set_accept_children_drop(self.c_tracks_folder, False)
+    self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
+    self.input_tree.set_accept_children_drop(self.c_faults_root, False)
+    self.input_tree.set_accept_children_drop(self.c_other_root, False)
 
-    #self.checkable_tree.setCurrentItem(c_wells_root)
+    #self.input_tree.setCurrentItem(c_wells_root)
 
 
     # Build from external demo data
 
     self.statusBar().showMessage("Toggle a checkbox...")
-    #self.checkable_tree.build_tree(build_demo_data())
+    #self.input_tree.build_tree(build_demo_data())
 
 def build_demo_data():
     """
