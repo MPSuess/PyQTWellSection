@@ -1462,6 +1462,486 @@ class  WellPanelWidget(QWidget):
 
         return wells
 
+    def add_visible_well_by_name(self, well_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a well (by name) to this panel's visible_wells list.
+        Keeps order stable (appends if not already present).
+
+        Returns True if the well was added (or already present), False if name not found in panel.wells.
+        """
+        well_name = (well_name or "").strip()
+        if not well_name:
+            return False
+
+        wells = getattr(self, "wells", []) or []
+        all_names = [w.get("name", "") for w in wells if w.get("name")]
+
+        if well_name not in all_names:
+            return False
+
+        # Ensure visible_wells list exists (None means "all wells visible")
+        vw = getattr(self, "visible_wells", None)
+        if vw is None:
+            vw = list(all_names)  # start from "all"
+            self.visible_wells = vw
+
+        if vw == set():
+            vw = list()
+
+        if well_name not in vw:
+            vw.append(well_name)
+
+        # Keep optional explicit ordering consistent
+        if hasattr(self, "well_order"):
+            wo = getattr(self, "well_order", None)
+            if wo is None:
+                self.well_order = list(vw)
+            elif well_name not in wo:
+                wo.append(well_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_well_by_name(self, well_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a well (by name) from this panel's visible_wells list.
+
+        Returns
+        -------
+        bool
+            True if removal happened,
+            False if well not found or not currently visible.
+        """
+        well_name = (well_name or "").strip()
+        if not well_name:
+            return False
+
+        wells = getattr(self, "wells", []) or []
+        all_names = [w.get("name", "") for w in wells if w.get("name")]
+
+        if well_name not in all_names:
+            return False
+
+        vw = getattr(self, "visible_wells", None)
+
+        # If visible_wells is None, it means "all wells visible"
+        if vw is None:
+            # Initialize explicit list excluding the removed well
+            self.visible_wells = [n for n in all_names if n != well_name]
+        else:
+            if well_name not in vw:
+                return False
+            self.visible_wells = [n for n in vw if n != well_name]
+
+        # Keep well_order consistent
+        if hasattr(self, "well_order"):
+            wo = getattr(self, "well_order", None)
+            if isinstance(wo, list):
+                self.well_order = [n for n in wo if n != well_name]
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def add_visible_top_by_name(self, top_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a stratigraphic unit/top (by name) to this panel's visible_tops filter.
+
+        Semantics:
+          - visible_tops is None  => all tops are visible (no filtering)
+          - visible_tops is list  => only listed tops are visible
+        This function ensures top_name becomes visible under both semantics.
+
+        Returns True if top_name is valid and ends up visible, False if top_name unknown.
+        """
+        top_name = (top_name or "").strip()
+        if not top_name:
+            return False
+
+        # determine known tops from project stratigraphy if available
+        known = set()
+        strat = getattr(self, "stratigraphy", None)
+        if isinstance(strat, dict):
+            known.update(strat.keys())
+
+        # also accept tops that exist in any well (helps when stratigraphy dict is incomplete)
+        for w in (getattr(self, "wells", None) or []):
+            tops = w.get("tops") or {}
+            known.update(tops.keys())
+
+        if known and top_name not in known:
+            return False
+
+        vt = getattr(self, "visible_tops", None)
+
+        if vt is None:
+            # all visible already
+            if redraw:
+                self.draw_well_panel()
+            return True
+
+        if vt == set():
+            vt = list()
+
+        if top_name not in vt:
+            vt.append(top_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_top_by_name(self, top_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a stratigraphic unit/top (by name) from this panel's visible_tops filter.
+
+        Semantics:
+          - visible_tops is None  => all tops visible; removing one requires turning
+                                    the filter into an explicit list of known tops minus this one.
+          - visible_tops is list  => remove from the list.
+
+        Returns True if removal happened, False otherwise.
+        """
+        top_name = (top_name or "").strip()
+        if not top_name:
+            return False
+
+        # gather known tops (same as in add)
+        known = set()
+        strat = getattr(self, "stratigraphy", None)
+        if isinstance(strat, dict):
+            known.update(strat.keys())
+        for w in (getattr(self, "wells", None) or []):
+            tops = w.get("tops") or {}
+            known.update(tops.keys())
+
+        vt = getattr(self, "visible_tops", None)
+
+        if vt is None:
+            # all visible -> convert to explicit list excluding top_name
+            if known and top_name not in known:
+                return False
+            self.visible_tops = sorted([nm for nm in known if nm != top_name])
+            changed = True
+        else:
+            if top_name not in vt:
+                return False
+            self.visible_tops = [nm for nm in vt if nm != top_name]
+            changed = True
+
+        if changed and redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def add_visible_track_by_name(self, track_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a track (by name) to this panel's visible_tracks filter.
+
+        Returns
+        -------
+        bool
+            True if track is valid and visible afterwards,
+            False if track name does not exist.
+        """
+        track_name = (track_name or "").strip()
+        if not track_name:
+            return False
+
+        tracks = getattr(self, "tracks", []) or []
+        all_names = [t.get("name", "") for t in tracks if t.get("name")]
+
+        if track_name not in all_names:
+            return False
+
+        vt = getattr(self, "visible_tracks", None)
+
+        if vt is None:
+            # already all visible
+            if redraw:
+                self.draw_well_panel()
+            return True
+
+        if track_name not in vt:
+            vt.append(track_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_track_by_name(self, track_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a track (by name) from this panel's visible_tracks filter.
+
+        Returns
+        -------
+        bool
+            True if removal happened,
+            False if track not found or already hidden.
+        """
+        track_name = (track_name or "").strip()
+        if not track_name:
+            return False
+
+        tracks = getattr(self, "tracks", []) or []
+        all_names = [t.get("name", "") for t in tracks if t.get("name")]
+
+        if track_name not in all_names:
+            return False
+
+        vt = getattr(self, "visible_tracks", None)
+
+        if vt is None:
+            # convert from "all visible" to explicit list excluding this track
+            self.visible_tracks = [n for n in all_names if n != track_name]
+        else:
+            if track_name not in vt:
+                return False
+            self.visible_tracks = [n for n in vt if n != track_name]
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def add_visible_log_by_name(self, log_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a log (by name) to this panel's visible_logs filter.
+
+        Returns
+        -------
+        bool
+            True if log is valid and visible afterwards,
+            False if log name does not exist.
+        """
+        log_name = (log_name or "").strip()
+        if not log_name:
+            return False
+
+        # Collect all known log names from panel wells
+        all_logs = set()
+        for w in (getattr(self, "wells", None) or []):
+            logs = w.get("logs") or {}
+            all_logs.update(logs.keys())
+
+        if log_name not in all_logs:
+            return False
+
+        vl = getattr(self, "visible_logs", None)
+
+        if vl is None:
+            # already all visible
+            if redraw:
+                self.draw_well_panel()
+            return True
+
+        if log_name not in vl:
+            vl.append(log_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_log_by_name(self, log_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a log (by name) from this panel's visible_logs filter.
+
+        Returns
+        -------
+        bool
+            True if removal happened,
+            False if log not found or already hidden.
+        """
+        log_name = (log_name or "").strip()
+        if not log_name:
+            return False
+
+        # Collect known logs
+        all_logs = set()
+        for w in (getattr(self, "wells", None) or []):
+            logs = w.get("logs") or {}
+            all_logs.update(logs.keys())
+
+        if log_name not in all_logs:
+            return False
+
+        vl = getattr(self, "visible_logs", None)
+
+        if vl is None:
+            # convert from "all visible" to explicit list excluding this log
+            self.visible_logs = sorted(n for n in all_logs if n != log_name)
+        else:
+            if log_name not in vl:
+                return False
+            self.visible_logs = [n for n in vl if n != log_name]
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def add_visible_discrete_log_by_name(self, log_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a discrete log (by name) to this panel's visible_discrete_logs filter.
+
+        Returns
+        -------
+        bool
+            True if log exists and is visible afterwards,
+            False if log does not exist.
+        """
+        log_name = (log_name or "").strip()
+        if not log_name:
+            return False
+
+        # Collect all known discrete logs from panel wells
+        all_logs = set()
+        for w in (getattr(self, "wells", None) or []):
+            dlogs = w.get("discrete_logs") or {}
+            all_logs.update(dlogs.keys())
+
+        if log_name not in all_logs:
+            return False
+
+        vdl = getattr(self, "visible_discrete_logs", None)
+
+        if vdl is None:
+            # already all visible
+            if redraw:
+                self.draw_well_panel()
+            return True
+
+        if log_name not in vdl:
+            vdl.append(log_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_discrete_log_by_name(self, log_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a discrete log (by name) from this panel's visible_discrete_logs filter.
+
+        Returns
+        -------
+        bool
+            True if removal happened,
+            False if log not found or already hidden.
+        """
+        log_name = (log_name or "").strip()
+        if not log_name:
+            return False
+
+        # Collect known discrete logs
+        all_logs = set()
+        for w in (getattr(self, "wells", None) or []):
+            dlogs = w.get("discrete_logs") or {}
+            all_logs.update(dlogs.keys())
+
+        if log_name not in all_logs:
+            return False
+
+        vdl = getattr(self, "visible_discrete_logs", None)
+
+        if vdl is None:
+            # convert from "all visible" to explicit list excluding this log
+            self.visible_discrete_logs = sorted(n for n in all_logs if n != log_name)
+        else:
+            if log_name not in vdl:
+                return False
+            self.visible_discrete_logs = [n for n in vdl if n != log_name]
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def add_visible_bitmap_by_name(self, bitmap_name: str, *, redraw: bool = True) -> bool:
+        """
+        Add a bitmap (by name) to this panel's visible_bitmaps_logs filter.
+
+        Returns
+        -------
+        bool
+            True if bitmap exists and is visible afterwards,
+            False if bitmap does not exist.
+        """
+        bitmap_name = (bitmap_name or "").strip()
+        if not bitmap_name:
+            return False
+
+        # Collect all known bitmaps across wells
+        all_bitmaps = set()
+        for w in (getattr(self, "wells", None) or []):
+            bitmaps = w.get("bitmaps") or {}
+            all_bitmaps.update(bitmaps.keys())
+
+        if bitmap_name not in all_bitmaps:
+            return False
+
+        vbl = getattr(self, "visible_bitmaps", None)
+
+        if vbl is None:
+            # already all visible
+            if redraw:
+                self.draw_well_panel()
+            return True
+
+        if bitmap_name not in vbl:
+            vbl.append(bitmap_name)
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+    def remove_visible_bitmap_by_name(self, bitmap_name: str, *, redraw: bool = True) -> bool:
+        """
+        Remove a bitmap (by name) from this panel's visible_bitmaps_logs filter.
+
+        Returns
+        -------
+        bool
+            True if removal happened,
+            False if bitmap not found or already hidden.
+        """
+        bitmap_name = (bitmap_name or "").strip()
+        if not bitmap_name:
+            return False
+
+        # Collect known bitmaps
+        all_bitmaps = set()
+        for w in (getattr(self, "wells", None) or []):
+            bitmaps = w.get("bitmaps") or {}
+            all_bitmaps.update(bitmaps.keys())
+
+        if bitmap_name not in all_bitmaps:
+            return False
+
+        vbl = getattr(self, "visible_bitmaps", None)
+
+        if vbl is None:
+            # convert from "all visible" to explicit list excluding this bitmap
+            self.visible_bitmaps = sorted(n for n in all_bitmaps if n != bitmap_name)
+        else:
+            if bitmap_name not in vbl:
+                return False
+            self.visible_bitmaps = [n for n in vbl if n != bitmap_name]
+
+        if redraw:
+            self.draw_well_panel()
+
+        return True
+
+
+
+
 
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated
