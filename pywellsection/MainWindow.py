@@ -760,7 +760,7 @@ class MainWindow(QMainWindow):
             # just copy the new data.json into the existing data_dir
                 shutil.copy2(tmp_data_json, data_dir)
                 shutil.rmtree(tmp_dir)
-            elif old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
+            elif old_path and old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
                     o_path, ofname = os.path.split(old_path)
                     oproject_stem = os.path.splitext(ofname)[0]
                     o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
@@ -1209,7 +1209,7 @@ class MainWindow(QMainWindow):
         self.stratigraphy = strat
 
         # ---- update well_panel ----
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.stratigraphy = self.stratigraphy
             # keep zoom/flatten; if you want to reset, uncomment:
@@ -2237,6 +2237,7 @@ class MainWindow(QMainWindow):
         #LOG.debug(f"rebuild_wells_from_tree: {checked_names}")
 
         self.panel.set_visible_wells(checked_names)
+        self.panel.set_draw_well_panel(True)
         self.panel.draw_well_panel()
 
     def _rebuild_visible_tops_from_tree(self):
@@ -2482,7 +2483,7 @@ class MainWindow(QMainWindow):
         del self.all_tracks[idx]
 
         # keep well_panel in sync
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
 
             # clean up visible_tracks if needed
@@ -2582,7 +2583,7 @@ class MainWindow(QMainWindow):
         self.all_stratigraphy = new_strat
 
         # 2) push into well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.stratigraphy = new_strat
 
             # flattening uses strat key order:
@@ -2715,7 +2716,7 @@ class MainWindow(QMainWindow):
             tops[top_name] = depth
 
         # --- redraw well_panel with updated tops ---
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -2741,7 +2742,7 @@ class MainWindow(QMainWindow):
         self.all_wells.append(new_well)
 
         # Update well_panel wells (keep tracks & stratigraphy)
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # you might want to reset flattening or keep it; here we keep zoom/flatten
             self.panel.draw_well_panel()
@@ -2787,7 +2788,7 @@ class MainWindow(QMainWindow):
         self.tracks.append(new_track)
 
         # push to well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.tracks
             self.panel.draw_well_panel()
 
@@ -2868,7 +2869,7 @@ class MainWindow(QMainWindow):
         disc_cfg["default_color"] = new_default
 
         # redraw well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
@@ -2900,7 +2901,7 @@ class MainWindow(QMainWindow):
             w["total_depth"] = hdr["total_depth"]
 
         # push into well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep current zoom; if you want to reset, uncomment:
             # self.panel.current_depth_window = None
@@ -2942,7 +2943,7 @@ class MainWindow(QMainWindow):
         well["total_depth"] = hdr["total_depth"]
 
         # update well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep zoom/flatten; if you want to reset, uncomment:
             # self.panel.current_depth_window = None
@@ -2995,7 +2996,7 @@ class MainWindow(QMainWindow):
         well["reference_depth"] = hdr["reference_depth"]
         well["total_depth"] = hdr["total_depth"]
 
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -3061,7 +3062,7 @@ class MainWindow(QMainWindow):
         facies_cfg["spline"] = params["spline"]
 
         # redraw well_panel so changes take effect
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
@@ -3095,7 +3096,7 @@ class MainWindow(QMainWindow):
             well["facies_intervals"] = list(intervals)
 
         # redraw well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -3204,7 +3205,7 @@ class MainWindow(QMainWindow):
         }
 
         # Redraw
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.tracks = self.tracks
             self.panel.draw_well_panel()
@@ -3292,7 +3293,7 @@ class MainWindow(QMainWindow):
         #        self._ensure_bitmap_track_exists()
 
         # push into well_panel & redraw
-        # if hasattr(self, "well_panel"):
+        # if hasattr(self, "panel"):
         #     self.panel.wells = self.all_wells
         #     self.panel.tracks = self.tracks
         #     self.panel.draw_well_panel()
@@ -3676,7 +3677,7 @@ class MainWindow(QMainWindow):
         #             log_cfg.pop("xlim", None)  # auto scale
         #
         # # 4) Sync with well_panel and redraw
-        # if hasattr(self, "well_panel"):
+        # if hasattr(self, "panel"):
         #     self.panel.tracks = self.all_tracks
         #     self.panel.draw_well_panel()
 
@@ -3779,7 +3780,7 @@ class MainWindow(QMainWindow):
             self._refresh_all_well_panels()
         else:
             # fallback
-            if hasattr(self, "well_panel"):
+            if hasattr(self, "panel"):
                 self.panel.wells = self.all_wells
                 self.panel.draw_well_panel()
         self._redraw_all_panels()
@@ -3788,7 +3789,7 @@ class MainWindow(QMainWindow):
         """
         Yield central well_panel + dock well_panels (if available).
         """
-        if hasattr(self, "well_panel") and self.panel is not None:
+        if hasattr(self, "panel") and self.panel is not None:
             yield self.panel
         for dock in getattr(self, "_well_panel_docks", []) or []:
             if dock and getattr(dock, "well_panel", None) is not None:
@@ -4507,7 +4508,7 @@ class MainWindow(QMainWindow):
 
 
         # ---- 3) reset central well_panel view state/filters ----
-        if hasattr(self, "well_panel") and self.panel is not None:
+        if hasattr(self, "panel") and self.panel is not None:
             p = self.panel
             p.wells = self.all_wells
             p.tracks = self.all_tracks

@@ -1056,7 +1056,7 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
                         continue
                     if stratigraphy[name_upper]['role']=='stratigraphy':
                         for ti in range(n_tracks):
-                            col_idx = first_track_idx + ti
+                            col_idx = first_track_idx + ti + 1
                             base_ax = axes[col_idx]
                             base_ax.axhspan(
                                 d1,

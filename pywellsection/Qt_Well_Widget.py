@@ -1369,7 +1369,7 @@ class  WellPanelWidget(QWidget):
         if n_wells <= 0:
             width_px = self._min_canvas_width
         else:
-            tracks_px = n_wells * n_tracks * self._px_per_track
+            tracks_px = n_wells * n_tracks * self._px_per_track * self.track_width
             depth_track_px = n_wells * self._px_per_depth_track
             gaps_px = (n_wells - 1) * self._px_per_well_gap
             width_px = max(self._min_canvas_width, tracks_px + gaps_px + depth_track_px)
