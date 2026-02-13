@@ -266,10 +266,10 @@ def _load_BEEE_stratigraphy(fn) -> pd.DataFrame:
         cols=colmap,
         derive_parent_age=("store_true"),
     )
-    with open("test-strat.json", "w", encoding="utf-8") as f:
-        json.dump(tree, f, ensure_ascii=False, indent=2)
+    # to test that it works:
+    #with open("test-strat.json", "w", encoding="utf-8") as f:
+    #    json.dump(tree, f, ensure_ascii=False, indent=2)
 
-    #json.dumps(tree, ensure_ascii=False, indent=2)
 
     return tree
 

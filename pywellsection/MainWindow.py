@@ -44,7 +44,7 @@ from pywellsection.Qt_Map_Widget import MapDockWindow, MapPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
-from pywellsection.io_utils import import_schichtenverzeichnis
+from pywellsection.io_utils import import_schichtenverzeichnis, import_sv_tops_using_beee
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
@@ -119,6 +119,8 @@ class MainWindow(QMainWindow):
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
         self.all_tracks = tracks
+
+        self.global_stratigraphy = None
 
         self.all_logs = None
         self.all_discrete_logs = None
@@ -1071,8 +1073,8 @@ class MainWindow(QMainWindow):
             return
 
         #load_LBEG_SV(path)
-        strat = _load_BEEE_stratigraphy(path)
-        build_stratigraphic_column_tree(self.well_tree,strat)
+        self.global_stratigraphy = _load_BEEE_stratigraphy(path)
+        build_stratigraphic_column_tree(self.well_tree,self.global_stratigraphy)
 
     def _file_load_tops_from_csv(self, path: str):
         """
@@ -1279,7 +1281,11 @@ class MainWindow(QMainWindow):
             self.all_wells = self.project.all_wells
             self._populate_well_tops_tree()
             self._populate_well_tree()
-#            self._refresh_all_panels()
+            self._populate_input_tree()
+
+            if self.global_stratigraphy:
+                import_sv_tops_using_beee(self,self.project, path,self.global_stratigraphy)
+            #            self._refresh_all_panels()
 #            self._populate_well_tree()
 
     def _build_well_tree_dock(self):
@@ -1335,8 +1341,6 @@ class MainWindow(QMainWindow):
         self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
         self.input_tree.set_accept_children_drop(self.c_faults_root, False)
         self.input_tree.set_accept_children_drop(self.c_other_root, False)
-
-
 
     def _populate_input_tree(self):
 
@@ -3852,7 +3856,7 @@ class MainWindow(QMainWindow):
             if chosen == act_delete_well:
                 self._delete_well_from_project(well_name, confirm = True)
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
+        if len(data) == 3 and data[0] == "Bitmap":
             #menu = QMenu(self)
             _, well_name, bitmap_key = data
             act_del = menu.addAction(f"Delete bitmap from well {well_name}")
@@ -3865,7 +3869,7 @@ class MainWindow(QMainWindow):
                         self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
             return
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "well_log":
+        if len(data) == 3 and data[0] == "well_log":
             _, well_name, log_name = data
 
             act_edit = menu.addAction("Edit log data (table)…")
