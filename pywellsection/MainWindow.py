@@ -71,6 +71,7 @@ from pywellsection.dialogs import TrackSettingsDialog
 from pywellsection.dialogs import EditWellLogTableDialog
 from pywellsection.dialogs import EditWellPanelOrderDialog
 from pywellsection.dialogs import MapLimitsDialog
+from pywellsection.dialogs import NewBitmapTrackDialog
 
 from pywellsection.log_calculator import LogCalculatorDialog
 
@@ -422,7 +423,7 @@ class MainWindow(QMainWindow):
 
             # connect old references
             self.all_wells = self.project.all_wells
-            self.tracks = self.project.all_tracks
+            self.all_tracks = self.project.all_tracks
             self.stratigraphy = self.project.all_stratigraphy
 
     def _save_pws_project(self, path):
@@ -524,7 +525,7 @@ class MainWindow(QMainWindow):
 
             for well in wells:
                 disc_logs = well.get("discrete_logs", {})
-                self.all_discrete_logs=disc_logs
+                #self.all_discrete_logs=disc_logs
 
                 for log_name, d in list(disc_logs.items()):
                     if "top_depths" in d and "bottom_depths" in d:
@@ -535,6 +536,7 @@ class MainWindow(QMainWindow):
                             "depth": tops.tolist(),
                             "values": values.tolist(),
                         }
+                self.all_discrete_logs = disc_logs.keys()
                 self.project.all_discrete_logs = self.all_discrete_logs
 
             for well in wells:
@@ -887,12 +889,16 @@ class MainWindow(QMainWindow):
 
         # Update well_panel + tree views
         self.panel.set_wells(self.all_wells)
+        self.panel.set_logs(self.all_logs)
+        self.panel.set_tracks(self.all_tracks)
         self.panel.draw_well_panel()
 
         # refresh tree sections
         self._populate_well_tree()
         #self._populate_well_log_tree()
         self._populate_well_track_tree()
+        #self.project.all_wells = self.all_wells
+        #self.project.all_logs = self.all_logs
 
         QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
 
@@ -1443,7 +1449,7 @@ class MainWindow(QMainWindow):
         faults_root.takeChildren()
 
         other_prev_selected = set()
-        other_root = self.faults_root
+        other_root = self.other_root
         for i in range(other_root.childCount()):
             it = other_root.child(i)
             if it.checkState(0) == Qt.Checked:
@@ -1612,7 +1618,7 @@ class MainWindow(QMainWindow):
         self._rebuild_visible_bitmaps_from_tree()
 
     def _populate_well_track_tree(self):
-        """Rebuild tracks subtree from self.tracks, showing track→log assignment."""
+        """Rebuild tracks subtree from self.all_tracks, showing track→log assignment."""
         if self.all_tracks is None:
             return
         else:
@@ -1661,8 +1667,8 @@ class MainWindow(QMainWindow):
                     | Qt.ItemIsSelectable
                     | Qt.ItemIsEnabled
                 )
+                log_item.setData(0, Qt.UserRole, ("track_log",track_name , log_name))
                 track_item.addChild(log_item)
-
             root.addChild(track_item)
 
         self.well_tree.blockSignals(False)
@@ -1718,6 +1724,8 @@ class MainWindow(QMainWindow):
 
         if item.data(0, Qt.UserRole) is None:
             return 0
+
+        print ("_on_well_tree_item_changed",item.data(0, Qt.UserRole))
 
         p = item.parent()
         if item is self.well_root_item or p is self.well_root_item:
@@ -1901,6 +1909,7 @@ class MainWindow(QMainWindow):
         #LOG.debug(f"rebuild_wells_from_tree: {checked_names}")
 
         self.panel.set_visible_wells(checked_names)
+        self.panel.set_draw_well_panel(True)
         self.panel.draw_well_panel()
 
     def _rebuild_visible_tops_from_tree(self):
@@ -2061,6 +2070,29 @@ class MainWindow(QMainWindow):
         self._populate_well_log_tree()
         self._populate_well_track_tree()
 
+    def remove_log_from_track(self, track_name: str, log_name: str):
+        """Remove a log config from a track by name and refresh well_panel & trees."""
+        track = None
+        for t in self.all_tracks:
+            if t.get("name") == track_name:
+                track = t
+                break
+        if track is None:
+            raise ValueError(f"Track '{track_name}' not found.")
+
+        logs = track.get("logs")
+        if logs is not None:
+            for i, log in enumerate(logs):
+                if log.get("log") == log_name:
+                    logs.pop(i)
+                    break
+        self._populate_well_track_tree()
+        self.panel.draw_well_panel()
+
+    def _action_remove_log_from_track(self, track_name: str, log_name: str):
+        """Remove selected log from selected track."""
+        self.remove_log_from_track(track_name, log_name)
+
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
 
@@ -2090,10 +2122,10 @@ class MainWindow(QMainWindow):
         # Ensure we have a list of existing names
 
         if not hasattr(self, "all_tracks") or self.all_tracks is None:
-            if self.tracks is None:
+            if self.all_tracks is None:
                 existing_names = set()
             else:
-                #            existing_names = {t.get("name", "") for t in self.tracks}
+                #            existing_names = {t.get("name", "") for t in self.all_tracks}
                 existing_names = {t.get("name", "") for t in getattr(self, "tracks", [])}
         else:
             existing_names = {t.get("name", "") for t in self.all_tracks}
@@ -2120,7 +2152,7 @@ class MainWindow(QMainWindow):
         #self.all_tracks.append(new_track)
 
         # Keep well_panel in sync
-        #self.panel.tracks = self.tracks
+        #self.panel.tracks = self.all_tracks
         #self.panel.draw_well_panel()
 
         # Refresh tree sections that depend on tracks
@@ -2436,8 +2468,8 @@ class MainWindow(QMainWindow):
 
     def _action_add_discrete_track(self):
         """Create a new discrete track and append it to the project."""
-        if not hasattr(self, "tracks") or self.tracks is None:
-            self.tracks = []
+        if not hasattr(self, "tracks") or self.all_tracks is None:
+            self.all_tracks = []
 
         # collect all discrete log names currently present in wells
         available_disc_logs = set()
@@ -2447,7 +2479,7 @@ class MainWindow(QMainWindow):
                 for lname in dlogs.keys():
                     available_disc_logs.add(lname)
 
-        existing_track_names = [t.get("name", "") for t in self.tracks]
+        existing_track_names = [t.get("name", "") for t in self.all_tracks]
 
         dlg = NewDiscreteTrackDialog(
             self,
@@ -2462,16 +2494,42 @@ class MainWindow(QMainWindow):
             return
 
         # append track
-        self.tracks.append(new_track)
+        self.all_tracks.append(new_track)
 
         # push to well_panel
         if hasattr(self, "well_panel"):
-            self.panel.tracks = self.tracks
+            self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
         # refresh track tree
         if hasattr(self, "_populate_track_tree"):
             self._populate_track_tree()
+
+    def _action_add_bitmap_track(self):
+        """Create a new bitmap track and append it to the project."""
+        print("add bitmap track")
+        if not hasattr(self, "tracks") or self.all_tracks is None:
+            self.all_tracks = []
+
+        available_bitmaps = set()
+
+        for w in self.all_wells:
+            bitmaps = w.get("bitmaps", {}) or {}
+            for lname in bitmaps.keys():
+                available_bitmaps.add(lname)
+
+        print(available_bitmaps)
+
+        existing_track_names = [t.get("name", "") for t in self.all_tracks]
+        #
+        dlg = NewBitmapTrackDialog(self, available_bitmaps=available_bitmaps, existing_track_names=existing_track_names)
+        if dlg.exec_() != QDialog.Accepted:
+             return
+
+        new_track = dlg.result_track()
+        if not new_track:
+            return
+
 
     def _action_edit_discrete_colors_for_track(self, track_name: str):
         """
@@ -2884,7 +2942,7 @@ class MainWindow(QMainWindow):
         # Redraw
         if hasattr(self, "well_panel"):
             self.panel.wells = self.all_wells
-            self.panel.tracks = self.tracks
+            self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
         # If you have multiple dock well_panels:
@@ -2900,6 +2958,10 @@ class MainWindow(QMainWindow):
         """
 
         LOG.debug("Loading core bitmap to well...")
+
+        if not self.current_project_path:
+            QMessageBox.warning(self, "Load bitmap", "No project loaded, first save project.")
+            return
 
         if not getattr(self, "all_wells", None):
             QMessageBox.information(self, "Load core bitmap", "No wells in project.")
@@ -2967,20 +3029,21 @@ class MainWindow(QMainWindow):
         }
 
         # ensure we have a bitmap track to display it
-        #        self._ensure_bitmap_track_exists()
+        self._ensure_bitmap_track_exists(track_name = res["track"])
 
         # push into well_panel & redraw
-        # if hasattr(self, "well_panel"):
-        #     self.panel.wells = self.all_wells
-        #     self.panel.tracks = self.tracks
-        #     self.panel.draw_well_panel()
+        #if hasattr(self, "well_panel"):
+        self.panel.wells = self.all_wells
+        self.panel.tracks = self.all_tracks
+        self.panel.draw_well_panel()
 
         # refresh tree (if you show bitmaps there)
 
         self.all_bitmaps.append(res["key"])
 
-        if hasattr(self, "_populate_well_tree"):
-            self._populate_well_tree()
+        self._populate_well_tree()
+        self._populate_well_log_tree()
+        self._populate_well_track_tree()
 
     def _action_add_well_panel_dock(self):
         dock = WellPanelDock(
@@ -3068,35 +3131,43 @@ class MainWindow(QMainWindow):
         self._populate_well_log_tree()
         self._populate_well_tree()
 
-    def _ensure_bitmap_track_exists(self):
+    def _ensure_bitmap_track_exists(self, track_name = None):
         """
-        Ensure there is at least one bitmap track in self.tracks.
+        Ensure there is at least one bitmap track in self.all_tracks.
         The bitmap track references a per-well bitmap by key.
         """
-        if not hasattr(self, "tracks") or self.tracks is None:
-            self.tracks = []
 
-        for t in self.tracks:
+        print("ensure bitmap track exists")
+
+        if not track_name:
+            return False
+
+        if not hasattr(self, "all_tracks") or self.all_tracks is None:
+            self.all_tracks = []
+        else:
+            tracks = self.all_tracks
+
+        for t in self.all_tracks:
             if "bitmap" in t:
-                return t# already exists
+                if t.get("name") == track_name:
+                    return t# already exists
 
-        # Create a default bitmap track
-        self.tracks.append({
-            "name": "Core",
+            # Create if not found create a new bitmap track
+        tracks.append({
+            "name": track_name,
             "type": "bitmap",
             "bitmap": {
-                "key": "core",  # per-well bitmap key
-                "label": "Core",
                 "alpha": 1.0,
                 "cmap": None,
                 "interpolation": "nearest",
                 "flip_vertical": False,
+                "label": "Bitmap",
             }
         })
 
-        self.all_tracks = self.tracks
+        self.all_tracks = tracks
 
-        return self.tracks[0]
+        return tracks
 
     def _add_well_panel_dock(self, window_title=None, visible_tops=None, visible_logs=None, visible_tracks=None,
                              visible_wells=None, panel_settings=None):
@@ -3490,6 +3561,7 @@ class MainWindow(QMainWindow):
         item = self.well_tree.itemAt(pos)
         menu = QMenu(self)
         if item is None:
+            print ("_on_tree_context_menu: no item at pos", pos)
             return
 
         global_pos = self.well_tree.viewport().mapToGlobal(pos)
@@ -3617,12 +3689,15 @@ class MainWindow(QMainWindow):
 
             act_add_track = menu.addAction("Add new track...")
             act_add_disc_track = menu.addAction("Add new discrete track...")
+            act_add_bitmap_track = menu.addAction("Add new bitmap track...")
             chosen = menu.exec_(global_pos)
 
             if chosen == act_add_track:
                 self._action_add_empty_track()
             elif chosen == act_add_disc_track:
                 self._action_add_discrete_track()
+            elif chosen == act_add_bitmap_track:
+                self._action_add_bitmap_track()
             return
 
         # --- case 2: log leaves under "Tracks" folder ---
@@ -3667,7 +3742,7 @@ class MainWindow(QMainWindow):
                 if chosen == act_edit:
                     #self._edit_log_display_settings(track_name)
                     self._action_edit_track_settings(track_name)
-                    menu.close()
+                    #menu.close()
                 elif chosen == act_add_log:
                     self._action_add_log_to_track()
             elif track.get("type") == "lithofacies":
@@ -3683,7 +3758,16 @@ class MainWindow(QMainWindow):
 
             return
 
+        if data[0] == "track_log":
+            track_name = data[1]
+            log_name = data[2]
+            act_delete_track = menu.addAction(f"Delete log '{log_name}' from track '{track_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_delete_track:
+                self._action_remove_log_from_track(track_name, log_name)
+            #menu.close()
 
+        menu.close()
 
 
         # other nodes (wells, tops folders, etc.) → no context menu for logs

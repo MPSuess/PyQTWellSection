@@ -2162,6 +2162,91 @@ class NewDiscreteTrackDialog(QDialog):
         """Return the new track dict or None."""
         return self._result
 
+class NewBitmapTrackDialog(QDialog):
+    def __init__(self, parent, available_bitmaps = None, existing_track_names=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add bitmap track")
+        self.resize(400, 220)
+
+        self._available_bitmaps = sorted(set(available_bitmaps or []))
+        self._existing_track_names = set(existing_track_names or [])
+        self._result = None
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Define a new bitmap track.\n"
+            "Choose a track name and a bitmap to display.",
+            self
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        # Track name
+        self.ed_track_name = QLineEdit(self)
+        form.addRow("Track name:", self.ed_track_name)
+
+        # Bitmap name (combo)
+        self.cmb_log = QComboBox(self)
+        self.cmb_log.setEditable(True)  # allow typing a new name if needed
+        self.cmb_log.addItems(self._available_bitmaps)
+        form.addRow("Bitmap:", self.cmb_log)
+
+        # Label (optional; default to discrete log name)
+        self.ed_label = QLineEdit(self)
+        form.addRow("Label (optional):", self.ed_label)
+
+        # Missing code (string, default "-999")
+        self.ed_missing = QLineEdit(self)
+        self.ed_missing.setText("-999")
+        form.addRow("Missing code:", self.ed_missing)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        track_name = self.ed_track_name.text().strip()
+        if not track_name:
+            QMessageBox.warning(self, "Discrete track", "Please enter a track name.")
+            return
+        if track_name in self._existing_track_names:
+            QMessageBox.warning(
+                self,
+                "Bitmap track",
+                f"A track named '{track_name}' already exists.\n"
+                "Please choose another name."
+            )
+            return
+
+        log_name = self.cmb_log.currentText().strip()
+        if not log_name:
+            QMessageBox.warning(self, "Bitmap track", "Please select or enter a bitmap name.")
+            return
+
+        label = self.ed_label.text().strip() or log_name
+
+        missing_txt = self.ed_missing.text().strip()
+        # store missing code as string; your plotting/export treats it symbolically
+        if not missing_txt:
+            missing_txt = "-999"
+
+        self._result = {
+            "name": track_name,
+            "logs": [],  # no continuous logs in this track by default
+
+            "bitmap": log_name,
+        }
+        self.accept()
+
+    def result_track(self):
+        """Return the new track dict or None."""
+        return self._result
+
+
 class DiscreteColorEditorDialog(QDialog):
     """
     Edit color map for a discrete track.
@@ -4281,6 +4366,183 @@ class EditWellLogTableDialog(QDialog):
 
     def result_arrays(self):
         return self._result_depth, self._result_data
+
+class DiscreteLogEditorDialog(QDialog):
+    """
+    Edit one discrete log in a table: Depth | Value(category)
+
+    - Add / delete rows
+    - Sort by depth on save
+    - Missing value token supported (default "-999")
+    """
+
+    def __init__(self, parent, well_name: str, log_name: str, disc_def: dict):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit Discrete Log: {log_name} • {well_name}")
+        self.resize(760, 520)
+
+        self.well_name = well_name
+        self.log_name = log_name
+        self._orig = disc_def or {}
+
+        self.missing = str(self._orig.get("missing", "-999"))
+
+        layout = QVBoxLayout(self)
+
+        # ---- header / metadata ----
+        form = QFormLayout()
+        self.ed_well = QLineEdit(self)
+        self.ed_well.setReadOnly(True)
+        self.ed_well.setText(well_name)
+
+        self.ed_name = QLineEdit(self)
+        self.ed_name.setText(log_name)
+
+        self.ed_missing = QLineEdit(self)
+        self.ed_missing.setText(self.missing)
+
+        form.addRow("Well:", self.ed_well)
+        form.addRow("Log name:", self.ed_name)
+        form.addRow("Missing token:", self.ed_missing)
+        layout.addLayout(form)
+
+        layout.addWidget(QLabel("Depth / Category rows:", self))
+
+        # ---- table ----
+        self.tbl = QTableWidget(self)
+        self.tbl.setColumnCount(2)
+        self.tbl.setHorizontalHeaderLabels(["Depth", "Value (category)"])
+        self.tbl.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.tbl, 1)
+
+        # ---- buttons row ----
+        row = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected", self)
+        self.btn_sort = QPushButton("Sort by depth", self)
+        row.addWidget(self.btn_add)
+        row.addWidget(self.btn_del)
+        row.addWidget(self.btn_sort)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+        self.btn_sort.clicked.connect(self._sort_table_by_depth)
+
+        # ---- OK/Cancel ----
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._load_into_table()
+
+    # -------------------------
+    # Populate table
+    # -------------------------
+    def _load_into_table(self):
+        depths = list(self._orig.get("depth", []) or [])
+        values = list(self._orig.get("values", []) or [])
+
+        n = max(len(depths), len(values))
+        self.tbl.setRowCount(n)
+
+        for i in range(n):
+            d = depths[i] if i < len(depths) else ""
+            v = values[i] if i < len(values) else self.missing
+
+            it_d = QTableWidgetItem("" if d == "" else str(d))
+            it_d.setFlags(it_d.flags() | Qt.ItemIsEditable)
+
+            it_v = QTableWidgetItem("" if v is None else str(v))
+            it_v.setFlags(it_v.flags() | Qt.ItemIsEditable)
+
+            self.tbl.setItem(i, 0, it_d)
+            self.tbl.setItem(i, 1, it_v)
+
+    def _add_row(self):
+        r = self.tbl.rowCount()
+        self.tbl.insertRow(r)
+        self.tbl.setItem(r, 0, QTableWidgetItem(""))
+        self.tbl.setItem(r, 1, QTableWidgetItem(self.ed_missing.text().strip() or "-999"))
+
+    def _delete_selected_rows(self):
+        rows = sorted({ix.row() for ix in self.tbl.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        for r in rows:
+            self.tbl.removeRow(r)
+
+    def _sort_table_by_depth(self):
+        rows = []
+        for r in range(self.tbl.rowCount()):
+            d_item = self.tbl.item(r, 0)
+            v_item = self.tbl.item(r, 1)
+
+            d_txt = (d_item.text().strip() if d_item else "")
+            v_txt = (v_item.text().strip() if v_item else "")
+
+            try:
+                d_val = float(d_txt)
+            except Exception:
+                d_val = np.nan
+
+            rows.append((d_val, d_txt, v_txt))
+
+        # sort with NaNs at bottom
+        rows.sort(key=lambda x: (np.isnan(x[0]), x[0] if np.isfinite(x[0]) else 0.0))
+
+        self.tbl.setRowCount(len(rows))
+        for r, (_, d_txt, v_txt) in enumerate(rows):
+            self.tbl.setItem(r, 0, QTableWidgetItem(d_txt))
+            self.tbl.setItem(r, 1, QTableWidgetItem(v_txt))
+
+    # -------------------------
+    # Extract result
+    # -------------------------
+    def result_discrete_log(self):
+        """
+        Returns (new_log_name, disc_def_dict) or raises ValueError if invalid.
+        """
+        new_name = self.ed_name.text().strip()
+        if not new_name:
+            raise ValueError("Log name must not be empty.")
+
+        missing = self.ed_missing.text().strip() or "-999"
+
+        depths = []
+        values = []
+
+        for r in range(self.tbl.rowCount()):
+            d_item = self.tbl.item(r, 0)
+            v_item = self.tbl.item(r, 1)
+
+            d_txt = (d_item.text().strip() if d_item else "")
+            v_txt = (v_item.text().strip() if v_item else "")
+
+            if d_txt == "":
+                # allow blank rows -> skip
+                continue
+
+            try:
+                d = float(d_txt)
+            except Exception:
+                raise ValueError(f"Invalid depth at row {r+1}: {d_txt!r}")
+
+            v = v_txt if v_txt != "" else missing
+
+            depths.append(d)
+            values.append(v)
+
+        # sort by depth
+        order = np.argsort(np.asarray(depths, dtype=float)) if depths else []
+        if len(order):
+            depths = [depths[i] for i in order]
+            values = [values[i] for i in order]
+
+        disc_def = {"depth": depths, "values": values, "missing": missing}
+        return new_name, disc_def
 
 
 class EditWellPanelOrderDialog(QDialog):

@@ -420,7 +420,8 @@ class LogCalculatorDialog(QDialog):
         for w in (self.all_wells or []):
             for ln in (w.get("logs") or {}).keys():
                 log_names.add(ln)
-
+            for ln in (w.get("discrete_logs") or {}).keys():
+                log_names.add(ln)
 
         # Make stable sorted list
         for ln in sorted(log_names):

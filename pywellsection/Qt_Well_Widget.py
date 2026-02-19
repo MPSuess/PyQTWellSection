@@ -1157,6 +1157,12 @@ class WellPanelWidget(QWidget):
         #self.visible_wells = wells
         self._flatten_depths = None
 
+    def set_logs(self,logs):
+        self.logs=logs
+
+    def set_tracks(self,tracks):
+        self.tracks=tracks
+
     def set_visible_wells(self, visible_wells):
         self.visible_wells = visible_wells
 
@@ -1273,8 +1279,6 @@ class WellPanelWidget(QWidget):
                 self.draw_panel()
 
         return True
-
-
 
     def set_vertical_scale(self, vertical_scale):
         self.vertical_scale = vertical_scale
