@@ -386,25 +386,6 @@ class AssignLasToWellDialog(QDialog):
                 self.ed_uwi.text().strip(),
             )
 
-class OldNewTrackDialog(QDialog):
-    def __init__(self, parent, suggested_name="Track"):
-        super().__init__(parent)
-        self.setWindowTitle("Add empty track")
-
-        layout = QVBoxLayout(self)
-        form = QFormLayout()
-        layout.addLayout(form)
-
-        self.ed_name = QLineEdit(suggested_name, self)
-        form.addRow("Track name:", self.ed_name)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-    def track_name(self) -> str:
-        return self.ed_name.text().strip()
 
 class NewTrackDialog(QDialog):
     """
@@ -962,7 +943,7 @@ class LayoutSettingsDialog(QDialog):
                 float(self.spin_max_fac.value())
                 )
 
-1
+
 
 class LogDisplaySettingsDialog(QDialog):
     """
@@ -1200,7 +1181,7 @@ class LogDisplaySettingsDialog(QDialog):
         out["alpha"] = float(self.spin_alpha.value())
         out["decimate"] = int(self.spin_dec.value())
         out["clip"] = bool(self.chk_clip.isChecked())
-        out["mask_nan"] = bool(self.chk_mask.isChecked())
+        out["mask_nan"] = not bool(self.chk_mask.isChecked())
         out["zorder"] = int(self.spin_z.value())
 
         # line / points specific
@@ -4301,13 +4282,6 @@ class EditWellLogTableDialog(QDialog):
     def result_arrays(self):
         return self._result_depth, self._result_data
 
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QDialogButtonBox, QMessageBox, QAbstractItemView,
-    QComboBox, QLabel
-)
-from PySide6.QtCore import Qt
-
 
 class EditWellPanelOrderDialog(QDialog):
     """
@@ -4576,12 +4550,6 @@ class ImportTopsAssignWellDialog(QDialog):
             "new_name": self.ed_new_name.text().strip(),
             "set_td": self.chk_set_td.isChecked(),
         }
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
-    QDoubleSpinBox, QDialogButtonBox, QCheckBox, QLabel, QMessageBox
-)
-from PySide6.QtCore import Qt
-
 
 class MapLimitsDialog(QDialog):
     """

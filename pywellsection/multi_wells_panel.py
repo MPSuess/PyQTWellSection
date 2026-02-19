@@ -458,13 +458,14 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             x = x[m]
             y = y[m]
 
+
         if decimate > 1:
             x = x[::decimate]
             y = y[::decimate]
 
         if clip and "xlim" in log_cfg:
             xmin, xmax = log_cfg["xlim"]
-            m = (x >= xmin) & (x <= xmax)
+            m = (x >= xmin) & (x <= xmax) | np.isnan(x)
             x = x[m]
             y = y[m]
 
@@ -905,7 +906,7 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
       - list that will collect Line2D and Polygon artists for correlations
         so they can be removed/redrawn when zooming.
     """
-    if visible_tops is None:
+    if visible_tops is None or len(visible_tops)==0:
         # do nothing if not visible_tops is provided
         return 0
 

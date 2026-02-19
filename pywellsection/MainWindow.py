@@ -72,6 +72,8 @@ from pywellsection.dialogs import EditWellLogTableDialog
 from pywellsection.dialogs import EditWellPanelOrderDialog
 from pywellsection.dialogs import MapLimitsDialog
 
+from pywellsection.log_calculator import LogCalculatorDialog
+
 from pathlib import Path
 from collections import OrderedDict
 
@@ -1516,14 +1518,14 @@ class MainWindow(QMainWindow):
         ### add logs as children of "All logs"
         # delete all logs under the folder and rebuild from scratch
         ### Remember current selection by name
-        ### First continous Logs
+        ### First continuous Logs
 
         print ("_populate_well_log_tree")
 
         self.well_tree.blockSignals(True)
         prev_selected = set()
-        ### Start with populating the continous logs tree ###
-        root = self.continous_logs_folder
+        ### Start with populating the continuous logs tree ###
+        root = self.continuous_logs_folder
         for i in range(root.childCount()):
             it = root.child(i)
             if it.checkState(0) == Qt.Checked:
@@ -1732,7 +1734,7 @@ class MainWindow(QMainWindow):
             self._rebuild_visible_tops_from_tree()
 
         # Logs
-        if item is self.continous_logs_folder or p is self.continous_logs_folder:
+        if item is self.continuous_logs_folder or p is self.continuous_logs_folder:
             #LOG.debug("LOGS FOLDER changed")
             self._rebuild_visible_logs_from_tree()
             self.panel.draw_well_panel()
@@ -1819,7 +1821,7 @@ class MainWindow(QMainWindow):
 
         logs = self.panel.get_visible_logs()
         #LOG.debug("getting visible logs", logs)
-        root = self.continous_logs_folder
+        root = self.continuous_logs_folder
         for i in range(root.childCount()):
             it = root.child(i)
             state = Qt.Unchecked
@@ -1933,7 +1935,7 @@ class MainWindow(QMainWindow):
 
     def _rebuild_visible_logs_from_tree(self):
         """Collect checked logs and inform the well_panel."""
-        root = self.continous_logs_folder
+        root = self.continuous_logs_folder
         visible = set()
         for i in range(root.childCount()):
             it = root.child(i)
@@ -2061,6 +2063,9 @@ class MainWindow(QMainWindow):
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
+
+        print (self)
+
         dlg = AddLogToTrackDialog(self, self.all_tracks, self.all_wells)
         if dlg.exec_() != QDialog.Accepted:
             return
@@ -2200,7 +2205,7 @@ class MainWindow(QMainWindow):
 
         self._populate_well_track_tree()
 
-    def _action_delete_track(self):
+    def _action_delete_track(self, track_name: str):
         """Ask user which track to delete, then call delete_track."""
         if not getattr(self, "all_tracks", None):
             QMessageBox.information(self, "Delete track", "There are no tracks to delete.")
@@ -2208,12 +2213,16 @@ class MainWindow(QMainWindow):
 
         track_names = [t.get("name", f"Track {i + 1}") for i, t in enumerate(self.all_tracks)]
 
+        selected = 0
+        if track_name in track_names:
+            selected = track_names.index(track_name)
+
         name, ok = QInputDialog.getItem(
             self,
             "Delete track",
             "Select track to delete:",
             track_names,
-            0,
+            selected,
             False,
         )
         if not ok or not name:
@@ -2227,35 +2236,48 @@ class MainWindow(QMainWindow):
     def _action_edit_stratigraphy(self):
         """Open table dialog to edit/add stratigraphy for the project."""
         # Make sure we have a stratigraphy dict
+
+
+
         strat = getattr(self, "all_stratigraphy", None)
         if strat is None:
             strat = {}
 
         dlg = StratigraphyEditorDialog(self, strat)
-        if dlg.exec_() != QDialog.Accepted:
+        if dlg.exec() != QDialog.Accepted:
             return
 
         new_strat = dlg.result_stratigraphy()
-        if new_strat is None:
-            return
 
-        # 1) update project-level stratigraphy
+
+        self.panel.draw_well_panel()
+
+        if new_strat is None:
+             print ("no strat")
+             return
+
+        # # 1) update project-level stratigraphy
         self.stratigraphy = new_strat
         self.all_stratigraphy = new_strat
+        #
+        # # 2) push into well_panel
+        for window in self.WindowList:
+             if window.type == "WellSection":
+                 panel = window.well_panel
+                 panel.stratigraphy = new_strat
+                 panel.update_visible_tops(new_strat)
 
-        # 2) push into well_panel
-        if hasattr(self, "well_panel"):
-            self.panel.stratigraphy = new_strat
 
-            # flattening uses strat key order:
-            # if you have any cached flatten state, you might want to reset:
-            if hasattr(self.panel, "_flatten_depths"):
-                self.panel._flatten_depths = None
 
-            self.panel.draw_well_panel()
+             # flattening uses strat key order:
+             # if you have any cached flatten state, you might want to reset:
+        if hasattr(self.panel, "_flatten_depths"):
+            self.panel._flatten_depths = None
 
-        # 3) refresh "Stratigraphic tops" folder in tree
-        #        if hasattr(self, "_populate_top_tree"):
+        self.panel.draw_well_panel()
+        #
+        # # 3) refresh "Stratigraphic tops" folder in tree
+        # #        if hasattr(self, "_populate_top_tree"):
         self._populate_well_tops_tree()
 
     def _action_layout_settings(self):
@@ -3037,6 +3059,15 @@ class MainWindow(QMainWindow):
         dlg = MapLimitsDialog(self, map_dock.panel)
         dlg.exec_()
 
+    def _action_open_log_calculator(self):
+        panel = self.panel
+        all_wells = self.all_wells
+        dlg = LogCalculatorDialog(self,panel, all_wells)
+        dlg.exec_()
+        panel.set_wells(all_wells)
+        self._populate_well_log_tree()
+        self._populate_well_tree()
+
     def _ensure_bitmap_track_exists(self):
         """
         Ensure there is at least one bitmap track in self.tracks.
@@ -3466,6 +3497,8 @@ class MainWindow(QMainWindow):
         data = item.data(0, Qt.UserRole)
         parent_data = parent.data(0, Qt.UserRole) if parent else None
 
+        if not data: return
+
         print (item, data)
         print (parent, parent_data)
 
@@ -3507,7 +3540,7 @@ class MainWindow(QMainWindow):
             if chosen == act_delete_well:
                 self._delete_well_from_project(well_name, confirm = True)
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "Bitmap":
+        if len(data) == 3 and data[0] == "Bitmap":
             #menu = QMenu(self)
             _, well_name, bitmap_key = data
             act_del = menu.addAction(f"Delete bitmap from well {well_name}")
@@ -3520,18 +3553,28 @@ class MainWindow(QMainWindow):
                         self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
             return
 
-        if isinstance(data, tuple) and len(data) == 3 and data[0] == "well_log":
+        if len(data) == 3 and data[0] == "well_log":
             _, well_name, log_name = data
 
             act_edit = menu.addAction("Edit log data (table)…")
+            act_calc = menu.addAction("Open Calculator ... ")
             chosen = menu.exec_(self.well_tree.viewport().mapToGlobal(pos))
             if chosen == act_edit:
                 self._edit_well_log_table(well_name, log_name)
+            elif chosen == act_calc:
+                self._action_open_log_calculator()
             return
 
 
         # --- case 1: logs under "Logs" folder ---
-        if parent is self.continous_logs_folder:
+        if parent is self.well_logs_folder:
+            act_calc = menu.addAction("Open Calculator ... ")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_calc:
+                self._action_open_log_calculator()
+            return
+
+        if parent is self.continuous_logs_folder:
             log_name = item.data(0, Qt.UserRole) or item.text(0)
             if not log_name:
                 return
@@ -3555,7 +3598,6 @@ class MainWindow(QMainWindow):
             if chosen == act_del:
                 for well in self.all_wells:
                     self._delete_bitmap_from_well(well.get("name"), bitmap_name, confirm=True)
-
         if item is self.well_tops_folder:
             #menu = QMenu(self)
 
@@ -3565,7 +3607,6 @@ class MainWindow(QMainWindow):
             if chosen == act_edit_stratigraphy:
                 self._action_edit_stratigraphy()
             return
-
         if item is self.track_root_item:
             track_name = item.text(0)
 
@@ -3599,6 +3640,7 @@ class MainWindow(QMainWindow):
 
             #menu = QMenu(self)
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
+
             if track.get("type") == "discrete":
                 #menu = QMenu(self)
                 act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
@@ -3637,7 +3679,7 @@ class MainWindow(QMainWindow):
 
             chosen = menu.exec_(global_pos)
             if chosen == act_delete_track:
-                self._action_delete_track()
+                self._action_delete_track(track_name)
 
             return
 

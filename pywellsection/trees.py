@@ -52,6 +52,7 @@ def setup_well_widget_tree(self):
     )
 
     self.well_root_item.setCheckState(0, Qt.Unchecked)
+    self.well_root_item.setData(0, Qt.UserRole, "wells")
     self.well_tree.addTopLevelItem(self.well_root_item)
 
     self.well_tops_folder = QTreeWidgetItem(["Well Tops"])
@@ -65,6 +66,7 @@ def setup_well_widget_tree(self):
     )
 
     self.well_tops_folder.setCheckState(0, Qt.Unchecked)
+    self.well_tops_folder.setData(0, Qt.UserRole, "well_tops")
     self.well_tree.addTopLevelItem(self.well_tops_folder)
 
     self.stratigraphy_root = QTreeWidgetItem(["Stratigraphy"])
@@ -76,6 +78,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.stratigraphy_root.setCheckState(0, Qt.Unchecked)
+    self.stratigraphy_root.setData(0, Qt.UserRole, "strat_tops")
     self.well_tops_folder.addChild(self.stratigraphy_root)
 
     self.faults_root = QTreeWidgetItem(["Faults"])
@@ -87,6 +90,8 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.faults_root.setCheckState(0, Qt.Unchecked)
+
+    self.faults_root.setData(0, Qt.UserRole, "faults_tops")
     self.well_tops_folder.addChild(self.faults_root)
 
     self.other_root = QTreeWidgetItem(["Other"])
@@ -98,6 +103,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.other_root.setCheckState(0, Qt.Unchecked)
+    self.other_root.setData(0, Qt.UserRole, "other_tops")
     self.well_tops_folder.addChild(self.other_root)
 
     self.well_logs_folder = QTreeWidgetItem(["Logs"])
@@ -111,19 +117,20 @@ def setup_well_widget_tree(self):
     )
 
     self.well_logs_folder.setCheckState(0, Qt.Unchecked)
-#    self.well_root_item.addChild(self.well_logs_folder)
+    self.well_logs_folder.setData(0, Qt.UserRole, "well_logs")
     self.well_tree.addTopLevelItem(self.well_logs_folder)
 
-    self.continous_logs_folder = QTreeWidgetItem(["Continous Logs"])
-    self.continous_logs_folder.setFlags(
-        self.continous_logs_folder.flags()
+    self.continuous_logs_folder = QTreeWidgetItem(["continuous Logs"])
+    self.continuous_logs_folder.setFlags(
+        self.continuous_logs_folder.flags()
         | Qt.ItemIsUserCheckable
         | Qt.ItemIsAutoTristate
         | Qt.ItemIsSelectable
         | Qt.ItemIsEnabled
     )
-    self.continous_logs_folder.setCheckState(0, Qt.Unchecked)
-    self.well_logs_folder.addChild(self.continous_logs_folder)
+    self.continuous_logs_folder.setCheckState(0, Qt.Unchecked)
+    self.continuous_logs_folder.setData(0, Qt.UserRole, "continuous_logs")
+    self.well_logs_folder.addChild(self.continuous_logs_folder)
 
     self.discrete_logs_folder = QTreeWidgetItem(["Discrete Logs"])
     self.discrete_logs_folder.setFlags(
@@ -134,6 +141,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.discrete_logs_folder.setCheckState(0, Qt.Unchecked)
+    self.discrete_logs_folder.setData(0, Qt.UserRole, "discrete_logs")
     self.well_logs_folder.addChild(self.discrete_logs_folder)
 
     self.bitmaps_folder = QTreeWidgetItem(["Bitmaps"])
@@ -145,9 +153,8 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.bitmaps_folder.setCheckState(0, Qt.Unchecked)
+    self.bitmaps_folder.setData(0, Qt.UserRole, "bitmaps")
     self.well_logs_folder.addChild(self.bitmaps_folder)
-
-
 
     # --- Folder: Tracks (structure only, not necessarily checkable) ---
     self.track_root_item = QTreeWidgetItem(["Tracks"])
@@ -160,6 +167,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.track_root_item.setCheckState(0, Qt.Unchecked)
+    self.track_root_item.setData(0, Qt.UserRole, "tracks")
     self.well_tree.addTopLevelItem(self.track_root_item)
 
     # --- Folder: stratigraphy (structure only, not necessarily checkable) ---
@@ -173,6 +181,7 @@ def setup_well_widget_tree(self):
         | Qt.ItemIsEnabled
     )
     self.stratigraphy_root_item.setCheckState(0, Qt.Unchecked)
+    self.stratigraphy_root_item.setData(0, Qt.UserRole, "stratigraphy")
     self.well_tree.addTopLevelItem(self.stratigraphy_root_item)
 
 

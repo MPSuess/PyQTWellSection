@@ -1215,7 +1215,64 @@ class WellPanelWidget(QWidget):
         self.gap_min_factor = settings.get("gap_min_factor",0.8)
         self.gap_max_factor = settings.get("gap_max_factor",8.0)
 
+    def update_visible_tops(self, strat, redraw: bool = False, keep_unknown: bool = False):
+        """
+        Sync this panel's visible_tops filter against the current project stratigraphy.
 
+        Use case:
+          - all_stratigraphy changes (tops removed/renamed)
+          - visible_tops may contain keys that no longer exist -> remove them to avoid stale filters
+
+        Semantics:
+          - visible_tops is None => "no filter" (all tops visible) -> keep None (but optionally validate)
+          - visible_tops is list => keep only those present in all_stratigraphy
+
+        Parameters
+        ----------
+        redraw : bool
+            Redraw panel once if changes were applied.
+        keep_unknown : bool
+            If True, do NOT drop tops that are not in all_stratigraphy. (Default False)
+            This is useful if you allow tops that exist only in wells but not in stratigraphy.
+
+        Returns
+        -------
+        bool
+            True if visible_tops changed, else False.
+        """
+        if strat is None:
+            return False
+
+        if not isinstance(strat, dict):
+            return False
+
+        known = set(strat.keys())
+
+        # Optionally also allow well-only tops
+        if keep_unknown:
+            for w in (getattr(self, "wells", None) or []):
+                known.update((w.get("tops") or {}).keys())
+
+        vt = getattr(self, "visible_tops", None)
+
+        # Nothing to sync if filter is "all"
+        if vt is None:
+            return False
+
+        # Filter current list
+        new_vt = [nm for nm in vt if nm in known]
+
+        if new_vt == vt:
+            return False
+
+        self.visible_tops = new_vt
+
+        if redraw and hasattr(self, "draw_panel"):
+            # respect your batching flag if you use it
+            if not getattr(self, "_suspend_redraw", False):
+                self.draw_panel()
+
+        return True
 
 
 
@@ -1383,7 +1440,6 @@ class WellPanelWidget(QWidget):
 
         # set matplotlib figure size in inches to match pixel size
         self.fig.set_size_inches(width_px / dpi, height_px / dpi, forward=True)
-
 
     def enable_track_mouse_scrolling(self):
         """Enable mouse-wheel scrolling inside tracks (pan/zoom depth window)."""
@@ -1574,6 +1630,7 @@ class WellPanelDock(QDockWidget):
 
     def get_panel(self):
         return self.well_panel
+
 
 
 
