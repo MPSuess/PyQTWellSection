@@ -77,6 +77,7 @@ from collections import OrderedDict
 
 from Import_LBEG_xlsx import load_LBEG_SV
 from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
+from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 
 import logging
 import os
@@ -304,9 +305,9 @@ class MainWindow(QMainWindow):
         act_import_bitmap.triggered.connect(self._action_load_core_bitmap_to_well)
         import_menu.addAction(act_import_bitmap)
 
-        act_import_test = QAction("Import test...", self)
-        act_import_test.triggered.connect(self._file_load_test)
-        import_menu.addAction(act_import_test)
+        # act_import_test = QAction("Import test...", self)
+        # act_import_test.triggered.connect(self._file_load_test)
+        # import_menu.addAction(act_import_test)
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
@@ -743,7 +744,11 @@ class MainWindow(QMainWindow):
 
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
-            if old_path == path: # if old equals new simple save ... .
+
+            if not old_path:
+                if os.path.exists(data_dir): # a previous project was saved under this name
+                    shutil.rmtree(data_dir)
+            elif old_path == path: # if old equals new simple save ... .
             # just copy the new data.json into the existing data_dir
                 shutil.copy2(tmp_data_json, data_dir)
                 shutil.rmtree(tmp_dir)
@@ -757,16 +762,18 @@ class MainWindow(QMainWindow):
                     shutil.copytree(o_data_path, data_dir)
                     shutil.copy2(tmp_data_json, data_dir)
                     shutil.rmtree(tmp_dir)
-
-            else: # a new project from scratch
-                if os.path.exists(data_dir): # a previous project was saved under this name
-                    shutil.rmtree(data_dir)
+            else:
+                print("Error: something went wrong with renaming the project")
+                return
+            if os.path.exists(tmp_dir):
                 os.rename(tmp_dir, data_dir)
+
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
             os.replace(tmp_pws, path)
             # keep last saved path if you want
-            self._last_project_path = old_path
+            if old_path:
+                self._last_project_path = old_path
             self.current_project_path = path
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
@@ -1056,8 +1063,14 @@ class MainWindow(QMainWindow):
             return
 
         #load_LBEG_SV(path)
-        strat = _load_BEEE_stratigraphy(path)
-        build_stratigraphic_column_tree(self.well_tree,strat)
+        #strat = _load_BEEE_stratigraphy(path)
+        #build_stratigraphic_column_tree(self.well_tree,strat)
+
+        bgr_data = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", path)
+
+        print (bgr_data)
+
+        return
 
 
 
@@ -1328,9 +1341,11 @@ class MainWindow(QMainWindow):
                 | Qt.ItemIsSelectable
                 | Qt.ItemIsEnabled
             )
+            state = Qt.Unchecked
             well_item.setData(0, Qt.UserRole, well_name)
             #state = Qt.Checked if (not prev_selected or well_name in prev_selected) else Qt.Unchecked
-            state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
+            if self.panel.visible_wells:
+                state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
             well_item.setCheckState(0, state)
             root.addChild(well_item)
 

@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Tuple, Optional
 import openpyxl
 
 from pywellsection.dialogs import ImportTopsAssignWellDialog
+from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -1536,7 +1537,7 @@ def import_schichtenverzeichnisv1(parent,project, xlsx_path: str,): # PWSProject
     )
     return True
 
-def import_schichtenverzeichnis(parent, project, xlsx_path):
+def import_schichtenverzeichnisv2(parent, project, xlsx_path):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1583,6 +1584,107 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
         xlsx_path,
         sel["sheet"],
     )
+
+    if not tops:
+        QMessageBox.information(parent, "Import", "No tops found in selected sheet.")
+        return False
+
+    # --- Resolve well (unchanged logic) ---
+    if sel["create_new"]:
+        target_well = {
+            "name": sel["new_name"],
+            "reference_type": "KB",
+            "reference_depth": 0.0,
+            "total_depth": td if sel["set_td"] else 0.0,
+            "logs": {},
+            "discrete_logs": {},
+            "tops": {},
+            "facies_intervals": [],
+            "bitmaps": {},
+        }
+        wells.append(target_well)
+    else:
+        target_well = next(
+            (w for w in wells if w.get("name") == sel["existing_name"]), None
+        )
+        if target_well is None:
+            QMessageBox.warning(parent, "Import", "Selected well not found.")
+            return False
+
+        if sel["set_td"]:
+            ref = float(target_well.get("reference_depth", 0.0))
+            target_well["total_depth"] = max(
+                float(target_well.get("total_depth", 0.0)),
+                td - ref,
+            )
+
+    # --- Apply stratigraphy + tops (unchanged) ---
+    strat = project.all_stratigraphy
+    for key, meta in strat_updates.items():
+        strat.setdefault(key, {}).update(meta)
+
+    tops_dict = target_well.setdefault("tops", {})
+    for t in tops:
+        tops_dict[t["key"]] = {
+            "depth": t["depth"],
+            "role": t["role"],
+            "level": strat.get(t["key"], {}).get("level", "formation"),
+        }
+
+    QMessageBox.information(
+        parent,
+        "Import",
+        f"Imported {len(tops)} tops from sheet '{sel['sheet']}' into '{target_well['name']}'."
+    )
+
+    return True
+
+def import_schichtenverzeichnis(parent, project, xlsx_path):
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
+        return False
+
+    # --- Load workbook first ---
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    sheet_names = wb.sheetnames
+
+    if not sheet_names:
+        QMessageBox.warning(parent, "Import", "No worksheets found in file.")
+        return False
+
+    wells = project.all_wells
+    existing_names = [w["name"] for w in wells if w.get("name")]
+
+    dlg = ImportTopsAssignWellDialog(
+        parent,
+        sheet_names=sheet_names,
+        existing_well_names=existing_names,
+        default_new_name=os.path.splitext(os.path.basename(xlsx_path))[0],
+    )
+
+    # --- Live preview update when sheet changes ---
+    def update_preview():
+        try:
+            # tops, td, _ = parse_geolprofile_xlsx_to_tops_v2(
+            #     xlsx_path,
+            #     dlg.selected_sheet(),
+            # )
+            tops, td, _ = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
+            dlg.set_preview(len(tops), td)
+        except Exception as e:
+            dlg.lbl_preview.setText(f"Preview error: {e}")
+
+    dlg.cmb_sheet.currentIndexChanged.connect(update_preview)
+    update_preview()
+
+    if dlg.exec_() != QDialog.Accepted:
+        return False
+
+    sel = dlg.result_selection()
+
+    # --- Parse selected sheet ---
+    tops, td, strat_updates = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
+
 
     if not tops:
         QMessageBox.information(parent, "Import", "No tops found in selected sheet.")
