@@ -536,7 +536,7 @@ class MainWindow(QMainWindow):
 
             for well in wells:
                 disc_logs = well.get("discrete_logs", {})
-                #self.all_discrete_logs=disc_logs
+                self.all_discrete_logs=disc_logs
 
                 for log_name, d in list(disc_logs.items()):
                     if "top_depths" in d and "bottom_depths" in d:
@@ -777,10 +777,10 @@ class MainWindow(QMainWindow):
                     shutil.copytree(o_data_path, data_dir)
                     shutil.copy2(tmp_data_json, data_dir)
                     shutil.rmtree(tmp_dir)
-            else:
-                print("Error: something went wrong with renaming the project")
-                return
-            if os.path.exists(tmp_dir):
+
+            else: # a new project from scratch
+                if os.path.exists(data_dir): # a previous project was saved under this name
+                    shutil.rmtree(data_dir)
                 os.rename(tmp_dir, data_dir)
 
             # 4) commit: replace .pws
@@ -1223,7 +1223,7 @@ class MainWindow(QMainWindow):
         self.stratigraphy = strat
 
         # ---- update well_panel ----
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.stratigraphy = self.stratigraphy
             # keep zoom/flatten; if you want to reset, uncomment:
@@ -1358,6 +1358,7 @@ class MainWindow(QMainWindow):
             state = Qt.Unchecked
             well_item.setData(0, Qt.UserRole, well_name)
             #state = Qt.Checked if (not prev_selected or well_name in prev_selected) else Qt.Unchecked
+            state = Qt.Unchecked
             if self.panel.visible_wells:
                 state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
             well_item.setCheckState(0, state)
@@ -1429,12 +1430,6 @@ class MainWindow(QMainWindow):
         self.well_tree.blockSignals(False)
         self._rebuild_well_panel_from_tree()
 
-    def _populate_c_well_tops_tree(self):
-        c_wells_root = self.checkable_tree.add_root("wells_root")
-        c_wells_parent = self.checkable_tree.add_parent(c_wells_root, "wells_parent")
-        for w in self.all_stratigraphy:
-            c_wells_child = self.checkable_tree.add_child(c_wells_parent, w["name"])
-
     def _populate_well_tops_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
         # Remember current selection by name
@@ -1467,6 +1462,94 @@ class MainWindow(QMainWindow):
             if it.checkState(0) == Qt.Checked:
                 other_prev_selected.add(it.data(0, Qt.UserRole))
         self.well_tree.blockSignals(True)
+
+        # remove all children under the folder
+        faults_root.takeChildren()
+
+        # add wells as children of "All wells"
+
+        strat_list = list(self.all_stratigraphy)
+
+        #self.checkable_tree.build_tree(self.all_stratigraphy)
+
+        for strat_name in strat_list:
+            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
+                strat_it = QTreeWidgetItem([strat_name])
+                strat_it.setFlags(
+                    strat_it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                strat_it.setData(0, Qt.UserRole, strat_name)
+#                self.checkable_tree.add_leaf(self.c_stratigraphy_root, strat_name)
+#                strat_it.parentToggled.connect(self.on_strat_toggled)
+
+                # default: keep previous selection; else checked
+                if not strat_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in strat_prev_selected else Qt.Unchecked
+                strat_it.setCheckState(0, state)
+                strat_root.addChild(strat_it)
+            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
+                fault_it = QTreeWidgetItem([strat_name])
+                fault_it.setFlags(
+                    fault_it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                fault_it.setData(0, Qt.UserRole, strat_name)
+
+                if not faults_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in faults_prev_selected else Qt.Unchecked
+                fault_it.setCheckState(0, state)
+                faults_root.addChild(fault_it)
+            elif self.all_stratigraphy[strat_name]['role'] == 'other':
+                other_it = QTreeWidgetItem([strat_name])
+                other_it.setFlags(
+                    other_it.flags()
+                    | Qt.ItemIsUserCheckable
+                    | Qt.ItemIsSelectable
+                    | Qt.ItemIsEnabled
+                )
+                other_it.setData(0, Qt.UserRole, strat_name)
+
+                if not other_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in other_prev_selected else Qt.Unchecked
+                other_it.setCheckState(0, state)
+                other_root.addChild(other_it)
+
+        self.well_tree.blockSignals(False)
+
+        # Apply current selection to well_panel
+        self._rebuild_well_panel_from_tree()
+
+    def _populate_c_well_tops_tree(self):
+        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+        # Remember current selection by name
+        self.c_well_tree.blockSignals(True)
+        strat_prev_selected = set()
+        strat_root = self.c_stratigraphy_root
+        for i in range(strat_root.childCount()):
+            it = strat_root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                strat_prev_selected.add(it.data(0, Qt.UserRole))
+
+        # remove all children under the folder
+        strat_root.takeChildren()
+
+        faults_prev_selected = set()
+        faults_root = self.c_faults_root
+        for i in range(faults_root.childCount()):
+            it = faults_root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                faults_prev_selected.add(it.data(0, Qt.UserRole))
 
         # remove all children under the folder
         faults_root.takeChildren()
@@ -2333,7 +2416,7 @@ class MainWindow(QMainWindow):
         del self.all_tracks[idx]
 
         # keep well_panel in sync
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
 
             # clean up visible_tracks if needed
@@ -2447,6 +2530,9 @@ class MainWindow(QMainWindow):
                  panel.stratigraphy = new_strat
                  panel.update_visible_tops(new_strat)
 
+        # 2) push into well_panel
+        if hasattr(self, "panel"):
+            self.panel.stratigraphy = new_strat
 
 
              # flattening uses strat key order:
@@ -2752,7 +2838,7 @@ class MainWindow(QMainWindow):
         disc_cfg["default_color"] = new_default
 
         # redraw well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
@@ -2784,7 +2870,7 @@ class MainWindow(QMainWindow):
             w["total_depth"] = hdr["total_depth"]
 
         # push into well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep current zoom; if you want to reset, uncomment:
             # self.panel.current_depth_window = None
@@ -2826,7 +2912,7 @@ class MainWindow(QMainWindow):
         well["total_depth"] = hdr["total_depth"]
 
         # update well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # optional: keep zoom/flatten; if you want to reset, uncomment:
             # self.panel.current_depth_window = None
@@ -2879,7 +2965,7 @@ class MainWindow(QMainWindow):
         well["reference_depth"] = hdr["reference_depth"]
         well["total_depth"] = hdr["total_depth"]
 
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -2945,7 +3031,7 @@ class MainWindow(QMainWindow):
         facies_cfg["spline"] = params["spline"]
 
         # redraw well_panel so changes take effect
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
 
@@ -2979,7 +3065,7 @@ class MainWindow(QMainWindow):
             well["facies_intervals"] = list(intervals)
 
         # redraw well_panel
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -3088,7 +3174,7 @@ class MainWindow(QMainWindow):
         }
 
         # Redraw
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.tracks = self.all_tracks
             self.panel.draw_well_panel()
@@ -3305,11 +3391,12 @@ class MainWindow(QMainWindow):
             "name": track_name,
             "type": "bitmap",
             "bitmap": {
+                "key": "core",  # per-well bitmap key
+                "label": "Core",
                 "alpha": 1.0,
                 "cmap": None,
                 "interpolation": "nearest",
                 "flip_vertical": False,
-                "label": "Bitmap",
             }
         })
 
@@ -3582,7 +3669,7 @@ class MainWindow(QMainWindow):
         #             log_cfg.pop("xlim", None)  # auto scale
         #
         # # 4) Sync with well_panel and redraw
-        # if hasattr(self, "well_panel"):
+        # if hasattr(self, "panel"):
         #     self.panel.tracks = self.all_tracks
         #     self.panel.draw_well_panel()
 
@@ -3685,7 +3772,7 @@ class MainWindow(QMainWindow):
             self._refresh_all_well_panels()
         else:
             # fallback
-            if hasattr(self, "well_panel"):
+            if hasattr(self, "panel"):
                 self.panel.wells = self.all_wells
                 self.panel.draw_well_panel()
         self._redraw_all_panels()
