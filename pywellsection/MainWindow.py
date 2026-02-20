@@ -885,7 +885,8 @@ class MainWindow(QMainWindow):
             if self.all_logs is None:
                 self.all_logs = logs
             else:
-                self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
+                all_logs = self.all_logs | set(logs)
+                self.all_logs = all_logs  # this operator merges the two dictionaries
 
         # Update well_panel + tree views
         self.panel.set_wells(self.all_wells)
@@ -1427,12 +1428,13 @@ class MainWindow(QMainWindow):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
         # Remember current selection by name
         strat_prev_selected = set()
+        self.well_tree.blockSignals(True)
         strat_root = self.stratigraphy_root
         for i in range(strat_root.childCount()):
             it = strat_root.child(i)
             if it.checkState(0) == Qt.Checked:
                 strat_prev_selected.add(it.data(0, Qt.UserRole))
-        self.well_tree.blockSignals(True)
+
 
         # remove all children under the folder
         strat_root.takeChildren()
@@ -1443,7 +1445,7 @@ class MainWindow(QMainWindow):
             it = faults_root.child(i)
             if it.checkState(0) == Qt.Checked:
                 faults_prev_selected.add(it.data(0, Qt.UserRole))
-        self.well_tree.blockSignals(True)
+
 
         # remove all children under the folder
         faults_root.takeChildren()
@@ -1454,10 +1456,12 @@ class MainWindow(QMainWindow):
             it = other_root.child(i)
             if it.checkState(0) == Qt.Checked:
                 other_prev_selected.add(it.data(0, Qt.UserRole))
-        self.well_tree.blockSignals(True)
+        other_root.takeChildren()
+
 
         # remove all children under the folder
         faults_root.takeChildren()
+
 
         # add wells as children of "All wells"
 
@@ -1515,6 +1519,7 @@ class MainWindow(QMainWindow):
                 other_root.addChild(other_it)
 
         self.well_tree.blockSignals(False)
+
 
         # Apply current selection to well_panel
         #self._rebuild_well_panel_from_tree()
