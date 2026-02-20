@@ -3283,7 +3283,8 @@ class BitmapPlacementDialog(QDialog):
             else:
                 for bmp in bmps:
                     bitmap=w.get("bitmaps", {}).get(bmp, {})
-                    rows.append((wname, bitmap, bmp))
+                    if bitmap.get("track") == self.track_name:
+                        rows.append((wname, bitmap, bmp))
 
         self.table.setRowCount(len(rows))
 
@@ -3344,7 +3345,7 @@ class BitmapPlacementDialog(QDialog):
 
             # redraw
             if self.panel is not None:
-                self.panel.draw_panel()
+                self.panel.draw_well_panel()
 
         except Exception as e:
             QMessageBox.warning(self, "Apply bitmap edits", f"Failed to apply edits:\n{e}")

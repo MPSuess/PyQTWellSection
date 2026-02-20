@@ -1856,17 +1856,32 @@ class MainWindow(QMainWindow):
 
             # add logs as children (structural only)
             for log_cfg in track.get("logs", []):
-                log_name = log_cfg.get("log")
-                if not log_name:
-                    continue
-                log_item = QTreeWidgetItem([log_name])
-                log_item.setFlags(
-                    log_item.flags()
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                log_item.setData(0, Qt.UserRole, ("track_log",track_name , log_name))
-                track_item.addChild(log_item)
+                if len(log_cfg) != 0: # this is a log track
+                    log_name = log_cfg.get("log")
+                    if not log_name:
+                        continue
+                    log_item = QTreeWidgetItem([log_name])
+                    log_item.setFlags(
+                        log_item.flags()
+                        | Qt.ItemIsSelectable
+                        | Qt.ItemIsEnabled
+                    )
+                    log_item.setData(0, Qt.UserRole, ("track_log",track_name , log_name))
+                    track_item.addChild(log_item)
+
+            # for log_cfg in track.get("bitmap", []):
+            #     if len(log_cfg) != 0: # this is a bitmap track
+            #         log_name = log_cfg.get("label")
+            #         if not log_name:
+            #             continue
+            #         log_item = QTreeWidgetItem([log_name])
+            #         log_item.setFlags(
+            #             log_item.flags()
+            #             | Qt.ItemIsSelectable
+            #             | Qt.ItemIsEnabled
+            #         )
+            #         log_item.setData(0, Qt.UserRole, ("track_bmp",track_name , log_name))
+            #         track_item.addChild(log_item)
 
             root.addChild(track_item)
 
@@ -3106,12 +3121,12 @@ class MainWindow(QMainWindow):
             if t.get("name") == track_name:
                 track = t
                 break
-        if track is None or "bitmaps" not in track:
+        if track is None or "bitmap" not in track:
             QMessageBox.warning(self, "Load bitmap", f"Track '{track_name}' is not a bitmap track.")
             return
 
         bmp_cfg = track.get("bitmap", {}) or {}
-        key = bmp_cfg.get("key", None)
+        key = bmp_cfg.get("label", None)
         if not key:
             QMessageBox.warning(self, "Load bitmap", "Bitmap track has no 'key' configured.")
             return
@@ -3138,7 +3153,7 @@ class MainWindow(QMainWindow):
         data_dir_name = f"{project_stem}.pdj"
         data_dir = os.path.join(base_dir, data_dir_name)
 
-        bitmap_name, bitmap_extention = os.path.splitext(res["bitmap_path"])
+        bitmap_name, bitmap_extention = os.path.splitext(res["path"])
 
         new_bitmap_path = os.path.join(data_dir,f"{res['well_name']}_{key}.{bitmap_extention}" )
 
@@ -3323,22 +3338,19 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Bitmap", "Selected track is not a bitmap track.")
             return
 
-        # key = (track.get("bitmaps") or {}).get("key")
-        # if not key:
-        #     QMessageBox.warning(self, "Bitmap", "Bitmap track has no 'key'.")
-        #     return
+
 
         key = "track"
 
         # Use the active well_panel (docked) if you implemented it; otherwise self.panel
-        well_panel = getattr(self, "active_well_panel", None) or self.panel
+        well_panel = self.panel
 
         dlg = BitmapPlacementDialog(
             parent=self,
             wells=self.all_wells,
             track_name=track_name,
             bitmap_key=key,
-            well_panel_widget=well_panel,
+            panel_widget=self.panel,
         )
         dlg.exec_()
 
@@ -3942,9 +3954,12 @@ class MainWindow(QMainWindow):
             if not track_name:
                 return
 
+            print(f"track_name={track_name}")
+
             for track in self.all_tracks:
                 if track.get("name") == track_name:
                     track_cfg = track
+                    print ("Name found:", track_cfg)
                     break
 
             #menu = QMenu(self)
@@ -4356,17 +4371,31 @@ class MainWindow(QMainWindow):
         """
         Resolve bitmap key from bitmap track and delete it from all wells.
         """
-        track = next((t for t in getattr(self, "tracks", []) if t.get("name") == track_name), None)
+        track = next((t for t in getattr(self, "all_tracks", []) if t.get("name") == track_name), None)
         if track is None or "bitmap" not in track:
             QMessageBox.information(self, "Delete bitmaps", "Selected track is not a bitmap track.")
             return
 
-        key = (track.get("bitmap") or {}).get("key")
-        if not key:
-            QMessageBox.warning(self, "Delete bitmaps", "Bitmap track has no bitmap key.")
-            return
+        track_cfg = track.get("bitmap", None)
 
-        self._delete_bitmap_key_from_all_wells(key, confirm=confirm)
+        # key = (track.get("bitmap") or {}).get("label")
+        # if not key:
+        #     QMessageBox.warning(self, "Delete bitmaps", "Bitmap track has no bitmap key.")
+        #     return
+
+        for well in self.all_wells:
+            bitmaps = well.get("bitmaps", None)
+
+            if bitmaps is not None:
+                for bitmap in bitmaps:
+                    if bitmap is not None:
+                        bmp_cfg = bitmaps.get(bitmap, None)
+                        bmp_track = bmp_cfg.get("track", None)
+                    if bmp_cfg is not None and bmp_track == track_name:
+                        bmp_cfg.pop("track", None)
+
+
+        #self._delete_bitmap_key_from_all_wells(key, confirm=confirm)
 
     def _available_log_names(self) -> list[str]:
         names = set()
