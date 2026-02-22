@@ -51,7 +51,8 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
 from pywellsection.trees import (setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree,
-                                 setup_checkable_tree)
+                                 setup_ctree)
+#from pywellsection.trees import CheckableTree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -86,6 +87,8 @@ from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
 
 import logging
 import os
+
+
 
 # This file is part of the `pywellsection` project and licensed under
 # EUPL 1.2
@@ -207,7 +210,7 @@ class MainWindow(QMainWindow):
 
         setup_well_widget_tree(self)
         setup_window_tree(self)
-        setup_checkable_tree(self)
+        setup_ctree(self)
         #self.checkable_tree.build_tree(self.all_wells)
 
         ### Setup the Dock
@@ -224,7 +227,7 @@ class MainWindow(QMainWindow):
 
         self.test_dock = QDockWidget("Test", self)
         self.test_dock.setObjectName("Test")
-        self.test_dock.setWidget(self.checkable_tree)
+        self.test_dock.setWidget(self.ctree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.test_dock)
 
         self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
@@ -1296,41 +1299,56 @@ class MainWindow(QMainWindow):
 #            self._refresh_all_panels()
 #            self._populate_well_tree()
 
-    def _build_well_tree_dock(self):
-        """Left dock: tree with checkboxes to toggle wells."""
-        self.well_dock = QDockWidget("Wells", self)
-        self.well_dock.setObjectName("WellDock")
-        self.well_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-
-        self.well_tree = QTreeWidget(self.well_dock)
-        self.well_tree.setHeaderHidden(True)
-        self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
-
-        # 👇 create the folder item once
-        self.well_root_item = QTreeWidgetItem(["All wells"])
-        # tristate so checking it checks/unchecks children
-        self.well_root_item.setFlags(
-            self.well_root_item.flags()
-            | Qt.ItemIsUserCheckable
-            | Qt.ItemIsTristate
-            | Qt.ItemIsSelectable
-            | Qt.ItemIsEnabled
-        )
-        self.well_root_item.setCheckState(0, Qt.Unchecked)
-
-        self.well_tree.addTopLevelItem(self.well_root_item)
-
-        # Context menu
-        #self.well_tree.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        #self.well_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
-        #self.well_tree.customContextMenuRequested.connect(self.test_connect)
-
-        self._populate_well_tree()  # initial fill
-
-        self.well_dock.setWidget(self.well_tree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
-
     def _populate_well_tree(self):
+
+        self.ctree.remove_all_descendants(self.cwell_root)
+
+        for w in self.all_wells:
+            well_item = self.ctree.add_parent(self.cwell_root, w["name"], False)
+            cont_folder = self.ctree.add_parent(well_item, "continuous",  False)
+            discrete_folder = self.ctree.add_parent(well_item, "discrete" , False)
+            bitmaps_folder = self.ctree.add_parent(well_item, "bitmaps", False)
+
+            self.ctree._remove_checkbox(cont_folder)
+            self.ctree._remove_checkbox(discrete_folder)
+            self.ctree._remove_checkbox(bitmaps_folder)
+            self.ctree.set_accept_children_drop(well_item, accept = False)
+            self.ctree.set_accept_children_drop(cont_folder, accept = False)
+            self.ctree.set_accept_children_drop(discrete_folder, accept = False)
+            self.ctree.set_accept_children_drop(bitmaps_folder, accept = False)
+
+
+            logs_dict = w.get("logs", {}) or {}
+            if logs_dict:
+                parent_for_logs = cont_folder  # direct children of the well
+                for log_name in sorted(logs_dict.keys()):
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    self.ctree.set_item_movable(leaf, False)
+                    #self.ctree._remove_checkbox(leaf)
+                    #self.ctree._remove_checkbox(parent_for_logs)
+
+            logs_dict = w.get("discrete_logs", {}) or {}
+            if logs_dict:
+                parent_for_logs = discrete_folder  # direct children of the well
+                for log_name in sorted(logs_dict.keys()):
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    self.ctree.lock_leaf_movement(leaf)
+                    self.ctree._remove_checkbox(leaf)
+
+            logs_dict = w.get("bitmaps", {}) or {}
+            if logs_dict:
+                parent_for_logs = bitmaps_folder  # direct children of the well
+                for log_name in sorted(logs_dict.keys()):
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    #self.ctree.set_item_movable(leaf, False)
+                    self.ctree._remove_checkbox(leaf)
+
+
+
+        self._populate_well_treeo()
+        return
+
+    def _populate_well_treeo(self):
         """Rebuild wells subtree from self.all_wells, with log leaves under each well."""
         prev_selected = set()
         root = self.well_root_item
@@ -1428,9 +1446,45 @@ class MainWindow(QMainWindow):
                     blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
 
         self.well_tree.blockSignals(False)
-        self._rebuild_well_panel_from_tree()
+        #self._rebuild_well_panel_from_tree()
+
 
     def _populate_well_tops_tree(self):
+
+        Blocker = QSignalBlocker(self.ctree)
+        self.ctree.remove_all_descendants(self.cstrat_root)
+
+        strat_list = list(self.all_stratigraphy)
+        print(strat_list)
+        visible_tops = self.panel.get_visible_tops()
+        print (visible_tops)
+
+        # self.checkable_tree.build_tree(self.all_stratigraphy)
+        if not visible_tops:
+            self.cstrat_root.setCheckState(0, Qt.Checked)
+            self.cfault_root.setCheckState(0, Qt.Checked)
+            self.cother_root.setCheckState(0, Qt.Checked)
+
+        self.ctree.remove_all_descendants(self.cstrat_root)
+        self.ctree.remove_all_descendants(self.cfault_root)
+        self.ctree.remove_all_descendants(self.cother_root)
+
+        for strat_name in strat_list:
+            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
+                strat_it = self.ctree.add_leaf(self.cstrat_root, strat_name, True if strat_name in visible_tops else False)
+
+                strat_it.setData(0, Qt.UserRole, strat_name)
+            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
+                fault_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
+                fault_it.setData(0, Qt.UserRole, strat_name)
+            elif self.all_stratigraphy[strat_name]['role'] == 'other':
+                other_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
+                other_it.setData(0, Qt.UserRole, strat_name)
+
+        Blocker.unblock()
+        self._populate_well_tops_otree()
+
+    def _populate_well_tops_otree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
         # Remember current selection by name
 
@@ -1529,193 +1583,6 @@ class MainWindow(QMainWindow):
 
         # Apply current selection to well_panel
         self._rebuild_well_panel_from_tree()
-
-    def _populate_c_well_tops_tree(self):
-        """Rebuild the tree from self.all_wells, preserving selections if possible."""
-        # Remember current selection by name
-        self.c_well_tree.blockSignals(True)
-        strat_prev_selected = set()
-        strat_root = self.c_stratigraphy_root
-        for i in range(strat_root.childCount()):
-            it = strat_root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                strat_prev_selected.add(it.data(0, Qt.UserRole))
-
-        # remove all children under the folder
-        strat_root.takeChildren()
-
-        faults_prev_selected = set()
-        faults_root = self.c_faults_root
-        for i in range(faults_root.childCount()):
-            it = faults_root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                faults_prev_selected.add(it.data(0, Qt.UserRole))
-
-        # remove all children under the folder
-        faults_root.takeChildren()
-
-        # add wells as children of "All wells"
-
-        strat_list = list(self.all_stratigraphy)
-
-        #self.checkable_tree.build_tree(self.all_stratigraphy)
-
-        for strat_name in strat_list:
-            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
-                strat_it = QTreeWidgetItem([strat_name])
-                strat_it.setFlags(
-                    strat_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                strat_it.setData(0, Qt.UserRole, strat_name)
-#                self.checkable_tree.add_leaf(self.c_stratigraphy_root, strat_name)
-#                strat_it.parentToggled.connect(self.on_strat_toggled)
-
-                # default: keep previous selection; else checked
-                if not strat_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in strat_prev_selected else Qt.Unchecked
-                strat_it.setCheckState(0, state)
-                strat_root.addChild(strat_it)
-            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
-                fault_it = QTreeWidgetItem([strat_name])
-                fault_it.setFlags(
-                    fault_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                fault_it.setData(0, Qt.UserRole, strat_name)
-
-                if not faults_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in faults_prev_selected else Qt.Unchecked
-                fault_it.setCheckState(0, state)
-                faults_root.addChild(fault_it)
-            elif self.all_stratigraphy[strat_name]['role'] == 'other':
-                other_it = QTreeWidgetItem([strat_name])
-                other_it.setFlags(
-                    other_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                other_it.setData(0, Qt.UserRole, strat_name)
-
-                if not other_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in other_prev_selected else Qt.Unchecked
-                other_it.setCheckState(0, state)
-                other_root.addChild(other_it)
-
-        self.well_tree.blockSignals(False)
-
-        # Apply current selection to well_panel
-        self._rebuild_well_panel_from_tree()
-
-    def _populate_c_well_tops_tree(self):
-        """Rebuild the tree from self.all_wells, preserving selections if possible."""
-        # Remember current selection by name
-        self.c_well_tree.blockSignals(True)
-        strat_prev_selected = set()
-        strat_root = self.c_stratigraphy_root
-        for i in range(strat_root.childCount()):
-            it = strat_root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                strat_prev_selected.add(it.data(0, Qt.UserRole))
-
-        # remove all children under the folder
-        strat_root.takeChildren()
-
-        faults_prev_selected = set()
-        faults_root = self.c_faults_root
-        for i in range(faults_root.childCount()):
-            it = faults_root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                faults_prev_selected.add(it.data(0, Qt.UserRole))
-
-        # remove all children under the folder
-        faults_root.takeChildren()
-
-        other_prev_selected = set()
-        other_root = self.other_root
-        for i in range(other_root.childCount()):
-            it = other_root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                other_prev_selected.add(it.data(0, Qt.UserRole))
-        self.well_tree.blockSignals(True)
-
-        # remove all children under the folder
-        faults_root.takeChildren()
-
-        # add wells as children of "All wells"
-
-        strat_list = list(self.all_stratigraphy)
-
-        # self.checkable_tree.build_tree(self.all_stratigraphy)
-
-        for strat_name in strat_list:
-            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
-                strat_it = QTreeWidgetItem([strat_name])
-                strat_it.setFlags(
-                    strat_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                strat_it.setData(0, Qt.UserRole, strat_name)
-                self.checkable_tree.add_leaf(self.c_stratigraphy_root, strat_name)
-                #                strat_it.parentToggled.connect(self.on_strat_toggled)
-
-                # default: keep previous selection; else checked
-                if not strat_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in strat_prev_selected else Qt.Unchecked
-                strat_it.setCheckState(0, state)
-                strat_root.addChild(strat_it)
-            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
-                fault_it = QTreeWidgetItem([strat_name])
-                fault_it.setFlags(
-                    fault_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                fault_it.setData(0, Qt.UserRole, strat_name)
-
-                if not faults_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in faults_prev_selected else Qt.Unchecked
-                fault_it.setCheckState(0, state)
-                faults_root.addChild(fault_it)
-            elif self.all_stratigraphy[strat_name]['role'] == 'other':
-                other_it = QTreeWidgetItem([strat_name])
-                other_it.setFlags(
-                    other_it.flags()
-                    | Qt.ItemIsUserCheckable
-                    | Qt.ItemIsSelectable
-                    | Qt.ItemIsEnabled
-                )
-                other_it.setData(0, Qt.UserRole, strat_name)
-
-                if not other_prev_selected:
-                    state = Qt.Checked
-                else:
-                    state = Qt.Checked if strat_name in other_prev_selected else Qt.Unchecked
-                other_it.setCheckState(0, state)
-                other_root.addChild(other_it)
-
-        self.well_tree.blockSignals(False)
-
-        # Apply current selection to well_panel
-        # self._rebuild_well_panel_from_tree()
 
     def _populate_well_log_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
@@ -1941,18 +1808,13 @@ class MainWindow(QMainWindow):
 
         p = item.parent()
         if item is self.well_root_item or p is self.well_root_item:
+            print ("item is a well root item")
             self._rebuild_wells_from_tree()
             self._update_map_windows()
 
         if item is self.stratigraphy_root:
             print ("item is stratigraphy_root")
             self._rebuild_visible_tops_from_tree()
-        elif item is self.stratigraphy_root:
-            print("parent is stratigraphy_root")
-            self._rebuild_visible_tops_from_tree()
-
-
-
         # if item is self.well_tops_folder:
         #     print ("item is well_tops_folder")
         #     #self.panel.set_draw_well_panel(False)
@@ -2529,7 +2391,7 @@ class MainWindow(QMainWindow):
         new_strat = dlg.result_stratigraphy()
 
 
-        self.panel.draw_well_panel()
+        #self.panel.draw_well_panel()
 
         if new_strat is None:
             return
@@ -4694,17 +4556,81 @@ class MainWindow(QMainWindow):
         for w in self.WindowList:
             w.window_deactivated()
 
+
+
     @QtCore.Slot(str, bool)
     def on_parent_toggled(self, path, checked):
         msg = f"PARENT toggled: {path} -> {'checked' if checked else 'unchecked'}"
         print(msg)
+
+        parent = ""
+        if " / " in path:
+            parent = path.split(" / ")[-1]
+        else: parent = path
+
+        if parent == "Stratigraphy" or parent == "Faults" or parent == "Other":
+            if checked:
+                visible_tops = list(self.all_stratigraphy.keys())
+                self.panel.set_visible_tops(visible_tops)
+            else:
+                self.panel.set_visible_tops([])
+            self.panel.draw_well_panel()
+
+        if parent == "Tops":
+            if checked:
+                visible_tops = list(self.all_stratigraphy.keys())
+                self.panel.set_visible_tops(visible_tops)
+            else:
+                self.panel.set_visible_tops([])
+            self.panel.draw_well_panel()
+
+
+
         self.statusBar().showMessage(msg)
 
     @QtCore.Slot(str, bool)
     def on_leaf_toggled(self, path, checked):
         msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
-        print(msg)
+
+        parent = ""
+        leaf = ""
+        root = ""
+
+        ne = path.count(" / ")
+
+        if " / " in path:
+            root = path.split(" / ")[1]
+            parent = path.split(" / ")[-2]
+            leaf = path.split(" / ")[-1]
+            print(msg, parent, leaf, root)
+
         self.statusBar().showMessage(msg)
+
+        if parent == "Stratigraphy" or root == "Stratigraphy":
+
+            visible_tops = self.panel.get_visible_tops()
+            #print (type(visible_tops), visible_tops)
+            if isinstance(visible_tops, OrderedDict):
+                visible_tops = list(visible_tops.keys()) ## change back to list
+            if isinstance(visible_tops, set):
+                visible_tops = list(visible_tops)
+
+            if checked:
+                if leaf in visible_tops:
+                    return  ## nothing to do here
+                else:
+                    visible_tops.append(leaf)
+            else:
+                if not visible_tops:
+                    return
+                if len(visible_tops) == 0: # if unchecked and no tops are visible, do nothing
+                    return
+                else:
+                    if leaf in visible_tops:
+                        visible_tops.remove(leaf)
+            self.panel.set_visible_tops(visible_tops)
+            self.panel.draw_well_panel()
+
 
     @QtCore.Slot(str, str)
     def on_context_action(self, path, action):

@@ -1157,6 +1157,13 @@ class WellPanelWidget(QWidget):
         #self.visible_wells = wells
         self._flatten_depths = None
 
+    def set_top_visible(self, top_name, top):
+
+        self.visible_tops[top_name] = top
+
+    def set_top_hidden(self, top_name: str):
+        self.visible_tops.pop(top_name)
+
     def set_logs(self,logs):
         self.logs=logs
 

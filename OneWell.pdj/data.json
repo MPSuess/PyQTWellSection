@@ -5092,7 +5092,8 @@
           "depth": 450,
           "level": "formation",
           "color": "#000000"
-        }
+        },
+        "Member A1": 290.5644112057831
       },
       "facies_intervals": [
         {
@@ -5498,58 +5499,28 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": {
-        "Upper Formation A": {
-          "level": "sequence",
-          "color": "#ff0000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Formation A": {
-          "level": "formation",
-          "color": "#ffcc00",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Sequence 1": {
-          "level": "sequence",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Member A1": {
-          "level": "member",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Carboniferous": {
-          "level": "formation",
-          "color": "#000000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Lower Formation A": {
-          "level": "sequence",
-          "color": "#0000ff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        }
-      },
+      "visible_tops": [
+        "Upper Formation A",
+        "Formation A",
+        "Sequence 1",
+        "Member A1",
+        "Carboniferous"
+      ],
       "visible_logs": [
         "GR",
         "PHI",
-        "RHOB",
+        "RT",
         "CAL",
-        "RT"
+        "RHOB"
       ],
       "visible_tracks": [
-        "LithoFacies",
-        "core",
         "GR-CAL",
-        "Facies",
+        "f3",
+        "LithoFacies",
         "RT-RHOB",
-        "RHOB-PHI"
+        "Facies",
+        "RHOB-PHI",
+        "core"
       ],
       "visible_wells": [
         "Well A"
@@ -5559,13 +5530,18 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "panel_title": "Well_Section_1"
+        "vertical_scale": 2.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     }
   ],
   "ui_layout": {
     "geometry_b64": "AdnQywADAAAAAAGvAAAAzAAACHIAAARrAAABrwAAAOgAAAhyAAAEawAAAAAAAAAACgAAAAGvAAAA6AAACHIAAARr",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAbEAAADbPwCAAAAAfwAAAAYAAADbAAAASQA/////AEAAAAC/AAAAAAAAAHcAAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAB3QAABOcAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAL2AAAArgD////8AAADDwAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAAAAAAAAAPwAAAAYAAADbAAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAADbAAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAbEAAADUfwCAAAAAfwAAAAYAAADUQAAASQA/////AEAAAAC/AAAAAAAAAHcAAAAkgD////6AAAAAgEAAAAD+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////7AAAACABUAGUAcwB0AQAAAAD/////AAAASgD////8AAAB3QAABOcAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAALbAAAArgD////8AAAC9AAAAHUAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAACzAAAA2z8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAG2AAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMBAAAD+AAAAswAAAAAAAAAAPwAAAAYAAADbAAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAADUQAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
     "tab_groups": [
       [
         "Console",
@@ -5573,8 +5549,9 @@
         "Log"
       ],
       [
+        "Input",
         "Windows",
-        "Input"
+        "Test"
       ]
     ]
   }
