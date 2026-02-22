@@ -37,6 +37,7 @@ from pywellsection.sample_data import Wells # The new class for wells
 from pywellsection.pws_project import PWSProject
 
 
+
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
 
@@ -51,7 +52,7 @@ from pywellsection.io_utils import import_schichtenverzeichnis
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
 from pywellsection.trees import (setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree,
-                                 setup_ctree)
+                                 setup_input_tree)
 #from pywellsection.trees import CheckableTree
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
@@ -88,7 +89,7 @@ from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
 import logging
 import os
 
-
+import secrets
 
 # This file is part of the `pywellsection` project and licensed under
 # EUPL 1.2
@@ -210,7 +211,7 @@ class MainWindow(QMainWindow):
 
         setup_well_widget_tree(self)
         setup_window_tree(self)
-        setup_ctree(self)
+        setup_input_tree(self)
         #self.checkable_tree.build_tree(self.all_wells)
 
         ### Setup the Dock
@@ -467,6 +468,7 @@ class MainWindow(QMainWindow):
         try:
             window_dict, wells, tracks, raw_strat, ui_layout, _ = load_project_from_json(path)
 
+
             self.current_project_path = path
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
@@ -555,11 +557,6 @@ class MainWindow(QMainWindow):
 
             for well in wells:
                 bitmaps = well.get("bitmaps", None)
-                # if bitmaps:
-                #     for bitmap in bitmaps:
-                #         if bitmap is not None:
-                #             self.all_bitmaps.append(bitmap)
-
                 if bitmaps:
                     for bitmap in bitmaps:
                         if bitmap is not None:
@@ -634,6 +631,11 @@ class MainWindow(QMainWindow):
             self.redraw_requested = False
             self.panel_settings["redraw_requested"] = False
 
+            self.ensure_all_object_ids()
+
+
+
+
             # populate well tree
             self._populate_well_tree()
             self._populate_well_tops_tree()
@@ -654,6 +656,10 @@ class MainWindow(QMainWindow):
             self.panel_settings["redraw_requested"] = True
             #self.panel.draw_well_panel()
             self._redraw_all_panels()
+
+
+            return
+
 
         except Exception as e:
             QMessageBox.critical(self, "Open Error", str(e))
@@ -1304,10 +1310,10 @@ class MainWindow(QMainWindow):
         self.ctree.remove_all_descendants(self.cwell_root)
 
         for w in self.all_wells:
-            well_item = self.ctree.add_parent(self.cwell_root, w["name"], False)
-            cont_folder = self.ctree.add_parent(well_item, "continuous",  False)
-            discrete_folder = self.ctree.add_parent(well_item, "discrete" , False)
-            bitmaps_folder = self.ctree.add_parent(well_item, "bitmaps", False)
+            well_item = self.ctree.add_parent(self.cwell_root, w["name"], w["uid"], False)
+            cont_folder = self.ctree.add_parent(well_item, "","continuous",  False)
+            discrete_folder = self.ctree.add_parent(well_item, "", "discrete" , False)
+            bitmaps_folder = self.ctree.add_parent(well_item, "", "bitmaps", False)
 
             self.ctree._remove_checkbox(cont_folder)
             self.ctree._remove_checkbox(discrete_folder)
@@ -1319,10 +1325,11 @@ class MainWindow(QMainWindow):
 
 
             logs_dict = w.get("logs", {}) or {}
+
             if logs_dict:
                 parent_for_logs = cont_folder  # direct children of the well
                 for log_name in sorted(logs_dict.keys()):
-                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name,w["logs"][log_name]["uid"])
                     self.ctree.set_item_movable(leaf, False)
                     #self.ctree._remove_checkbox(leaf)
                     #self.ctree._remove_checkbox(parent_for_logs)
@@ -1331,7 +1338,8 @@ class MainWindow(QMainWindow):
             if logs_dict:
                 parent_for_logs = discrete_folder  # direct children of the well
                 for log_name in sorted(logs_dict.keys()):
-                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name,
+                                                            w["discrete_logs"][log_name]["uid"])
                     self.ctree.lock_leaf_movement(leaf)
                     self.ctree._remove_checkbox(leaf)
 
@@ -1339,7 +1347,8 @@ class MainWindow(QMainWindow):
             if logs_dict:
                 parent_for_logs = bitmaps_folder  # direct children of the well
                 for log_name in sorted(logs_dict.keys()):
-                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name)
+                    leaf = self.ctree.add_noncheckable_leaf(parent_for_logs, log_name,
+                                                            w["bitmaps"][log_name]["uid"])
                     #self.ctree.set_item_movable(leaf, False)
                     self.ctree._remove_checkbox(leaf)
 
@@ -1455,6 +1464,7 @@ class MainWindow(QMainWindow):
         self.ctree.remove_all_descendants(self.cstrat_root)
 
         strat_list = list(self.all_stratigraphy)
+        astrat = self.all_stratigraphy
         print(strat_list)
         visible_tops = self.panel.get_visible_tops()
         print (visible_tops)
@@ -1471,14 +1481,17 @@ class MainWindow(QMainWindow):
 
         for strat_name in strat_list:
             if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
-                strat_it = self.ctree.add_leaf(self.cstrat_root, strat_name, True if strat_name in visible_tops else False)
+                strat_it = self.ctree.add_leaf(self.cstrat_root, strat_name, astrat[strat_name]["uid"],
+                                               True if strat_name in visible_tops else False)
 
                 strat_it.setData(0, Qt.UserRole, strat_name)
             elif self.all_stratigraphy[strat_name]['role'] == 'fault':
-                fault_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
+                fault_it = self.ctree.add_leaf(self.cfault_root, strat_name, astrat[strat_name]["uid"],
+                                               True if strat_name in visible_tops else False)
                 fault_it.setData(0, Qt.UserRole, strat_name)
             elif self.all_stratigraphy[strat_name]['role'] == 'other':
-                other_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
+                other_it = self.ctree.add_leaf(self.cfault_root, strat_name, astrat[strat_name]["uid"],
+                                               True if strat_name in visible_tops else False)
                 other_it.setData(0, Qt.UserRole, strat_name)
 
         Blocker.unblock()
@@ -2988,7 +3001,7 @@ class MainWindow(QMainWindow):
             return
 
         bmp_cfg = track.get("bitmap", {}) or {}
-        key = bmp_cfg.get("label", None)
+        key = bmp_cfg.get("key", None)
         if not key:
             QMessageBox.warning(self, "Load bitmap", "Bitmap track has no 'key' configured.")
             return
@@ -4556,12 +4569,468 @@ class MainWindow(QMainWindow):
         for w in self.WindowList:
             w.window_deactivated()
 
+    def ensure_project_object_ids(self,project):
+
+        """
+        Ensure every object has a persistent 'id' field.
+        Run this after loading a project (JSON/PWS).
+
+        Objects covered:
+          - wells
+          - well.tops (each top dict)
+          - well.logs (each log dict)
+          - well.discrete_logs (each discrete log dict)
+          - well.bitmaps (each bitmap dict)
+          - well.facies_intervals entries (dicts in list)
+          - tracks (track dict)
+          - stratigraphy units (dict entry value) -> stored as 'id' in value
+
+        Returns
+        -------
+        int: number of IDs added
+        """
+
+        added = 0
+
+        def _ensure_id(d: dict):
+            nonlocal added
+            if isinstance(d, dict) and not d.get("id"):
+                d["id"] = new_uid64()  # or new_uid8()
+                added += 1
+
+        # --- stratigraphy ---
+        strat = getattr(project, "all_stratigraphy", None)
+        if isinstance(strat, dict):
+            for _, meta in strat.items():
+                if isinstance(meta, dict):
+                    _ensure_id(meta)
+
+        # --- tracks ---
+        tracks = getattr(project, "all_tracks", None)
+        if isinstance(tracks, list):
+            for tr in tracks:
+                if isinstance(tr, dict):
+                    _ensure_id(tr)
+                    # ensure per-log config IDs too (optional)
+                    for lc in (tr.get("logs") or []):
+                        if isinstance(lc, dict):
+                            _ensure_id(lc)
+                    if isinstance(tr.get("discrete"), dict):
+                        _ensure_id(tr["discrete"])
+                    if isinstance(tr.get("bitmap"), dict):
+                        _ensure_id(tr["bitmap"])
+                    if isinstance(tr.get("config"), dict):
+                        _ensure_id(tr["config"])
+
+        # --- wells and nested objects ---
+        wells = getattr(project, "all_wells", None)
+        if isinstance(wells, list):
+            for w in wells:
+                if not isinstance(w, dict):
+                    continue
+                _ensure_id(w)
+
+                # tops
+                tops = w.get("tops") or {}
+                if isinstance(tops, dict):
+                    for _, tval in tops.items():
+                        if isinstance(tval, dict):
+                            _ensure_id(tval)
+
+                # continuous logs
+                logs = w.get("logs") or {}
+                if isinstance(logs, dict):
+                    for _, ldef in logs.items():
+                        if isinstance(ldef, dict):
+                            _ensure_id(ldef)
+
+                # discrete logs
+                dlogs = w.get("discrete_logs") or {}
+                if isinstance(dlogs, dict):
+                    for _, ddef in dlogs.items():
+                        if isinstance(ddef, dict):
+                            _ensure_id(ddef)
+
+                # bitmaps
+                bm = w.get("bitmaps") or {}
+                if isinstance(bm, dict):
+                    for _, bdef in bm.items():
+                        if isinstance(bdef, dict):
+                            _ensure_id(bdef)
+
+                # facies intervals (list of dicts)
+                fins = w.get("facies_intervals") or []
+                if isinstance(fins, list):
+                    for fi in fins:
+                        if isinstance(fi, dict):
+                            _ensure_id(fi)
+
+        return added
+
+    def ensure_all_object_ids(self):
+
+        """
+        Ensure every object has a persistent 'id' field.
+        Run this after loading a project (JSON/PWS).
+
+        Objects covered:
+          - wells
+          - well.tops (each top dict)
+          - well.logs (each log dict)
+          - well.discrete_logs (each discrete log dict)
+          - well.bitmaps (each bitmap dict)
+          - well.facies_intervals entries (dicts in list)
+          - tracks (track dict)
+          - stratigraphy units (dict entry value) -> stored as 'id' in value
+
+        Returns
+        -------
+        int: number of IDs added
+        """
+
+        added = 0
+
+        def _ensure_id(d: dict):
+            nonlocal added
+            if isinstance(d, dict) and not d.get("uid"):
+                d["uid"] = new_uid64()  # or new_uid8()
+                added += 1
+
+        # --- stratigraphy ---
+        strat = self.all_stratigraphy
+        if isinstance(strat, dict):
+            for _, meta in strat.items():
+                if isinstance(meta, dict):
+                    _ensure_id(meta)
+
+        # --- tracks ---
+        tracks = self.all_tracks
+        if isinstance(tracks, list):
+            for tr in tracks:
+                if isinstance(tr, dict):
+                    _ensure_id(tr)
+                    # ensure per-log config IDs too (optional)
+                    for lc in (tr.get("logs") or []):
+                        if isinstance(lc, dict):
+                            _ensure_id(lc)
+                    if isinstance(tr.get("discrete"), dict):
+                        _ensure_id(tr["discrete"])
+                    if isinstance(tr.get("bitmap"), dict):
+                        _ensure_id(tr["bitmap"])
+                    if isinstance(tr.get("config"), dict):
+                        _ensure_id(tr["config"])
+
+        # --- wells and nested objects ---
+        wells = self.all_wells
+        if isinstance(wells, list):
+            for w in wells:
+                if not isinstance(w, dict):
+                    continue
+                _ensure_id(w)
+
+                # tops
+                tops = w.get("tops") or {}
+                if isinstance(tops, dict):
+                    for _, tval in tops.items():
+                        if isinstance(tval, dict):
+                            _ensure_id(tval)
+
+                # continuous logs
+                logs = w.get("logs") or {}
+                if isinstance(logs, dict):
+                    for _, ldef in logs.items():
+                        if isinstance(ldef, dict):
+                            _ensure_id(ldef)
+
+                # discrete logs
+                dlogs = w.get("discrete_logs") or {}
+                if isinstance(dlogs, dict):
+                    for _, ddef in dlogs.items():
+                        if isinstance(ddef, dict):
+                            _ensure_id(ddef)
+
+                # bitmaps
+                bm = w.get("bitmaps") or {}
+                if isinstance(bm, dict):
+                    for _, bdef in bm.items():
+                        if isinstance(bdef, dict):
+                            _ensure_id(bdef)
+
+                # facies intervals (list of dicts)
+                fins = w.get("facies_intervals") or []
+                if isinstance(fins, list):
+                    for fi in fins:
+                        if isinstance(fi, dict):
+                            _ensure_id(fi)
+
+        print ("All ids added.")
+        return added
+
+    # --------------------------------------------------------
+    # PUBLIC: get object by uid
+    # --------------------------------------------------------
+    def get_object_by_uid(self, uid: str):
+        """
+        Search the entire project for an object with matching id.
+
+        Returns:
+            (obj, parent, object_type)
+        or:
+            (None, None, None)
+        """
+
+        if not uid:
+            return None, None, None
+
+        # search wells
+        for well in (self.all_wells or []):
+            obj = self._search_dict_recursive(well, uid)
+            if obj:
+                return obj
+
+        # search tracks
+        for track in (self.all_tracks or []):
+            obj = self._search_dict_recursive(track, uid)
+            if obj:
+                return obj
+
+        # search stratigraphy
+        for name, meta in (self.all_stratigraphy or {}).items():
+            if isinstance(meta, dict) and meta.get("uid") == uid:
+                return meta, self.all_stratigraphy, "stratigraphy"
+
+        return None, None, None
+
+    # --------------------------------------------------------
+    # INTERNAL recursive search helper
+    # --------------------------------------------------------
+    def _search_dict_recursive(self, obj, uid):
+        """
+        Recursively search dicts/lists for object with id == uid.
+        Returns (obj, parent, type) or None.
+        """
+
+        if isinstance(obj, dict):
+
+            # direct hit
+            if obj.get("uid") == uid:
+                return obj, None, self._infer_object_type(obj)
+
+            for key, val in obj.items():
+
+                # nested dict
+                if isinstance(val, dict):
+                    result = self._search_dict_recursive(val, uid)
+                    if result:
+                        found, parent, typ = result
+                        return found, obj, typ
+
+                # nested list
+                elif isinstance(val, list):
+                    for item in val:
+                        result = self._search_dict_recursive(item, uid)
+                        if result:
+                            found, parent, typ = result
+                            return found, obj, typ
+
+        return None
+
+    def _infer_object_type(self, obj: dict) -> str:
+        """
+        Guess object type from content.
+        """
+        if "reference_depth" in obj:
+            return "well"
+        if "level" in obj and "depth" in obj:
+            return "top"
+        if "data" in obj and "depth" in obj:
+            return "continuous_log"
+        if "values" in obj and "depth" in obj:
+            return "discrete_log"
+        if "path" in obj and "top_depth" in obj:
+            return "bitmap"
+        if "type" in obj:
+            return "track"
+        return "unknown"
+
+    # --------------------------------------------------------
+    # PUBLIC: get object name by uid
+    # --------------------------------------------------------
+    def get_object_name_by_uid(self, uid: str):
+        """
+        Return a human-readable name for object with given uid.
+
+        Returns:
+            str or None
+        """
+
+        obj, parent, obj_type = self.get_object_by_uid(uid)
+
+        if not obj:
+            return None
+
+        # 1️⃣ explicit name field
+        if isinstance(obj, dict) and "name" in obj:
+            return obj["name"]
+
+        # 2️⃣ stratigraphy key (dict key is name)
+        if obj_type == "stratigraphy":
+            for key, val in (self.all_stratigraphy or {}).items():
+                if val is obj:
+                    return key
+
+        # 3️⃣ tops (dict key is name inside well["tops"])
+        if obj_type == "top":
+            for well in (self.all_wells or []):
+                tops = well.get("tops") or {}
+                for key, val in tops.items():
+                    if val is obj:
+                        return key
+
+        # 4️⃣ logs (dict key is name inside well["logs"])
+        if obj_type == "continuous_log":
+            for well in (self.all_wells or []):
+                logs = well.get("logs") or {}
+                for key, val in logs.items():
+                    if val is obj:
+                        return key
+
+        # 5️⃣ discrete logs
+        if obj_type == "discrete_log":
+            for well in (self.all_wells or []):
+                logs = well.get("discrete_logs") or {}
+                for key, val in logs.items():
+                    if val is obj:
+                        return key
+
+        # 6️⃣ bitmaps
+        if obj_type == "bitmap":
+            for well in (self.all_wells or []):
+                bms = well.get("bitmaps") or {}
+                for key, val in bms.items():
+                    if val is obj:
+                        return key
+
+        # 7️⃣ tracks
+        if obj_type == "track":
+            for tr in (self.all_tracks or []):
+                if tr is obj:
+                    return tr.get("name")
+
+        return None
+
+    # --------------------------------------------------------
+    # PUBLIC: delete object by uid
+    # --------------------------------------------------------
+    def delete_object_by_uid(self, uid: str):
+        """
+        Delete object identified by uid from project.
+
+        Returns:
+            (True, object_type, object_name)
+        or:
+            (False, None, None)
+        """
+
+        if not uid:
+            return False, None, None
+
+        obj, parent, obj_type = self.get_object_by_uid(uid)
+        if not obj:
+            return False, None, None
+
+        obj_name = self.get_object_name_by_uid(uid)
+
+        # 1️⃣ Wells
+        if obj_type == "well":
+            self.all_wells = [
+                w for w in (self.all_wells or [])
+                if w.get("id") != uid
+            ]
+            return True, "well", obj_name
+
+        # 2️⃣ Stratigraphy
+        if obj_type == "stratigraphy":
+            for key, val in list((self.all_stratigraphy or {}).items()):
+                if val.get("id") == uid:
+                    self.all_stratigraphy.pop(key)
+                    return True, "stratigraphy", key
+
+        # 3️⃣ Tracks
+        if obj_type == "track":
+            self.all_tracks = [
+                t for t in (self.all_tracks or [])
+                if t.get("id") != uid
+            ]
+            return True, "track", obj_name
+
+        # 4️⃣ Nested objects inside wells
+        for well in (self.all_wells or []):
+
+            # tops
+            tops = well.get("tops") or {}
+            for key, val in list(tops.items()):
+                if val.get("id") == uid:
+                    tops.pop(key)
+                    return True, "top", key
+
+            # continuous logs
+            logs = well.get("logs") or {}
+            for key, val in list(logs.items()):
+                if val.get("id") == uid:
+                    logs.pop(key)
+                    return True, "continuous_log", key
+
+            # discrete logs
+            dlogs = well.get("discrete_logs") or {}
+            for key, val in list(dlogs.items()):
+                if val.get("id") == uid:
+                    dlogs.pop(key)
+                    return True, "discrete_log", key
+
+            # bitmaps
+            bms = well.get("bitmaps") or {}
+            for key, val in list(bms.items()):
+                if val.get("id") == uid:
+                    bms.pop(key)
+                    return True, "bitmap", key
+
+            # facies intervals (list)
+            fins = well.get("facies_intervals") or []
+            for i, fi in enumerate(list(fins)):
+                if fi.get("id") == uid:
+                    fins.pop(i)
+                    return True, "facies_interval", obj_name
+
+        return False, None, None
+
+    def cleanup_visibility_after_delete(self, uid):
+        name = self.get_object_name_by_uid(uid)
+
+        for panel in self.all_windows or []:
+            if hasattr(panel, "remove_visible_well_by_name"):
+                panel.remove_visible_well_by_name(name)
+            if hasattr(panel, "remove_visible_track_by_name"):
+                panel.remove_visible_track_by_name(name)
+            if hasattr(panel, "remove_visible_top_by_name"):
+                panel.remove_visible_top_by_name(name)
+            if hasattr(panel, "remove_visible_log_by_name"):
+                panel.remove_visible_log_by_name(name)
+            if hasattr(panel, "remove_visible_discrete_log_by_name"):
+                panel.remove_visible_discrete_log_by_name(name)
 
 
-    @QtCore.Slot(str, bool)
-    def on_parent_toggled(self, path, checked):
+
+    @QtCore.Slot(str, str, bool)
+    def on_parent_toggled(self, path, uid, checked):
         msg = f"PARENT toggled: {path} -> {'checked' if checked else 'unchecked'}"
-        print(msg)
+        #print(msg)
+        #print("UID:", uid)
+
+
+        #uid_obj,uid_parent, uid_type = self.get_object_by_uid(uid)
+
+        #print(uid_obj, uid_parent, uid_type)
 
         parent = ""
         if " / " in path:
@@ -4588,47 +5057,26 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(msg)
 
-    @QtCore.Slot(str, bool)
-    def on_leaf_toggled(self, path, checked):
-        msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
+    @QtCore.Slot(str, str, bool)
+    def on_leaf_toggled(self, path, uid, checked):
+        #msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
+        #print("UID:", uid)
 
         parent = ""
         leaf = ""
         root = ""
 
-        ne = path.count(" / ")
+        uid_obj,uid_parent, uid_type = self.get_object_by_uid(uid)
 
-        if " / " in path:
-            root = path.split(" / ")[1]
-            parent = path.split(" / ")[-2]
-            leaf = path.split(" / ")[-1]
-            print(msg, parent, leaf, root)
+        #print(uid_obj, uid_parent, uid_type)
 
-        self.statusBar().showMessage(msg)
+        name = self.get_object_name_by_uid(uid)
+        type = uid_type
 
-        if parent == "Stratigraphy" or root == "Stratigraphy":
 
-            visible_tops = self.panel.get_visible_tops()
-            #print (type(visible_tops), visible_tops)
-            if isinstance(visible_tops, OrderedDict):
-                visible_tops = list(visible_tops.keys()) ## change back to list
-            if isinstance(visible_tops, set):
-                visible_tops = list(visible_tops)
 
-            if checked:
-                if leaf in visible_tops:
-                    return  ## nothing to do here
-                else:
-                    visible_tops.append(leaf)
-            else:
-                if not visible_tops:
-                    return
-                if len(visible_tops) == 0: # if unchecked and no tops are visible, do nothing
-                    return
-                else:
-                    if leaf in visible_tops:
-                        visible_tops.remove(leaf)
-            self.panel.set_visible_tops(visible_tops)
+        if type == "stratigraphy":
+            self.panel.change_top_visibility(name, checked)
             self.panel.draw_well_panel()
 
 
@@ -4651,3 +5099,28 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"{action}: {path}")
         else:
             self.statusBar().showMessage(f"{action}")
+
+
+
+def new_uid8() -> str:
+    """
+    Generate a compact universal ID:
+      - 64-bit random value (8 bytes)
+      - encoded as 8 URL-safe characters (base64url without padding)
+
+    Example: 'aZ3kP0Qm'
+    """
+    # 6 bytes -> 8 base64 chars; but we want 64-bit => 8 bytes.
+    # We encode 8 bytes and trim padding to keep compact.
+    raw = secrets.token_bytes(8)  # 64-bit
+    # base64 urlsafe without padding
+    import base64
+    s = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    # s is typically 11 chars for 8 bytes; compress to 8 chars by using 6 bytes instead?
+    # If you truly require 8 chars, use 6 bytes (48-bit). Very low collision still for most projects.
+    return s[:8]
+
+def new_uid64() -> str:
+    import secrets, base64
+    raw = secrets.token_bytes(8)  # 64-bit
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")  # ~11 chars

@@ -138,6 +138,79 @@ class PWSProject:
 
         self.touch_modified()
 
+    class pws_project:
+        ...
+
+        # --------------------------------------------------------
+        # PUBLIC: get object by uid
+        # --------------------------------------------------------
+        def get_object_by_uid(self, uid: str):
+            """
+            Search the entire project for an object with matching id.
+
+            Returns:
+                (obj, parent, object_type)
+            or:
+                (None, None, None)
+            """
+
+            if not uid:
+                return None, None, None
+
+            # search wells
+            for well in (self.all_wells or []):
+                obj = self._search_dict_recursive(well, uid)
+                if obj:
+                    return obj
+
+            # search tracks
+            for track in (self.all_tracks or []):
+                obj = self._search_dict_recursive(track, uid)
+                if obj:
+                    return obj
+
+            # search stratigraphy
+            for name, meta in (self.all_stratigraphy or {}).items():
+                if isinstance(meta, dict) and meta.get("id") == uid:
+                    return meta, self.all_stratigraphy, "stratigraphy"
+
+            return None, None, None
+
+        # --------------------------------------------------------
+        # INTERNAL recursive search helper
+        # --------------------------------------------------------
+        def _search_dict_recursive(self, obj, uid):
+            """
+            Recursively search dicts/lists for object with id == uid.
+            Returns (obj, parent, type) or None.
+            """
+
+            if isinstance(obj, dict):
+
+                # direct hit
+                if obj.get("id") == uid:
+                    return obj, None, self._infer_object_type(obj)
+
+                for key, val in obj.items():
+
+                    # nested dict
+                    if isinstance(val, dict):
+                        result = self._search_dict_recursive(val, uid)
+                        if result:
+                            found, parent, typ = result
+                            return found, obj, typ
+
+                    # nested list
+                    elif isinstance(val, list):
+                        for item in val:
+                            result = self._search_dict_recursive(item, uid)
+                            if result:
+                                found, parent, typ = result
+                                return found, obj, typ
+
+            return None
+
+
 
 # ============================================================
 # 3) Migration helper: legacy JSON -> PWSProject

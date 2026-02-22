@@ -41,6 +41,12 @@ LOG.setLevel("DEBUG")
 
 import numpy as np
 
+from collections import OrderedDict
+
+
+
+
+
 
 #from mpl_interactions import panhandler
 
@@ -1528,6 +1534,36 @@ class WellPanelWidget(QWidget):
             wells.sort(key=lambda w: idx.get(w.get("name", ""), 10 ** 9))
 
         return wells
+
+    def get_visible_tops_list(self) -> list[str]:
+        visible_tops = self.get_visible_tops()
+        # print (type(visible_tops), visible_tops)
+        if isinstance(visible_tops, OrderedDict):
+            visible_tops = list(visible_tops.keys())  ## change back to list
+        if isinstance(visible_tops, set):
+            visible_tops = list(visible_tops)
+
+        return visible_tops
+
+    def change_top_visibility(self, name, checked):
+
+        visible_tops = self.get_visible_tops_list()
+
+        if checked:
+            if name in visible_tops:
+                return  ## nothing to do here
+            else:
+                visible_tops.append(name)
+        else:
+            if not visible_tops:
+                return
+            if len(visible_tops) == 0: # if unchecked and no tops are visible, do nothing
+                return
+            else:
+                if name in visible_tops:
+                    visible_tops.remove(name)
+
+        self.set_visible_tops(visible_tops)
 
 
 class WellPanelDock(QDockWidget):
