@@ -3,7 +3,7 @@
 ### You like to improve the code? just join the developers team :-).
 ### This program is licensed according to EUPL1.2
 ### M. Peter Süss, University of Tuebingen, Copyright 2025, 2026
-### v 12.04
+### v 16.03
 from os import removedirs
 
 ### TODO: reformulate the code to be more object oriented ... .
