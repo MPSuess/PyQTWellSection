@@ -28,6 +28,8 @@ from .dialogs import AddFormationTopDialog
 from .dialogs import AddLogToTrackDialog
 
 import logging
+
+from collections import OrderedDict
 from pathlib import Path
 
 logging.getLogger("ipykernel").setLevel("CRITICAL")
@@ -1528,6 +1530,35 @@ class WellPanelWidget(QWidget):
             wells.sort(key=lambda w: idx.get(w.get("name", ""), 10 ** 9))
 
         return wells
+
+    def change_top_visibility(self, top_name, checked):
+
+        visible_tops = self.get_visible_tops()
+        # print (type(visible_tops), visible_tops)
+        if isinstance(visible_tops, OrderedDict):
+            visible_tops = list(visible_tops.keys())  ## change back to list
+        if isinstance(visible_tops, set):
+            visible_tops = list(visible_tops)
+
+        if checked:
+            if top_name in visible_tops:
+                return  ## nothing to do here
+            else:
+                visible_tops.append(top_name)
+                self.set_visible_tops(visible_tops)
+                self.draw_well_panel()
+        else:
+            if not visible_tops:
+                return
+            if len(visible_tops) == 0:  # if unchecked and no tops are visible, do nothing
+                return
+            else:
+                if top_name in visible_tops:
+                    visible_tops.remove(leaf)
+                    self.set_visible_tops(visible_tops)
+                    self.draw_well_panel()
+                else:
+                    return  # nothing to do here.
 
 
 class WellPanelDock(QDockWidget):

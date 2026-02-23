@@ -465,7 +465,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            window_dict, wells, tracks, raw_strat, ui_layout, _ = load_project_from_json(path)
+            window_dict, wells, tracks, raw_strat, ui_layout, tree_setup, _ = load_project_from_json(path)
 
             self.current_project_path = path
             self.project_name = Path(path).stem
@@ -643,6 +643,9 @@ class MainWindow(QMainWindow):
             self._dock_layout_restore(ui_layout)
             self._populate_window_tree()
 
+            if tree_setup:
+                self.ctree.restore_state(tree_setup)
+
             #            self.panel.update_well_panel(tracks, wells, stratigraphy, self.panel_settings)
 
             self.panel.set_visible_tops(self.all_stratigraphy)
@@ -730,6 +733,11 @@ class MainWindow(QMainWindow):
 
         window_list = self._get_window_list()
 
+        tree_setup = self.ctree.to_dict()
+
+        print (tree_setup)
+
+
 
         # Write into a temp dir first (safer than half-written projects)
         tmp_dir = os.path.join(base_dir, f".{data_dir_name}.tmp")
@@ -741,7 +749,8 @@ class MainWindow(QMainWindow):
             # 1) write data.json inside tmp data dir
             tmp_data_json = os.path.join(tmp_dir, "data.json")
 
-            export_project_to_json(tmp_data_json, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
+            export_project_to_json(tmp_data_json, wells, tracks, stratigraphy, window_list, ui_layout,
+                                   tree_setup = tree_setup,extra_metadata = extra_metadata)
             #
             # with open(tmp_data_json, "w", encoding="utf-8") as f:
             #     json.dump(project_data, f, indent=2)
@@ -1452,18 +1461,17 @@ class MainWindow(QMainWindow):
     def _populate_well_tops_tree(self):
 
         Blocker = QSignalBlocker(self.ctree)
-        self.ctree.remove_all_descendants(self.cstrat_root)
 
         strat_list = list(self.all_stratigraphy)
-        print(strat_list)
+        #print(strat_list)
         visible_tops = self.panel.get_visible_tops()
-        print (visible_tops)
+        #print (visible_tops)
 
         # self.checkable_tree.build_tree(self.all_stratigraphy)
-        if not visible_tops:
-            self.cstrat_root.setCheckState(0, Qt.Checked)
-            self.cfault_root.setCheckState(0, Qt.Checked)
-            self.cother_root.setCheckState(0, Qt.Checked)
+        # if not visible_tops:
+        #     self.cstrat_root.setCheckState(0, Qt.Checked)
+        #     self.cfault_root.setCheckState(0, Qt.Checked)
+        #     self.cother_root.setCheckState(0, Qt.Checked)
 
         self.ctree.remove_all_descendants(self.cstrat_root)
         self.ctree.remove_all_descendants(self.cfault_root)
@@ -1478,7 +1486,7 @@ class MainWindow(QMainWindow):
                 fault_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
                 fault_it.setData(0, Qt.UserRole, strat_name)
             elif self.all_stratigraphy[strat_name]['role'] == 'other':
-                other_it = self.ctree.add_leaf(self.cfault_root, strat_name, True if strat_name in visible_tops else False)
+                other_it = self.ctree.add_leaf(self.cother_root, strat_name, True if strat_name in visible_tops else False)
                 other_it.setData(0, Qt.UserRole, strat_name)
 
         Blocker.unblock()
@@ -4574,18 +4582,47 @@ class MainWindow(QMainWindow):
                 self.panel.set_visible_tops(visible_tops)
             else:
                 self.panel.set_visible_tops([])
-            self.panel.draw_well_panel()
 
-        if parent == "Tops":
+        elif parent == "Tops":
             if checked:
                 visible_tops = list(self.all_stratigraphy.keys())
                 self.panel.set_visible_tops(visible_tops)
             else:
                 self.panel.set_visible_tops([])
-            self.panel.draw_well_panel()
 
 
+        elif "stratigraphy" in path.lower():
+            item = self.ctree.get_item_by_name(parent)
+            children = self.ctree.get_children_list(item)
+            visible_tops = self.panel.get_visible_tops()
+            # print (type(visible_tops), visible_tops)
+            if isinstance(visible_tops, OrderedDict):
+                visible_tops = list(visible_tops.keys())  ## change back to list
+            if isinstance(visible_tops, set):
+                visible_tops = list(visible_tops)
+            if not checked and not visible_tops:
+                return
+            if not checked and len(visible_tops) == 0:
+                # if unchecked and no tops are visible, do nothing
+                return
 
+            if checked:
+                for leaf in children:
+                    if leaf in visible_tops:
+                        continue  ## nothing to do here
+                    else:
+                        visible_tops.append(leaf)
+            else:
+                for leaf in children:
+                    if len(visible_tops) == 0: # continue to the end.
+                        continue
+                    else:
+                        if leaf in visible_tops:
+                            visible_tops.remove(leaf)
+
+            self.panel.set_visible_tops(visible_tops)
+
+        self.panel.draw_well_panel()
         self.statusBar().showMessage(msg)
 
     @QtCore.Slot(str, bool)
@@ -4606,30 +4643,10 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(msg)
 
-        if parent == "Stratigraphy" or root == "Stratigraphy":
+        if "stratigraphy" in path.lower():
 
-            visible_tops = self.panel.get_visible_tops()
-            #print (type(visible_tops), visible_tops)
-            if isinstance(visible_tops, OrderedDict):
-                visible_tops = list(visible_tops.keys()) ## change back to list
-            if isinstance(visible_tops, set):
-                visible_tops = list(visible_tops)
+            self.panel.change_top_visibility(leaf, checked)
 
-            if checked:
-                if leaf in visible_tops:
-                    return  ## nothing to do here
-                else:
-                    visible_tops.append(leaf)
-            else:
-                if not visible_tops:
-                    return
-                if len(visible_tops) == 0: # if unchecked and no tops are visible, do nothing
-                    return
-                else:
-                    if leaf in visible_tops:
-                        visible_tops.remove(leaf)
-            self.panel.set_visible_tops(visible_tops)
-            self.panel.draw_well_panel()
 
 
     @QtCore.Slot(str, str)
