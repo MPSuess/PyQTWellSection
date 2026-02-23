@@ -885,7 +885,7 @@ class MainWindow(QMainWindow):
             if self.all_logs is None:
                 self.all_logs = logs
             else:
-                all_logs = set(self.all_logs) | set(logs.keys())
+                all_logs = set(self.all_logs) | set(logs.keys()) #change from dict to set
                 #all_logs.update(logs)
                 self.all_logs = all_logs  # this operator merges the two dictionaries
 
