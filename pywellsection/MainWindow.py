@@ -902,7 +902,10 @@ class MainWindow(QMainWindow):
             if self.all_logs is None:
                 self.all_logs = logs
             else:
-                self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
+                #self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
+                all_logs = set(self.all_logs) | set(logs.keys()) # change from dict to set
+                #all_logs.update(logs)
+                self.all_logs = all_logs  # this operator merges the two dictionaries
 
         # Update well_panel + tree views
         self.panel.set_wells(self.all_wells)
