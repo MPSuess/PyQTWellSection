@@ -876,9 +876,9 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         if folder_item is None:
             return False
-        try:
-            t = folder_item.childCount()
-        except: return False
+        #try:
+        #    t = folder_item.childCount()
+        #except: return False
 
 
         try:

@@ -1303,7 +1303,7 @@ class MainWindow(QMainWindow):
 
         self.ctree.remove_all_descendants(self.cwell_root)
 
-        self.cwell_root.setFlags(self.cwell_root.flags() | Qt.ItemIsUserCheckable)
+        #self.cwell_root.setFlags(self.cwell_root.flags() | Qt.ItemIsUserCheckable)
 
         for w in self.all_wells:
             well_item = self.ctree.add_parent(self.cwell_root, w["name"], checkable = True)
