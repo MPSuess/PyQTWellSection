@@ -589,6 +589,8 @@ class MainWindow(QMainWindow):
             self.panel.gap_min_factor = window_dict[0].get("gap_min_factor", 0.8)
             self.panel.gap_max_factor = window_dict[0].get("gap_max_factor", 8.0)
 
+            self.panel.wells = self.all_wells
+
             #add all remaining windows back in
             for window in window_dict[1:]:
                 if (window["type"] == "WellSection"):
@@ -648,12 +650,7 @@ class MainWindow(QMainWindow):
 
             #            self.panel.update_well_panel(tracks, wells, stratigraphy, self.panel_settings)
 
-            self.panel.set_visible_tops(self.all_stratigraphy)
 
-            self._refresh_all_well_panels()
-
-            # ✅ Trigger full redraw
-            #            self.redraw_requested = True
             self.panel_settings["redraw_requested"] = True
             #self.panel.draw_well_panel()
             self._redraw_all_panels()
@@ -772,35 +769,32 @@ class MainWindow(QMainWindow):
             # 3) commit: replace existing data_dir atomically-ish
             #    - remove old dir
 
-            if not old_path:
-                if os.path.exists(data_dir): # a previous project was saved under this name
-                    shutil.rmtree(data_dir)
-            elif old_path == path: # if old equals new simple save ... .
-            # just copy the new data.json into the existing data_dir
+            # 3) commit: replace existing data_dir atomically-ish
+            #    - remove old dir
+            if old_path == path:  # if old equals new simple save ... .
+                # just copy the new data.json into the existing data_dir
                 shutil.copy2(tmp_data_json, data_dir)
                 shutil.rmtree(tmp_dir)
-            elif old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
-                    o_path, ofname = os.path.split(old_path)
-                    oproject_stem = os.path.splitext(ofname)[0]
-                    o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
-                    #os.makedirs(data_dir, exist_ok=True)
-                    if os.path.exists(data_dir): # a previous project was saved under this name
-                        shutil.rmtree(data_dir)
-                    shutil.copytree(o_data_path, data_dir)
-                    shutil.copy2(tmp_data_json, data_dir)
-                    shutil.rmtree(tmp_dir)
+            elif old_path and old_path != path:  # .. an old name exist but it is not the same save existing project under new name ...
+                o_path, ofname = os.path.split(old_path)
+                oproject_stem = os.path.splitext(ofname)[0]
+                o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
+                # os.makedirs(data_dir, exist_ok=True)
+                if os.path.exists(data_dir):  # a previous project was saved under this name
+                    shutil.rmtree(data_dir)
+                shutil.copytree(o_data_path, data_dir)
+                shutil.copy2(tmp_data_json, data_dir)
+                shutil.rmtree(tmp_dir)
 
-            else: # a new project from scratch
-                if os.path.exists(data_dir): # a previous project was saved under this name
+            else:  # a new project from scratch
+                if os.path.exists(data_dir):  # a previous project was saved under this name
                     shutil.rmtree(data_dir)
                 os.rename(tmp_dir, data_dir)
-
             # 4) commit: replace .pws
             #    On Windows os.replace is safest; on macOS/Linux also fine.
             os.replace(tmp_pws, path)
             # keep last saved path if you want
-            if old_path:
-                self._last_project_path = old_path
+            self._last_project_path = old_path
             self.current_project_path = path
             self.project_name = Path(path).stem
             self.setWindowTitle(f"PyQtWellSection - {self.project_name}")
@@ -1095,8 +1089,6 @@ class MainWindow(QMainWindow):
         strat = _load_BEEE_stratigraphy(path)
         build_stratigraphic_column_tree(self.well_tree,strat)
 
-
-
     def _file_load_tops_from_csv(self, path: str):
         """
         Load formation / fault tops from a CSV file with columns:
@@ -1307,16 +1299,22 @@ class MainWindow(QMainWindow):
             self._populate_well_tree()
 #            self._refresh_all_panels()
 #            self._populate_well_tree()
-
     def _populate_well_tree(self):
 
         self.ctree.remove_all_descendants(self.cwell_root)
 
+        self.cwell_root.setFlags(self.cwell_root.flags() | Qt.ItemIsUserCheckable)
+
         for w in self.all_wells:
-            well_item = self.ctree.add_parent(self.cwell_root, w["name"], False)
-            cont_folder = self.ctree.add_parent(well_item, "continuous",  False)
-            discrete_folder = self.ctree.add_parent(well_item, "discrete" , False)
-            bitmaps_folder = self.ctree.add_parent(well_item, "bitmaps", False)
+            well_item = self.ctree.add_parent(self.cwell_root, w["name"], checkable = True)
+            state = Qt.Unchecked
+            if self.panel.visible_wells:
+                state = Qt.Checked if w["name"] in self.panel.visible_wells else Qt.Unchecked
+            well_item.setCheckState(0, state)
+
+            cont_folder = self.ctree.add_parent(well_item, "continuous", checkable = False)
+            discrete_folder = self.ctree.add_parent(well_item, "discrete" , checkable = False)
+            bitmaps_folder = self.ctree.add_parent(well_item, "bitmaps", checkable = False)
 
             self.ctree._remove_checkbox(cont_folder)
             self.ctree._remove_checkbox(discrete_folder)
@@ -1455,8 +1453,7 @@ class MainWindow(QMainWindow):
                     blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
 
         self.well_tree.blockSignals(False)
-        #self._rebuild_well_panel_from_tree()
-
+        self._rebuild_well_panel_from_tree()
 
     def _populate_well_tops_tree(self):
 
@@ -1593,6 +1590,44 @@ class MainWindow(QMainWindow):
         self._rebuild_well_panel_from_tree()
 
     def _populate_well_log_tree(self):
+
+        print ("_populate_well_log_tree")
+
+        self.ctree.blockSignals(True)
+
+        logs = self.all_logs or {}
+        ### Start with populating the continuous logs tree ###
+
+        def setup_leafs(root, log_set):
+            prev_selected = set()
+            for i in range(root.childCount()):
+                it = root.child(i)
+                if it.checkState(0) == Qt.Checked:
+                    prev_selected.add(it.data(0, Qt.UserRole))
+            # remove all wells under the folder
+            self.ctree.remove_all_descendants(root)
+
+            log_names = set()
+            if log_set:
+                for log in log_set:
+                    name = log
+                    if name:
+                        log_names.add(name)
+                for name in sorted(log_names):
+                    it = self.ctree.add_leaf(root, name, True if name in prev_selected else False)
+                    state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                    it.setCheckState(0, state)
+
+        setup_leafs(self.cont_folder, self.all_logs)
+        setup_leafs(self.disc_folder, self.all_discrete_logs)
+        setup_leafs(self.bmp_folder, self.all_bitmaps)
+
+        self.ctree.blockSignals(False)
+
+        self._populate_well_log_treeo()
+        return
+
+    def _populate_well_log_treeo(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
         ### add logs as children of "All logs"
         # delete all logs under the folder and rebuild from scratch
@@ -4576,58 +4611,48 @@ class MainWindow(QMainWindow):
             parent = path.split(" / ")[-1]
         else: parent = path
 
-        if parent == "Stratigraphy" or parent == "Faults" or parent == "Other":
+        if parent == "Stratigraphy" or parent == "Faults" or parent == "Other" or parent == "Tops":
+            print("Stratigraphy:", msg)
             if checked:
                 visible_tops = list(self.all_stratigraphy.keys())
                 self.panel.set_visible_tops(visible_tops)
             else:
                 self.panel.set_visible_tops([])
 
-        elif parent == "Tops":
-            if checked:
-                visible_tops = list(self.all_stratigraphy.keys())
-                self.panel.set_visible_tops(visible_tops)
+        if "wells" in path.lower():
+            print(path, " wells in path ", msg)
+            if " / " not in path: # the root has been toggled change all
+                if checked:
+                    visible_wells = [w.get("name") for w in self.all_wells]
+                    self.panel.set_visible_wells(visible_wells)
+                else:
+                    self.panel.set_visible_wells([])
             else:
-                self.panel.set_visible_tops([])
+                self.panel.change_well_visibility(parent, checked)
+                item = self.ctree.get_item_by_name(path)
+                children = self.ctree.get_children_list(item)
+                well_list = self.all_wells
+                for child in children: # we change only the visibility of well children (and not the rest)
+                    if child in well_list:
+                        self.panel.change_well_visibility(child, checked)
 
-
-        elif "stratigraphy" in path.lower():
+        if "stratigraphy" in path.lower() or "faults" in path.lower() or "other" in path.lower():
+            print("stratigraphy folder:", path, msg)
             item = self.ctree.get_item_by_name(parent)
             children = self.ctree.get_children_list(item)
-            visible_tops = self.panel.get_visible_tops()
-            # print (type(visible_tops), visible_tops)
-            if isinstance(visible_tops, OrderedDict):
-                visible_tops = list(visible_tops.keys())  ## change back to list
-            if isinstance(visible_tops, set):
-                visible_tops = list(visible_tops)
-            if not checked and not visible_tops:
-                return
-            if not checked and len(visible_tops) == 0:
-                # if unchecked and no tops are visible, do nothing
-                return
+            self.panel.change_tops_visibility(checked, children)
 
-            if checked:
-                for leaf in children:
-                    if leaf in visible_tops:
-                        continue  ## nothing to do here
-                    else:
-                        visible_tops.append(leaf)
-            else:
-                for leaf in children:
-                    if len(visible_tops) == 0: # continue to the end.
-                        continue
-                    else:
-                        if leaf in visible_tops:
-                            visible_tops.remove(leaf)
 
-            self.panel.set_visible_tops(visible_tops)
+
 
         self.panel.draw_well_panel()
         self.statusBar().showMessage(msg)
 
+
     @QtCore.Slot(str, bool)
     def on_leaf_toggled(self, path, checked):
         msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
+        print(msg)
 
         parent = ""
         leaf = ""
@@ -4644,8 +4669,25 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg)
 
         if "stratigraphy" in path.lower():
-
             self.panel.change_top_visibility(leaf, checked)
+
+        if "wells" in path.lower():
+            self.statusBar().showMessage(msg)
+            if "continuous" in path.lower() or "discrete" in path.lower() or "bitmaps" in path.lower():
+                return
+            else:
+                self.panel.change_well_visibility(leaf, checked)
+
+        if "logs" in path.lower():
+            #print(path, " logs in path ", msg)
+            if "Continuous" in path:
+                self.panel.change_log_visibility(leaf, "continuous", checked)
+            elif "Discrete" in path:
+                self.panel.change_log_visibility(leaf, "discrete", checked)
+            elif "Bitmaps" in path:
+                print("Bitmap logs:", msg)
+                self.panel.change_log_visibility(leaf, "bitmap", checked)
+
 
 
 

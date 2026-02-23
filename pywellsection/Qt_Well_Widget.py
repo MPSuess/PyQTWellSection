@@ -211,8 +211,8 @@ class WellPanelWidget(QWidget):
             visible_tops = self.visible_tops
             visible_logs = self.visible_logs
             visible_discrete_logs = self.visible_discrete_logs
-            visible_tracks = self.visible_tracks
             visible_bitmaps = self.visible_bitmaps
+            visible_tracks = self.visible_tracks
 
             n_wells = len(self.visible_wells)
 
@@ -1531,14 +1531,17 @@ class WellPanelWidget(QWidget):
 
         return wells
 
-    def change_top_visibility(self, top_name, checked):
-
+    def get_visible_tops_list(self):
         visible_tops = self.get_visible_tops()
         # print (type(visible_tops), visible_tops)
         if isinstance(visible_tops, OrderedDict):
             visible_tops = list(visible_tops.keys())  ## change back to list
         if isinstance(visible_tops, set):
             visible_tops = list(visible_tops)
+        return visible_tops
+
+    def change_top_visibility(self, top_name, checked):
+        visible_tops = self.get_visible_tops_list()
 
         if checked:
             if top_name in visible_tops:
@@ -1554,11 +1557,127 @@ class WellPanelWidget(QWidget):
                 return
             else:
                 if top_name in visible_tops:
-                    visible_tops.remove(leaf)
+                    visible_tops.remove(top_name)
                     self.set_visible_tops(visible_tops)
                     self.draw_well_panel()
                 else:
                     return  # nothing to do here.
+
+    def change_tops_visibility(self, checked, well_tops):
+        # change the visibility of a list of tops in the tree
+
+        visible_tops = self.get_visible_tops()
+
+        if checked:
+            for leaf in well_tops:
+                if leaf in visible_tops:
+                    continue  ## nothing to do here
+                else:
+                    visible_tops.append(leaf)
+        else:
+            for leaf in well_tops:
+                if len(visible_tops) == 0:  # continue to the end.
+                    continue
+                else:
+                    if leaf in visible_tops:
+                        visible_tops.remove(leaf)
+
+        self.set_visible_tops(visible_tops)
+        self.draw_well_panel()
+
+    def get_visible_wells_list(self):
+        visible_wells = self.get_visible_wells()
+        if isinstance(visible_wells, OrderedDict):
+            visible_wells = list(visible_wells.keys())  ## change back to list
+        if isinstance(visible_wells, set):
+            visible_wells = list(visible_wells)
+        return visible_wells
+
+    def change_well_visibility(self, well_name, checked):
+        #changes the visibility of a well in the well panel
+
+        visible_wells = self.get_visible_wells_list()
+
+        if checked:
+            if well_name in visible_wells:
+                return
+            else:
+                visible_wells.append(well_name)
+                self.set_visible_wells(visible_wells)
+                self.draw_well_panel()
+        else:
+            if not visible_wells:
+                return
+            if len(visible_wells) == 0:
+                return
+            else:
+                if well_name in visible_wells:
+                    visible_wells.remove(well_name)
+                    self.set_visible_wells(visible_wells)
+                    self.draw_well_panel()
+                else:
+                    return
+
+    def change_wells_visibility(self, children, checked):
+        # takes a list of well names and changes their visibility.
+        visible_wells = self.get_visible_wells_list()
+        if checked:
+            for leaf in children:
+                if leaf in visible_wells:
+                    continue
+        else:
+            for leaf in children:
+                if leaf in visible_wells:
+                    visible_wells.remove(leaf)
+
+        self.set_visible_wells(visible_wells)
+        self.draw_well_panel()
+
+    def change_log_visibility(self,log, logtype, checked):
+        logs = []
+        print("change_log_visibility",log, logtype, checked)
+        if logtype == "discrete":
+            if self.visible_discrete_logs is None:
+                return
+            else:
+                logs = list(self.visible_discrete_logs)
+        elif logtype == "bitmap":
+            if self.visible_bitmaps is None:
+                return
+            else:
+                logs = list(self.visible_bitmaps)
+        elif logtype == "continuous":
+            if self.visible_logs is None:
+                return
+            else:
+                logs = list(self.visible_logs)
+        else:
+            return
+        print (logs)
+        if checked:
+            if log in logs:
+                return
+            else:
+                logs.append(log)
+        else:
+            if not logs:
+                return
+            if len(logs) == 0:
+                return
+            else:
+                if log in logs:
+                    logs.remove(log)
+
+        if logtype == "discrete":
+            self.visible_discrete_logs = logs
+        elif logtype == "bitmap":
+            self.visible_bitmaps  = logs
+        elif logtype == "continuous":
+            self.visible_logs = logs
+
+        self.draw_well_panel()
+
+
 
 
 class WellPanelDock(QDockWidget):

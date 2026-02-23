@@ -93,15 +93,19 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         return root
 
-    def add_parent(self, parent_item, text: str, checkable) -> QtWidgets.QTreeWidgetItem:
+    def add_parent(self, parent_item, text: str, checkable=True) -> QtWidgets.QTreeWidgetItem:
         """
         Add a new parent node under parent_item (or as top-level if parent_item is None).
         Returns the created item.
         """
         new_item = self._make_item(text, parent=None)
         self.set_check_policy(new_item, self.LEAF_ALWAYS_CHECKABLE if checkable else self.LEAF_NEVER_CHECKABLE)
+        if checkable:
+            new_item.setFlags(new_item.flags() | Qt.ItemIsUserCheckable)
+        else:
+            new_item.setFlags(new_item.flags() & ~Qt.ItemIsUserCheckable)
         parent_item.addChild(new_item)
-        return new_item
+
         self._apply_check_policy(new_item)
         if parent_item is None:
             self.addTopLevelItem(new_item)
@@ -383,10 +387,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # ----------------------------
 
     # ---- Drop flags (bitmask stored on items) ----
-    DROP_ACCEPT_CHILDREN = 0x01   # item can accept drops ONTO it (become parent)
-    DROP_DEFAULT = DROP_ACCEPT_CHILDREN
 
-    _DROP_ROLE = QtCore.Qt.UserRole + 101  # where we store the bitmask
 
     def drop_flags(self, item: QtWidgets.QTreeWidgetItem) -> int:
         if item is None:
@@ -708,9 +709,12 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
     def get_children_list(self, root):
         children = []
-        for i in range(root.childCount()):
-            children.append(root.child(i).text(0))
-        return children
+        if root:
+            for i in range(root.childCount()):
+                children.append(root.child(i).text(0))
+            return children
+        else:
+            return []
 
 
     def _update_parents(self, item):
@@ -791,6 +795,9 @@ class CheckableTree(QtWidgets.QTreeWidget):
             item.setCheckState(0, QtCore.Qt.Unchecked)
 
     def _apply_check_policy(self, item: QtWidgets.QTreeWidgetItem):
+
+        if True: return
+
         if item is None:
             return
 
@@ -1220,14 +1227,18 @@ def setup_ctree(self, root_label=None):
     self.cfault_root = self.ctree.add_parent(self.c_well_tops_folder,"Faults", True)
     self.cother_root = self.ctree.add_parent(self.c_well_tops_folder,"Other", True)
 
-    self.c_logs_folder = self.ctree.add_root("Logs")
+    self.clogs_root = self.ctree.add_root("Logs")
+    self.cont_folder = self.ctree.add_parent(self.clogs_root,"Continuous", True)
+    self.disc_folder = self.ctree.add_parent(self.clogs_root,"Discrete", True)
+    self.bmp_folder = self.ctree.add_parent(self.clogs_root,"Bitmaps", True)
 
-    self.c_tracks_folder = self.ctree.add_root("Tracks")
+
+    self.c_tracks_root = self.ctree.add_root("Tracks")
 
 
     self.ctree.set_accept_children_drop(self.cwell_root, False)
-    self.ctree.set_accept_children_drop(self.c_logs_folder, False)
-    self.ctree.set_accept_children_drop(self.c_tracks_folder, False)
+    self.ctree.set_accept_children_drop(self.clogs_root, False)
+    self.ctree.set_accept_children_drop(self.c_tracks_root, False)
     self.ctree.set_accept_children_drop(self.cstrat_root, True)
     self.ctree.set_accept_children_drop(self.cfault_root, True)
     self.ctree.set_accept_children_drop(self.cother_root, True)
