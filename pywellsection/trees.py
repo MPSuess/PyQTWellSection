@@ -309,6 +309,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # Structural change signal: (moved_path_before, "moved", new_parent_path_or_empty_for_root)
     structureChanged = QtCore.Signal(str, str, str)
 
+    contextMenuEvent = QtCore.Signal(QtCore.QPoint, object)
+
     # ---------- Checkability Policies (stored per item) ----------
     LEAF_ALWAYS_CHECKABLE = 1
     LEAF_NEVER_CHECKABLE = 2
@@ -568,7 +570,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
         """
         Add a checkable folder (default folder type) under parent_item, or as top-level if None.
         """
-        item = self._make_item(text, parent=None)
+        item = self._make_item(text, parent=parent_item)
 
         if UserRole:
             item.setData(0, Qt.UserRole, UserRole)
@@ -902,7 +904,16 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # Context menu
     # ======================================================================
 
+
     def _show_context_menu(self, pos: QtCore.QPoint):
+
+        item = self.itemAt(pos)
+        global_pos = (self.viewport().mapToGlobal(pos))
+
+        self.contextMenuEvent.emit(global_pos, item)
+        return
+
+    def _show_context_menuo(self, pos: QtCore.QPoint):
         item = self.itemAt(pos)
         menu = QtWidgets.QMenu(self)
 
@@ -955,19 +966,19 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         # --- Add/remove actions ---
         act_add_folder = menu.addAction("Add folder (checkable) under this")
-        act_add_folder_nc = menu.addAction("Add folder (non-checkable) under this")
-        act_add_leaf_chk = menu.addAction("Add leaf (checkable) under this")
-        act_add_leaf_nchk = menu.addAction("Add leaf (non-checkable) under this")
-        act_remove_children = menu.addAction("Remove all children")
+        #act_add_folder_nc = menu.addAction("Add folder (non-checkable) under this")
+        #act_add_leaf_chk = menu.addAction("Add leaf (checkable) under this")
+        #act_add_leaf_nchk = menu.addAction("Add leaf (non-checkable) under this")
+        #act_remove_children = menu.addAction("Remove all children")
         act_remove = menu.addAction("Remove this")
 
         # Only folders can receive children (in this UI)
-        if not is_folder:
-            act_add_folder.setEnabled(False)
-            act_add_folder_nc.setEnabled(False)
-            act_add_leaf_chk.setEnabled(False)
-            act_add_leaf_nchk.setEnabled(False)
-            act_remove_children.setEnabled(False)
+        #if not is_folder:
+            #act_add_folder.setEnabled(False)
+            #act_add_folder_nc.setEnabled(False)
+            #act_add_leaf_chk.setEnabled(False)
+            #act_add_leaf_nchk.setEnabled(False)
+            #act_remove_children.setEnabled(False)
 
         menu.addSeparator()
 
@@ -993,8 +1004,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
         if is_folder:
             act_expand = menu.addAction("Expand")
             act_collapse = menu.addAction("Collapse")
-        else:
-            act_print = menu.addAction("Print path")
+        #else:
+        #    act_print = menu.addAction("Print path")
 
         chosen = menu.exec(self.viewport().mapToGlobal(pos))
         if chosen is None:
@@ -1163,15 +1174,6 @@ class CheckableTree(QtWidgets.QTreeWidget):
     # Toggle logic + tri-state aggregation (including non-checkable folders)
     # ======================================================================
 
-    def _on_item_changedo(self, item: QtWidgets.QTreeWidgetItem, column: int):
-        if column != 0 or self._updating:
-            return
-        #self.blockSignals(True)
-        self._handle_user_toggle(item)
-        #self.blockSignals(False)
-        #self.parentToggled.connect(self.on_parent_toggled)
-        #self.leafToggled.connect(self.on_leaf_toggled)
-        #self.contextAction.connect(self.on_context_action)
 
     def _on_item_changed(self, item: QtWidgets.QTreeWidgetItem, column: int):
 
@@ -1437,6 +1439,7 @@ def connect_input_tree(self):
     self.input_tree.itemToggled.connect(self.on_leaf_toggled)
     self.input_tree.contextAction.connect(self.on_context_action)
     # self.input_tree.structureChanged.connect(self.on_structure_changed)
+    self.input_tree.contextMenuEvent.connect(self.on_input_tree_context_menu)
 
     self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
     self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
@@ -1450,11 +1453,20 @@ def setup_well_tree(self):
     self.c_well_logs_folder = self.input_tree.add_root("Logs")
     self.c_well_track_folder = self.input_tree.add_root("Tracks")
 
+    self.c_well_folder.setData(0, Qt.UserRole, ("Wells", "Root", "Folder"))
+
+    self.c_well_tops_folder.setData(0,Qt.UserRole, ("Tops", "Root", "Folder"))
+    self.c_well_logs_folder.setData(0,Qt.UserRole, ("Logs", "Root", "Folder"))
+    self.c_well_track_folder.setData(0,Qt.UserRole, ("Tracks", "Root", "Folder"))
+
 
     # The Well Tops entries
     self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
+    self.c_stratigraphy_root.setData(0, Qt.UserRole, ("Well Tops", "Stratigraphy", "None"))
     self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
+    self.c_faults_root.setData(0, Qt.UserRole, ("Well Tops", "Faults", "None"))
     self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
+    self.c_other_root.setData(0, Qt.UserRole, ("Well Tops", "Other", "None"))
 
     self.input_tree.set_accept_children_drop(self.c_well_tops_folder, False)
     self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
@@ -1468,10 +1480,14 @@ def setup_well_tree(self):
     # self.input_tree.set_accept_children_drop(it, False)
 
     # --- subfolders ---
-
+    self.c_well_logs_folder.setData(0, Qt.UserRole, ("Well Logs", "Folder", "None"))
     self.cont_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "continuous")
     self.disc_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "discrete")
     self.bmp_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "bitmap")
+
+    self.cont_folder.setData(0, Qt.UserRole, ("Well Logs", "continuous", "Folder"))
+    self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Folder"))
+    self.bmp_folder.setData(0, Qt.UserRole, ("Well Logs", "bitmap", "Folder"))
 
     self.input_tree.set_accept_children_drop(self.cont_folder, False)
     self.input_tree.set_accept_children_drop(self.disc_folder, False)

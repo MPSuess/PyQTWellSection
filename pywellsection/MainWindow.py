@@ -1373,7 +1373,7 @@ class MainWindow(QMainWindow):
 
         prev_selected = set()
         root = self.c_well_folder
-        root.setData(0, Qt.UserRole, ("WellRoot", "Wells", "None"))
+        root.setData(0, Qt.UserRole, ("Wells", "Root", "Folder"))
 
         for i in range(root.childCount()):
             it = root.child(i)
@@ -1390,11 +1390,6 @@ class MainWindow(QMainWindow):
             well_folder = self.input_tree.add_parent(root,well_name)
             self.input_tree.set_accept_children_drop(well_folder, False)
             well_folder.setData(0, Qt.UserRole, (w.get("name"),"Well"))
-            #self.input_tree.lock_leaf_movement(well_folder)
-            #it.setData(0, Qt.UserRole, well_name)
-            #state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
-            #it.setCheckState(0, state)
-            #self.input_tree.set_accept_children_drop(it, False)
 
             # --- subfolders ---
             logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
@@ -1419,7 +1414,7 @@ class MainWindow(QMainWindow):
                     self.input_tree.set_accept_children_drop(wlog_item, False)
                     self.input_tree.lock_leaf_movement(wlog_item)
 
-                    wlog_item.setData(0, Qt.UserRole, ("well_log", well_name, log_name))
+                    wlog_item.setData(0, Qt.UserRole, ("Continuous_Log", well_name, log_name))
 
                     #print(l.data(0, Qt.UserRole))
 
@@ -1430,7 +1425,7 @@ class MainWindow(QMainWindow):
                     dlog_item = self.input_tree.add_noncheckable_leaf(disc_folder, dlog_name)
                     self.input_tree.set_accept_children_drop(dlog_item, False)
                     self.input_tree.lock_leaf_movement(dlog_item)
-                    dlog_item.setData(0, Qt.UserRole, ("Discrete", well_name, dlog_name))
+                    dlog_item.setData(0, Qt.UserRole, ("Discrete_Log", well_name, dlog_name))
 
             # --- bitmaps ---
             blogs = (w.get("bitmaps", None) or {})
@@ -1447,10 +1442,25 @@ class MainWindow(QMainWindow):
 
             #self.input_tree.set_item_checkable(logs_folder, False)
 
-
-
-
         return
+
+    def _add_new_well_to_tree(self, well_name: str):
+        root = self.c_well_folder
+        well_folder = self.input_tree.add_parent(root, well_name)
+        self.input_tree.setCurrentItem(well_folder)
+        #self.input_tree.editItem(well_folder,0)
+        self.input_tree.set_accept_children_drop(well_folder, False)
+        well_folder.setData(0, Qt.UserRole, (well_name, "Well"))
+
+        # # --- subfolders ---
+        logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
+        self.input_tree.set_accept_children_drop(logs_folder, False)
+        self.input_tree.lock_leaf_movement(logs_folder)
+        #
+        cont_folder = self.input_tree.add_noncheckable_folder(logs_folder, "continuous")
+        disc_folder = self.input_tree.add_noncheckable_folder(logs_folder, "discrete")
+        bmp_folder = self.input_tree.add_noncheckable_folder(logs_folder, "bitmap")
+        comp_folder = self.input_tree.add_noncheckable_folder(well_folder, "Completions")
 
     def _populate_tops_tree(self):
         """Rebuild the new well tops tree from self.c_stratigraphy_root, preserving selections if possible."""
@@ -1493,7 +1503,7 @@ class MainWindow(QMainWindow):
         for strat_name in strat_list:
             if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
                 strat_it=self.input_tree.add_checkable_leaf(strat_root,strat_name)
-                strat_it.setData(0, Qt.UserRole, (strat_name,"Stratigraphy"))
+                strat_it.setData(0, Qt.UserRole, ("Tops","stratigraphy", strat_name))
 
                 # default: keep previous selection; else checked
                 if not strat_prev_selected:
@@ -1505,7 +1515,7 @@ class MainWindow(QMainWindow):
                 #strat_root.addChild(strat_it)
             elif self.all_stratigraphy[strat_name]['role'] == 'fault':
                 fault_it = self.input_tree.add_checkable_leaf(faults_root,strat_name)
-                fault_it.setData(0, Qt.UserRole, (strat_name,"Stratigraphy"))
+                fault_it.setData(0, Qt.UserRole, ("Tops","fault",strat_name))
 
                 if not faults_prev_selected:
                     state = Qt.Checked
@@ -1516,7 +1526,7 @@ class MainWindow(QMainWindow):
 
             elif self.all_stratigraphy[strat_name]['role'] == 'other':
                 other_it = self.input_tree.add_checkable_leaf(other_root, strat_name)
-                other_it.setData(0, Qt.UserRole, (strat_name,"Stratigraphy"))
+                other_it.setData(0, Qt.UserRole, ("Tops","other",strat_name))
 
                 if not other_prev_selected:
                     state = Qt.Checked
@@ -1558,7 +1568,7 @@ class MainWindow(QMainWindow):
             for name in sorted(log_names):
                 #state = True if (not prev_selected or name in prev_selected) else False
                 it = self.input_tree.add_checkable_leaf(root, name)
-                it.setData(0, Qt.UserRole, (name, "ContinuousLog"))
+                it.setData(0, Qt.UserRole, ("Logs", "Continuous_Log", name))
                 state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
                 it.setCheckState(0, state)
                 #root.addChild(it)
@@ -1581,7 +1591,7 @@ class MainWindow(QMainWindow):
             for name in sorted(dlog_names):
                 it = self.input_tree.add_checkable_leaf(root, name)
 
-                it.setData(0, Qt.UserRole, (name, "DiscreteLog"))
+                it.setData(0, Qt.UserRole, ("Logs", "DiscreteLog", name))
                 state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
                 it.setCheckState(0, state)
                 #root.addChild(it)
@@ -1603,7 +1613,7 @@ class MainWindow(QMainWindow):
                     bmp_names.add(name)
             for name in sorted(bmp_names):
                 it = self.input_tree.add_checkable_leaf(root, name)
-                it.setData(0, Qt.UserRole, (name,"BitmapLog"))
+                it.setData(0, Qt.UserRole, ("Logs","Bitmap", name))
                 state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
                 it.setCheckState(0, state)
                 #root.addChild(it)
@@ -1636,7 +1646,7 @@ class MainWindow(QMainWindow):
         for track in self.all_tracks:
             track_name = track.get("name") or "Track"
             track_item = self.input_tree.add_checkable_leaf(root, track_name)
-            track_item.setData(0, Qt.UserRole, (track_name,"Track"))
+            track_item.setData(0, Qt.UserRole, ("Track", track_name,"None"))
 
             state = (
                 Qt.Checked
@@ -1651,7 +1661,7 @@ class MainWindow(QMainWindow):
                 if not log_name:
                     continue
                 log_item = self.input_tree.add_noncheckable_leaf(track_item,log_name)
-                log_item.setData(0, Qt.UserRole, (log_name, "Track_Log", track_name))
+                log_item.setData(0, Qt.UserRole, ("Track", track_name,log_name ))
 
 
         self.input_tree.blockSignals(False)
@@ -2404,6 +2414,8 @@ class MainWindow(QMainWindow):
         # 4) append to track
         track["logs"].append(log_cfg)
 
+        self.add_log_in_track_to_tree(track_name, log_name)
+
         # 5) propagate to well_panel & tree widgets
         #if self.panel.tracks is not None:
         #    self.panel.tracks = self.panel.tracks
@@ -2413,6 +2425,18 @@ class MainWindow(QMainWindow):
         # refresh log+track trees so the new log shows up
         self._populate_well_log_tree()
         self._populate_well_track_tree()
+
+    def add_log_in_track_to_tree(self, track_name, log_name):
+        track_folder = self.c_well_track_folder
+        descendents = self.input_tree.get_items_in_folder(track_folder, include_folders=True)
+        for d in descendents:
+            data = d.data(0, Qt.UserRole)
+            print(f"data: {data}")
+            if data[1] == track_name:
+                track_item = self.input_tree.add_noncheckable_leaf(d, log_name)
+                track_item.setData(0, Qt.UserRole, ("Track", track_name, log_name))
+                return
+
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
@@ -2766,6 +2790,13 @@ class MainWindow(QMainWindow):
         # Refresh wells tree (and maybe other trees)
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
+
+        well_name = new_well.get("name")
+
+        self._add_new_well_to_tree(well_name)
+
+
+
 
     def _action_show_well(self, path):
         print("show well in path")
@@ -3373,14 +3404,16 @@ class MainWindow(QMainWindow):
         key = "track"
 
         # Use the active well_panel (docked) if you implemented it; otherwise self.panel
-        well_panel = getattr(self, "active_well_panel", None) or self.panel
+        #well_panel = getattr(self, "active_well_panel", None) or self.panel
+        well_panel = self.active_window
+
 
         dlg = BitmapPlacementDialog(
             parent=self,
             wells=self.all_wells,
             track_name=track_name,
             bitmap_key=key,
-            well_panel_widget=well_panel,
+            panel_widget=well_panel,
         )
         dlg.exec_()
 
@@ -4698,7 +4731,7 @@ class MainWindow(QMainWindow):
                 self.panel.add_visible_well_by_name(item_info[0])
             else:
                 self.panel.remove_visible_well_by_name(item_info[0])
-        if item_info[1]== "Stratigraphy":
+        if item_info[1]== "stratigraphy":
             if checked:
                 self.panel.add_visible_top_by_name(item_info[0])
             else:
@@ -4762,11 +4795,11 @@ class MainWindow(QMainWindow):
                 self.panel.add_visible_well_by_name(item_info[0])
             else:
                 self.panel.remove_visible_well_by_name(item_info[0])
-        if item_info[1]== "Stratigraphy":
+        if item_info[1]== "stratigraphy":
             if checked:
-                self.panel.add_visible_top_by_name(item_info[0])
+                self.panel.add_visible_top_by_name(item_info[2])
             else:
-                self.panel.remove_visible_top_by_name(item_info[0])
+                self.panel.remove_visible_top_by_name(item_info[2])
 
         if item_info[1]== "Track":
             if checked:
@@ -4801,6 +4834,7 @@ class MainWindow(QMainWindow):
 
     @QtCore.Slot(str, str)
     def on_context_action(self, path, action):
+        print(f"Context action: {path} -> {action}")
         if path:
             print(f"CONTEXT action: {action} on {path}")
         else:
@@ -4819,7 +4853,7 @@ class MainWindow(QMainWindow):
         item_info = item.data(0, Qt.UserRole)
         print(item_info)
 
-        if item_info[1] == "Wells":
+        if item_info[0] == "Wells":
             descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
             for d in descendents:
                 d_info = d.data(0, Qt.UserRole)
@@ -4834,11 +4868,18 @@ class MainWindow(QMainWindow):
                 self.panel.add_visible_well_by_name(item_info[0])
             else:
                 self.panel.remove_visible_well_by_name(item_info[0])
-        if item_info[1]== "Stratigraphy":
-            if checked:
-                self.panel.add_visible_top_by_name(item_info[0])
-            else:
-                self.panel.remove_visible_top_by_name(item_info[0])
+        if item_info[1]== "Stratigraphy" or item_info[0]== "Tops":
+            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+            self.active_window.redraw_requested = False
+            for d in descendents:
+                d_info = d.data(0, Qt.UserRole)
+                if d_info is not None:
+                    if checked:
+                        self.panel.add_visible_top_by_name(d_info[2], redraw=False)
+                    else:
+                        self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
+
+            self.active_window.draw_well_panel()
 
         if item_info[1]== "Track":
             if checked:
@@ -4847,3 +4888,177 @@ class MainWindow(QMainWindow):
                 self.panel.remove_visible_track_by_name(item_info[0])
 
         return
+
+    @QtCore.Slot(QtCore.QPoint, object)
+    def on_input_tree_context_menu(self, pos, item):
+        """
+        Show a context menu for logs in the tree:
+          - logs under the 'Logs' folder
+          - logs under each track in the 'Tracks' folder
+        """
+        #item = self.input_tree.itemAt(self.input_tree.viewport().mapFromGlobal(pos))
+        data = item.data(0, Qt.UserRole)
+        print(item, data)
+        print(pos)
+        #global_pos = (self.input_tree.viewport().mapToGlobal(pos))
+        print(self.input_tree.viewport().mapFromGlobal(pos))
+
+        menu = QMenu(self)
+
+        global_pos = pos
+
+        menu = QMenu(self)
+        #
+
+        if data[0] == "Wells":
+
+            act_add_well = menu.addAction("Add new well...")
+            act_edit_all_wells = menu.addAction("Edit all well settings ...")
+
+        #
+            chosen = menu.exec_(global_pos)
+            #
+            if chosen == act_add_well:
+                self._action_add_new_well()
+            elif chosen == act_edit_all_wells:
+               self._action_edit_all_wells()
+        if data[1] == "Well":
+            well_name = item.text(0)
+            act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
+            act_left = menu.addAction(f"Move well left '{well_name}'...")
+            act_right = menu.addAction(f"Move well right '{well_name}'...")
+            act_load_bitmap = menu.addAction(f"Load bitmap '{well_name}'...")
+            act_delete_well = menu.addAction(f"Delete well '{well_name}'...")
+            menu.addSeparator()
+            act_expand_all = menu.addAction("Expand all")
+            act_collapse_all = menu.addAction("Collapse all")
+
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_edit_well:
+                self._action_edit_single_well_by_name(well_name)
+            elif chosen == act_left:
+                self._move_well(well_name, -1)
+            elif chosen == act_right:
+                self._move_well(well_name, +1)
+            if chosen == act_load_bitmap:
+                self._action_load_core_bitmap_to_well(default_well_name=well_name)
+            if chosen == act_delete_well:
+                self._delete_well_from_project(well_name, confirm = True)
+            elif chosen == act_expand_all:
+                self.expandAll()
+                self.contextAction.emit("", "expand_all")
+            elif chosen == act_collapse_all:
+                self.collapseAll()
+                self.contextAction.emit("", "collapse_all")
+        if data[0] == "Tops":
+            act_edit_stratigraphy = menu.addAction("Edit well tops ...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit_stratigraphy:
+                self._action_edit_stratigraphy()
+            return
+        # # --- case 1: logs under "Logs" folder ---
+        if data[0] == "Bitmap":
+            #menu = QMenu(self)
+            _, well_name, bitmap_key = data
+            act_del = menu.addAction(f"Delete bitmap from well {well_name}")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_del:
+                if well_name and bitmap_key:
+                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=True)
+                elif not well_name:
+                    for well in self.all_wells:
+                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
+            return
+        if data[0] == "Continuous_Log":
+
+            _, well_name, log_name = data
+
+            act_edit = menu.addAction("Edit log data (table)…")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_well_log_table(well_name, log_name)
+            return
+        if data[0] == "Logs":
+            if data[1] == "Continuous_Log":
+                log_name = data[2]
+                act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit:
+                    self._edit_log_display_settings(log_name)
+                return
+        if data[0] == "Tracks":
+            print (data)
+
+            act_add_track = menu.addAction("Add new track...")
+            act_add_disc_track = menu.addAction("Add new discrete track...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_track:
+                self._action_add_empty_track()
+            elif chosen == act_add_disc_track:
+                self._action_add_discrete_track()
+                return
+        if data[0] == "Track":
+            print(data)
+            track_name = data[1]
+            if not track_name:
+                return
+
+            for track in self.all_tracks:
+                if track.get("name") == track_name:
+                    track_cfg = track
+                    break
+
+            act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
+            if track.get("type") == "discrete":
+                #menu = QMenu(self)
+                act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_disc_colors:
+                    self._action_edit_discrete_colors_for_track(track_name)
+            elif track.get("type") == "bitmap":
+                #menu = QMenu(self)
+                act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
+                act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
+                act_delete_all = menu.addAction("Delete all bitmaps for this track…")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_add_core_bitmap:
+                    self._action_load_bitmap_into_bitmap_track(track_name)
+                elif chosen == act_edit_bitmap_track:
+                    self._action_edit_bitmap_positions(track_name=track_name)
+                elif chosen == act_delete_all:
+                    self._delete_bitmaps_for_bitmap_track(track_name, confirm=True)
+            elif track.get("type") == "continuous":
+                #menu = QMenu(self)
+                act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
+                act_add_log = menu.addAction(f"Add new log to track ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit:
+                    #self._edit_log_display_settings(track_name)
+                    self._action_edit_track_settings(track_name)
+                    menu.close()
+                elif chosen == act_add_log:
+                    self._action_add_log_to_track()
+            elif track.get("type") == "lithofacies":
+                #menu = QMenu(self)
+                act_edit_lithofacies_settings = menu.addAction("Edit lithofacies track settings ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_lithofacies_settings:
+                    self._action_edit_lithofacies_settings_for_track(track_name)
+
+            chosen = menu.exec_(global_pos)
+            if chosen == act_delete_track:
+                self._action_delete_track()
+
+
+
+        menu.addSeparator()
+        act_expand_all = menu.addAction("Expand all")
+        act_collapse_all = menu.addAction("Collapse all")
+
+
+
+        return
+
+
