@@ -440,6 +440,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
             # Drop flags
             drop_flags = self.drop_flags(item)
 
+            item_data = item.data(0, Qt.UserRole)
+
             # Expanded state (folders only)
             expanded = item.isExpanded() if is_folder else False
 
@@ -452,6 +454,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
                 "drop_flags": drop_flags,
                 "expanded": expanded,
                 "children": [],
+                "data": item_data,
             }
 
             for i in range(item.childCount()):
@@ -491,9 +494,11 @@ class CheckableTree(QtWidgets.QTreeWidget):
             drop_flags = node_dict.get("drop_flags", self.DROP_DEFAULT)
             expanded = node_dict.get("expanded", False)
             children = node_dict.get("children", [])
+            item_data = node_dict.get("data", None)
 
             # Create item (no checkbox yet; policy will apply it)
             item = self._make_item(text, parent_item)
+            item.setData(0, Qt.UserRole, item_data)
 
             if parent_item is None:
                 self.addTopLevelItem(item)
@@ -517,6 +522,10 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
             # Restore check state if applicable
             if check_state is not None and self._has_checkbox(item):
+                if check_state == "CheckState.Unchecked":
+                    check_state = Qt.Unchecked
+                else:
+                    check_state = Qt.Checked
                 item.setCheckState(0, check_state)
 
             # Restore expanded state
@@ -539,6 +548,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
         finally:
             del blocker
             self._updating = False
+
+
     # ======================================================================
     # Public API: add/remove/move items
     # ======================================================================
@@ -553,11 +564,15 @@ class CheckableTree(QtWidgets.QTreeWidget):
         self._apply_check_policy(root)
         return root
 
-    def add_parent(self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str) -> QtWidgets.QTreeWidgetItem:
+    def add_parent(self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str, UserRole = None) -> QtWidgets.QTreeWidgetItem:
         """
         Add a checkable folder (default folder type) under parent_item, or as top-level if None.
         """
         item = self._make_item(text, parent=None)
+
+        if UserRole:
+            item.setData(0, Qt.UserRole, UserRole)
+
         if parent_item is None:
             self.addTopLevelItem(item)
         else:
@@ -572,23 +587,27 @@ class CheckableTree(QtWidgets.QTreeWidget):
         self._refresh_upwards(item)
         return item
 
-    def add_noncheckable_folder(self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str) -> QtWidgets.QTreeWidgetItem:
+    def add_noncheckable_folder(self, parent_item: QtWidgets.QTreeWidgetItem | None, text: str, UserRole = None) -> QtWidgets.QTreeWidgetItem:
         """
         Add a folder with NO checkbox (but can contain checkable descendants).
         """
-        folder = self.add_parent(parent_item, text)
+        folder = self.add_parent(parent_item, text, UserRole=UserRole)
         self.set_check_policy(folder, self.FOLDER_NEVER_CHECKABLE)
         self._apply_check_policy(folder)
         self._refresh_upwards(folder)
         return folder
 
-    def add_checkable_leaf(self, parent_item: QtWidgets.QTreeWidgetItem, text: str) -> QtWidgets.QTreeWidgetItem:
+    def add_checkable_leaf(self, parent_item: QtWidgets.QTreeWidgetItem, text: str, UserRole = None) -> QtWidgets.QTreeWidgetItem:
         """
         Add an ALWAYS-checkable leaf (checkbox leaf).
         """
         if parent_item is None:
             raise ValueError("add_checkable_leaf requires a parent_item")
         leaf = self._make_item(text, parent_item)
+
+        if UserRole:
+            leaf.setData(0, Qt.UserRole, UserRole)
+
         self.set_check_policy(leaf, self.LEAF_ALWAYS_CHECKABLE)
         self._apply_check_policy(leaf)
 
@@ -597,13 +616,16 @@ class CheckableTree(QtWidgets.QTreeWidget):
         self._refresh_upwards(leaf)
         return leaf
 
-    def add_noncheckable_leaf(self, parent_item: QtWidgets.QTreeWidgetItem, text: str) -> QtWidgets.QTreeWidgetItem:
+    def add_noncheckable_leaf(self, parent_item: QtWidgets.QTreeWidgetItem, text: str, UserRole = None) -> QtWidgets.QTreeWidgetItem:
         """
         Add a NEVER-checkable leaf (no checkbox).
         """
         if parent_item is None:
             raise ValueError("add_noncheckable_leaf requires a parent_item")
         leaf = self._make_item(text, parent_item)
+        if UserRole:
+            item.setData(0, Qt.UserRole, UserRole)
+
         self.set_check_policy(leaf, self.LEAF_NEVER_CHECKABLE)
         self._apply_check_policy(leaf)
 
@@ -1152,6 +1174,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
         #self.contextAction.connect(self.on_context_action)
 
     def _on_item_changed(self, item: QtWidgets.QTreeWidgetItem, column: int):
+
+        #print("_on_item_changed")
         if column != 0 or self._updating:
             return
 
@@ -1166,7 +1190,15 @@ class CheckableTree(QtWidgets.QTreeWidget):
     def _handle_user_toggle(self, item: QtWidgets.QTreeWidgetItem):
         # Enforce policy and ignore non-checkable items
         self._apply_check_policy(item)
+        print(f"handle_user_toggle: {item.text(0)}",
+              "children=", item.childCount(),
+              "has_checkbox=", self._has_checkbox(item),
+              "policy=", self.check_policy(item),
+              "state=", item.data(0, QtCore.Qt.CheckStateRole),
+              )
+
         if not self._has_checkbox(item):
+            print("WARNING: non-checkable item toggled")
             return
 
         state = item.checkState(0)
@@ -1175,7 +1207,12 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         if item.childCount() > 0:
             # folder toggled (only checkable folders can reach here)
+            print("WARNING: folder toggled")
+            self.parentToggled.connect(lambda : print("WARNING: folder toggled"))
+
             self.parentToggled.emit(self._item_path(item), checked, item)
+            print(id(self), "Toggled emitted")
+            print(item.flags() & QtCore.Qt.ItemIsUserCheckable)
 
             try:
                 self._updating = True
@@ -1186,6 +1223,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
             return
 
         # checkable leaf toggled
+        print("WARNING: leaf toggled")
         self.itemToggled.emit(self._item_path(item), checked, item)
         try:
             self._updating = True
@@ -1386,23 +1424,28 @@ def setup_input_tree(self, root_label=None):
     self.input_tree = CheckableTree(self)
     self.input_tree.setHeaderHidden(True)
 
-
-    self.input_tree.parentToggled.connect(self.on_item_toggled)
-    self.input_tree.itemToggled.connect(self.on_item_toggled)
-    self.input_tree.contextAction.connect(self.on_context_action)
-    #self.input_tree.structureChanged.connect(self.on_structure_changed)
-
-    self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-    self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+    connect_input_tree(self)
 
     setup_well_tree(self)
     #self.input_tree.clear_tree()
     #setup_test_tree(self)
 
+
+def connect_input_tree(self):
+    self.input_tree.parentToggled.connect(self.on_parent_toggled)
+    #self.input_tree.itemToggled.connect(self.on_item_toggled)
+    self.input_tree.itemToggled.connect(self.on_leaf_toggled)
+    self.input_tree.contextAction.connect(self.on_context_action)
+    # self.input_tree.structureChanged.connect(self.on_structure_changed)
+
+    self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+
+
 def setup_well_tree(self):
 
     #High Level Folder
-    self.c_well_root_item = self.input_tree.add_root("Wells")
+    self.c_well_folder = self.input_tree.add_root("Wells")
     self.c_well_tops_folder = self.input_tree.add_root("Wells Tops")
     self.c_well_logs_folder = self.input_tree.add_root("Logs")
     self.c_well_track_folder = self.input_tree.add_root("Tracks")

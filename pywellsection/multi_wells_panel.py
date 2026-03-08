@@ -518,7 +518,11 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         xscale = log_cfg.get("xscale", "linear")
         twin_ax.set_xscale("log" if xscale == "log" else "linear")
         if "xlim" in log_cfg:
-            twin_ax.set_xlim(log_cfg["xlim"])
+            xlim = log_cfg["xlim"]
+            if xscale == "log":
+                if xlim[0] <= 0:
+                    xlim = (1e-10, xlim[1])
+            twin_ax.set_xlim(xlim)
 
         if log_cfg.get("direction", "normal") == "reverse":
             x_min, x_max = twin_ax.get_xlim()
