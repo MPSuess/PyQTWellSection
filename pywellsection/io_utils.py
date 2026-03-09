@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Tuple, Optional
 import openpyxl
 
 from pywellsection.dialogs import ImportTopsAssignWellDialog
+#from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -243,9 +244,8 @@ def load_project_from_json(path):
     window_dict = data.get("window_dict", {})
     metadata = data.get("metadata", {})
     ui_layout = data.get("ui_layout", {})
-    tree_dict = data.get("tree_dict", {})
 
-    return window_dict, wells, tracks, stratigraphy, ui_layout, tree_dict, metadata
+    return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
 
 def load_project_from_json_old(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -263,7 +263,7 @@ def load_project_from_json_old(path):
 
     return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
 
-def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None, tree_dict = None, extra_metadata=None):
+def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None, extra_metadata=None):
     """
     Export the current project to a JSON file (NumPy-safe).
 
@@ -294,8 +294,6 @@ def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=N
         project["window_dict"] = window_dict
     if ui_layout is not None:
         project["ui_layout"] = ui_layout
-    if tree_dict is not None:
-        project["tree_dict"] = tree_dict
 
     with path.open("w", encoding="utf-8") as f:
         json.dump(project, f, indent=2, default=_json_serializer)
@@ -1176,6 +1174,9 @@ def _normalize_loaded_project(wells: list, tracks: list, stratigraphy: dict):
     if stratigraphy is None:
         stratigraphy = {}
 
+
+
+
 # ============================================================
 # 1) Role inference from Hauptformation (full) and abbreviation
 # ============================================================
@@ -1536,7 +1537,7 @@ def import_schichtenverzeichnisv1(parent,project, xlsx_path: str,): # PWSProject
     )
     return True
 
-def import_schichtenverzeichnis(parent, project, xlsx_path):
+def import_schichtenverzeichnisv2(parent, project, xlsx_path):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1638,145 +1639,103 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
 
     return True
 
-def read_sv_tops_file(path: str) -> List[Dict[str, Any]]:
-    """
-    Returns list of records:
-      {"well": str, "md": float, "name": str, "type": str}
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
+def import_schichtenverzeichnis(parent, project, xlsx_path):
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
+        return False
 
-    # sniff delimiter
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        sample = f.read(4096)
-        f.seek(0)
-        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
-        reader = csv.DictReader(f, dialect=dialect)
+    # --- Load workbook first ---
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    sheet_names = wb.sheetnames
 
-        out = []
-        for row in reader:
-            # normalize keys
-            keys = {k.strip(): k for k in row.keys() if k}
+    if not sheet_names:
+        QMessageBox.warning(parent, "Import", "No worksheets found in file.")
+        return False
 
-            def g(*cands):
-                for c in cands:
-                    for kk, orig in keys.items():
-                        if kk.lower() == c.lower():
-                            return row.get(orig)
-                return None
+    wells = project.all_wells
+    existing_names = [w["name"] for w in wells if w.get("name")]
 
-            well = (g("Well_name", "Well", "WELL") or "").strip()
-            name = (g("Horizon", "Name", "Unit", "Strat", "STRAT") or "").strip()
-            typ = (g("Type", "TYPE") or "").strip()
-            md_s = g("MD", "Depth", "DEPTH", "TVD")  # treat as MD-like number for now
+    dlg = ImportTopsAssignWellDialog(
+        parent,
+        sheet_names=sheet_names,
+        existing_well_names=existing_names,
+        default_new_name=os.path.splitext(os.path.basename(xlsx_path))[0],
+    )
 
-            try:
-                md = float(md_s) if md_s not in (None, "") else None
-            except Exception:
-                md = None
+    # --- Live preview update when sheet changes ---
+    def update_preview():
+        try:
+            # tops, td, _ = parse_geolprofile_xlsx_to_tops_v2(
+            #     xlsx_path,
+            #     dlg.selected_sheet(),
+            # )
+            tops, td, _ = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
+            dlg.set_preview(len(tops), td)
+        except Exception as e:
+            dlg.lbl_preview.setText(f"Preview error: {e}")
 
-            if not name:
-                continue
+    dlg.cmb_sheet.currentIndexChanged.connect(update_preview)
+    update_preview()
 
-            out.append({"well": well, "md": md, "name": name, "type": typ})
+    if dlg.exec_() != QDialog.Accepted:
+        return False
 
-    return out
+    sel = dlg.result_selection()
+
+    # --- Parse selected sheet ---
+    tops, td, strat_updates = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
 
 
+    if not tops:
+        QMessageBox.information(parent, "Import", "No tops found in selected sheet.")
+        return False
 
-def import_sv_tops_using_beee(
-    parent,
-    project,
-    sv_path: str,
-    beee_strat_roots: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    """
-    Workflow:
-      - parse sv_tops (Base picks)
-      - map base -> top using BEEE hierarchy
-      - show dialog for unresolved
-      - return list of TOP picks:
-          {"well":..., "md":..., "name":..., "role":..., "type":"Top"}
-    """
-    sv_rows = read_sv_tops_file(sv_path)
-    idx = flatten_strat_tree(beee_strat_roots)
+    # --- Resolve well (unchanged logic) ---
+    if sel["create_new"]:
+        target_well = {
+            "name": sel["new_name"],
+            "reference_type": "KB",
+            "reference_depth": 0.0,
+            "total_depth": td if sel["set_td"] else 0.0,
+            "logs": {},
+            "discrete_logs": {},
+            "tops": {},
+            "facies_intervals": [],
+            "bitmaps": {},
+        }
+        wells.append(target_well)
+    else:
+        target_well = next(
+            (w for w in wells if w.get("name") == sel["existing_name"]), None
+        )
+        if target_well is None:
+            QMessageBox.warning(parent, "Import", "Selected well not found.")
+            return False
 
-    mapped, unresolved = map_sv_bases_to_tops(sv_rows, idx, only_base_rows=True)
+        if sel["set_td"]:
+            ref = float(target_well.get("reference_depth", 0.0))
+            target_well["total_depth"] = max(
+                float(target_well.get("total_depth", 0.0)),
+                td - ref,
+            )
 
-    # resolve unresolved
-    if unresolved:
-        dlg = ResolveUnmatchedBasesDialog(parent, unresolved, idx)
-        if dlg.exec_() != QDialog.Accepted:
-            return []
+    # --- Apply stratigraphy + tops (unchanged) ---
+    strat = project.all_stratigraphy
+    for key, meta in strat_updates.items():
+        strat.setdefault(key, {}).update(meta)
 
-        manual = dlg.results()
-        for m in manual:
-            # If user picked a BEEE base unit, convert via hierarchy
-            if m["chosen_beee_base_key"]:
-                eq_top = equivalent_top_for_base(idx, m["chosen_beee_base_key"])
-                if eq_top:
-                    mapped.append({
-                        "well": m["well"],
-                        "md": m["md"],
-                        "sv_name": m["sv_name"],
-                        "beee_base_key": m["chosen_beee_base_key"],
-                        "mapped_top": eq_top,
-                        "role": "stratigraphy",
-                        "type": "Top",
-                    })
-                    continue
-
-            # Otherwise use custom top name, with chosen role
-            if m["custom_top"]:
-                mapped.append({
-                    "well": m["well"],
-                    "md": m["md"],
-                    "sv_name": m["sv_name"],
-                    "beee_base_key": None,
-                    "mapped_top": m["custom_top"],
-                    "role": m["role"] or "other",
-                    "type": "Top",
-                })
-
-    # Ensure project stratigraphy contains custom tops (role != stratigraphy)
-    strat = getattr(project, "all_stratigraphy", None)
-    if strat is None:
-        strat = {}
-        project.all_stratigraphy = strat
-
-    added_strat = 0
-    for r in mapped:
-        nm = r["mapped_top"]
-        role = r.get("role", "stratigraphy")
-        if nm and nm not in strat:
-            # Only auto-create for non-stratigraphy custom entries OR unknown names
-            # (BEEE names likely already exist elsewhere, but harmless if added)
-            strat[nm] = {
-                "level": "fault" if role == "fault" else ("other" if role == "other" else "formation"),
-                "role": role,
-                "color": None,
-                "hatch": None,
-            }
-            added_strat += 1
-
-    # Final TOP picks list (name replaced)
-    out = []
-    for r in mapped:
-        out.append({
-            "well": r.get("well",""),
-            "md": r.get("md", None),
-            "name": r.get("mapped_top",""),
-            "role": r.get("role","stratigraphy"),
-            "type": "Top",
-            "source": "sv_tops(Base→Top via BEEE)",
-            "sv_base_name": r.get("sv_name",""),
-        })
+    tops_dict = target_well.setdefault("tops", {})
+    for t in tops:
+        tops_dict[t["key"]] = {
+            "depth": t["depth"],
+            "role": t["role"],
+            "level": strat.get(t["key"], {}).get("level", "formation"),
+        }
 
     QMessageBox.information(
         parent,
-        "SV tops import",
-        f"Imported {len(out)} TOP picks from sv_tops.\n"
-        f"Unmatched base rows resolved: {len(unresolved)}\n"
-        f"Stratigraphy entries added: {added_strat}"
+        "Import",
+        f"Imported {len(tops)} tops from sheet '{sel['sheet']}' into '{target_well['name']}'."
     )
-    return out
+
+    return True
