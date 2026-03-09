@@ -37,7 +37,6 @@ from pywellsection.sample_data import Wells # The new class for wells
 from pywellsection.pws_project import PWSProject
 
 
-
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from matplotlib.pyplot import vlines
 
@@ -47,13 +46,12 @@ from pywellsection.Qt_Map_Widget import MapDockWindow, MapPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
-from pywellsection.io_utils import import_schichtenverzeichnis
+from pywellsection.io_utils import import_schichtenverzeichnis, import_sv_tops_using_beee
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
-from pywellsection.trees import (setup_well_widget_tree, setup_window_tree, build_stratigraphic_column_tree,
-                                 setup_input_tree)
-#from pywellsection.trees import CheckableTree
+from pywellsection.trees import (setup_input_tree, setup_well_widget_tree, setup_window_tree,
+                                 build_stratigraphic_column_tree, connect_input_tree)
 from pywellsection.dialogs import AssignLasToWellDialog, NewTrackDialog
 from pywellsection.dialogs import AddLogToTrackDialog
 from pywellsection.dialogs import StratigraphyEditorDialog
@@ -117,6 +115,10 @@ class MainWindow(QMainWindow):
         self.redraw_requested = False
         self.current_project_path = None
 
+        self.tops_tree_populated = False
+        self.well_tree_populated = False
+        self.well_tree_dict = {}
+
         self.project = PWSProject(name="My Project", crs="EPSG:32632", units={"xy": "m", "depth": "m"})
 
         # The Windows
@@ -128,6 +130,8 @@ class MainWindow(QMainWindow):
         self.all_wells = wells
         self.all_stratigraphy = stratigraphy
         self.all_tracks = tracks
+
+        self.global_stratigraphy = None
 
         self.all_logs = None
         self.all_discrete_logs = None
@@ -210,9 +214,8 @@ class MainWindow(QMainWindow):
         self.dock_logger.setWidget(self.textbox_logger.widget)
 
         setup_well_widget_tree(self)
-        setup_window_tree(self)
         setup_input_tree(self)
-        #self.checkable_tree.build_tree(self.all_wells)
+        setup_window_tree(self)
 
         ### Setup the Dock
 
@@ -226,10 +229,10 @@ class MainWindow(QMainWindow):
         self.window_dock.setWidget(self.window_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.window_dock)
 
-        self.test_dock = QDockWidget("Test", self)
-        self.test_dock.setObjectName("Test")
-        self.test_dock.setWidget(self.ctree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.test_dock)
+        self.Input_Dock = QDockWidget("New Input", self)
+        self.Input_Dock.setObjectName("New Input")
+        self.Input_Dock.setWidget(self.input_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.Input_Dock)
 
         self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
         self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
@@ -238,7 +241,6 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(self.dock_console, self.dock_commands)
         self.tabifyDockWidget(self.dock_commands, self.dock_logger)
         self.tabifyDockWidget(self.well_dock, self.window_dock)
-        self.tabifyDockWidget(self.window_dock, self.test_dock)
         self.dock_console.raise_()
         self.well_dock.raise_()
 
@@ -248,7 +250,11 @@ class MainWindow(QMainWindow):
         self._populate_well_log_tree()
         self._populate_well_track_tree()
         self._populate_window_tree()
-        #eckable_tree(self)
+
+        self.well_tree_dict = self.input_tree.to_dict()
+
+
+
         #self.redraw_requested = False
 
         self.redraw_requested = True
@@ -323,9 +329,9 @@ class MainWindow(QMainWindow):
         act_import_bitmap.triggered.connect(self._action_load_core_bitmap_to_well)
         import_menu.addAction(act_import_bitmap)
 
-        # act_import_test = QAction("Import test...", self)
-        # act_import_test.triggered.connect(self._file_load_test)
-        # import_menu.addAction(act_import_test)
+        act_import_test = QAction("Import test...", self)
+        act_import_test.triggered.connect(self._file_load_test)
+        import_menu.addAction(act_import_test)
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
@@ -438,7 +444,7 @@ class MainWindow(QMainWindow):
 
             # connect old references
             self.all_wells = self.project.all_wells
-            self.all_tracks = self.project.all_tracks
+            self.tracks = self.project.all_tracks
             self.stratigraphy = self.project.all_stratigraphy
 
     def _save_pws_project(self, path):
@@ -466,7 +472,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            window_dict, wells, tracks, raw_strat, ui_layout, _ = load_project_from_json(path)
+            window_dict, wells, tracks, raw_strat, ui_layout, tree_dict, _ = load_project_from_json(path)
 
 
             self.current_project_path = path
@@ -639,6 +645,19 @@ class MainWindow(QMainWindow):
             # populate well tree
             self._populate_well_tree()
             self._populate_well_tops_tree()
+            if type(tree_dict) is dict and len(tree_dict) > 0:
+                print("rebuilding input tree from dict")
+                print(id(self.input_tree))
+                self.input_tree.from_dict(tree_dict)
+                connect_input_tree(self)
+
+                #connect_input_tree(self)
+            else:
+                self._populate_input_tree()
+                self._populate_tops_tree()
+                self._populate_log_tree()
+                self._populate_track_tree()
+
             #self._populate_well_log_tree()
             self._populate_well_track_tree()
             self._populate_window_tree()
@@ -733,6 +752,7 @@ class MainWindow(QMainWindow):
             "version": "0.1.0",
         }
         ui_layout = self._dock_layout_snapshot()
+        tree_dict = self._get_tree_dict()
 
         window_list = self._get_window_list()
 
@@ -747,7 +767,7 @@ class MainWindow(QMainWindow):
             # 1) write data.json inside tmp data dir
             tmp_data_json = os.path.join(tmp_dir, "data.json")
 
-            export_project_to_json(tmp_data_json, wells, tracks, stratigraphy, window_list, ui_layout, extra_metadata)
+            export_project_to_json(tmp_data_json, wells, tracks, stratigraphy, window_list, ui_layout, tree_dict,extra_metadata)
             #
             # with open(tmp_data_json, "w", encoding="utf-8") as f:
             #     json.dump(project_data, f, indent=2)
@@ -776,7 +796,7 @@ class MainWindow(QMainWindow):
             # just copy the new data.json into the existing data_dir
                 shutil.copy2(tmp_data_json, data_dir)
                 shutil.rmtree(tmp_dir)
-            elif old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
+            elif old_path and old_path != path: # .. an old name exist but it is not the same save existing project under new name ...
                     o_path, ofname = os.path.split(old_path)
                     oproject_stem = os.path.splitext(ofname)[0]
                     o_data_path = os.path.join(o_path, oproject_stem + ".pdj")
@@ -906,6 +926,8 @@ class MainWindow(QMainWindow):
                 self.all_logs = logs
             else:
                 self.all_logs = self.all_logs | logs  # this operator merges the two dictionaries
+
+        self._populate_input_tree()
 
         # Update well_panel + tree views
         self.panel.set_wells(self.all_wells)
@@ -1089,10 +1111,8 @@ class MainWindow(QMainWindow):
             return
 
         #load_LBEG_SV(path)
-        strat = _load_BEEE_stratigraphy(path)
-        build_stratigraphic_column_tree(self.well_tree,strat)
-
-
+        self.global_stratigraphy = _load_BEEE_stratigraphy(path)
+        build_stratigraphic_column_tree(self.well_tree,self.global_stratigraphy)
 
     def _file_load_tops_from_csv(self, path: str):
         """
@@ -1302,8 +1322,371 @@ class MainWindow(QMainWindow):
             self.all_wells = self.project.all_wells
             self._populate_well_tops_tree()
             self._populate_well_tree()
-#            self._refresh_all_panels()
+            self._populate_input_tree()
+
+            if self.global_stratigraphy:
+                import_sv_tops_using_beee(self,self.project, path,self.global_stratigraphy)
+            #            self._refresh_all_panels()
+            self._populate_tops_tree()
 #            self._populate_well_tree()
+
+    def _build_well_tree_dock(self):
+        """Left dock: tree with checkboxes to toggle wells."""
+        self.well_dock = QDockWidget("Wells", self)
+        self.well_dock.setObjectName("WellDock")
+        self.well_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        self.well_tree = QTreeWidget(self.well_dock)
+        self.well_tree.setHeaderHidden(True)
+        self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
+
+        # 👇 create the folder item once
+        self.well_root_item = QTreeWidgetItem(["All wells"])
+        # tristate so checking it checks/unchecks children
+        self.well_root_item.setFlags(
+            self.well_root_item.flags()
+            | Qt.ItemIsUserCheckable
+            | Qt.ItemIsTristate
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEnabled
+        )
+        self.well_root_item.setCheckState(0, Qt.Unchecked)
+
+        self.well_tree.addTopLevelItem(self.well_root_item)
+
+        # Context menu
+        #self.well_tree.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.well_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        #self.well_tree.customContextMenuRequested.connect(self.test_connect)
+
+        self._populate_well_tree()  # initial fill
+
+        self.well_dock.setWidget(self.well_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+
+    def setup_test_tree(self):
+
+        self.c_well_folder = self.input_tree.add_root("Wells")
+
+        self.c_well_tops_folder = self.input_tree.add_root("Tops")
+        self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
+        self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
+        self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
+
+        self.c_logs_folder = self.input_tree.add_root("Logs")
+
+        self.c_tracks_folder = self.input_tree.add_root("Tracks")
+
+        self.input_tree.set_accept_children_drop(self.c_well_folder, False)
+        self.input_tree.set_accept_children_drop(self.c_logs_folder, False)
+        self.input_tree.set_accept_children_drop(self.c_tracks_folder, False)
+        self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
+        self.input_tree.set_accept_children_drop(self.c_faults_root, False)
+        self.input_tree.set_accept_children_drop(self.c_other_root, False)
+
+    def _update_input_tree(self):
+
+        items = self.input_tree.get_items_in_folder(self.c_well_folder)
+        if not items:
+            return
+
+    def _populate_input_tree(self):
+
+        prev_selected = set()
+        root = self.c_well_folder
+        root.setData(0, Qt.UserRole, ("Wells", "Root", "Folder"))
+
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        self.input_tree.remove_all_children(root)
+
+        # Rebuild the well tree
+
+        for w in self.all_wells:
+            well_name = w.get("name") or "UNKNOWN"
+
+            well_folder = self.input_tree.add_parent(root,well_name)
+            self.input_tree.set_accept_children_drop(well_folder, False)
+            well_folder.setData(0, Qt.UserRole, (w.get("name"),"Well"))
+
+            # --- subfolders ---
+            logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
+            self.input_tree.set_accept_children_drop(logs_folder, False)
+            self.input_tree.lock_leaf_movement(logs_folder)
+
+            cont_folder = self.input_tree.add_noncheckable_folder(logs_folder,"continuous")
+            disc_folder = self.input_tree.add_noncheckable_folder(logs_folder,"discrete")
+            bmp_folder = self.input_tree.add_noncheckable_folder(logs_folder,"bitmap")
+            comp_folder = self.input_tree.add_noncheckable_folder(well_folder, "Completions")
+
+            for f in [cont_folder, disc_folder, bmp_folder, comp_folder]:
+                f.setExpanded(False)
+                self.input_tree.set_accept_children_drop(f, False)
+                self.input_tree.lock_leaf_movement(f)
+
+            # --- log leaves (informational, not checkable) ---
+            logs_dict = w.get("logs", {}) or {}
+            if logs_dict:
+                for log_name in sorted(logs_dict.keys()):
+                    wlog_item=self.input_tree.add_noncheckable_leaf(cont_folder, log_name)
+                    self.input_tree.set_accept_children_drop(wlog_item, False)
+                    self.input_tree.lock_leaf_movement(wlog_item)
+
+                    wlog_item.setData(0, Qt.UserRole, ("Continuous_Log", well_name, log_name))
+
+                    #print(l.data(0, Qt.UserRole))
+
+            # --- discrete logs ---
+            dlogs = (w.get("discrete_logs") or {})
+            if dlogs:
+                for dlog_name in sorted(dlogs.keys(), key=str):
+                    dlog_item = self.input_tree.add_noncheckable_leaf(disc_folder, dlog_name)
+                    self.input_tree.set_accept_children_drop(dlog_item, False)
+                    self.input_tree.lock_leaf_movement(dlog_item)
+                    dlog_item.setData(0, Qt.UserRole, ("Discrete_Log", well_name, dlog_name))
+
+            # --- bitmaps ---
+            blogs = (w.get("bitmaps", None) or {})
+            if blogs:
+                for blog_name in sorted(blogs.keys(), key=str):
+                    blog_item = self.input_tree.add_noncheckable_leaf(bmp_folder, blog_name)
+                    self.input_tree.set_accept_children_drop(blog_item, False)
+                    self.input_tree.lock_leaf_movement(dlog_item)
+                    blog_item.setData(0, Qt.UserRole, ("Bitmap", well_name, blog_name))
+
+            # for l  in self.input_tree._iter_leaves(logs_folder):
+            #    self.input_tree.set_accept_children_drop(l, False)
+            #    l.setExpanded(False)
+
+            #self.input_tree.set_item_checkable(logs_folder, False)
+
+        return
+
+    def _add_new_well_to_tree(self, well_name: str):
+        root = self.c_well_folder
+        well_folder = self.input_tree.add_parent(root, well_name)
+        self.input_tree.setCurrentItem(well_folder)
+        #self.input_tree.editItem(well_folder,0)
+        self.input_tree.set_accept_children_drop(well_folder, False)
+        well_folder.setData(0, Qt.UserRole, (well_name, "Well"))
+
+        # # --- subfolders ---
+        logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
+        self.input_tree.set_accept_children_drop(logs_folder, False)
+        self.input_tree.lock_leaf_movement(logs_folder)
+        #
+        cont_folder = self.input_tree.add_noncheckable_folder(logs_folder, "continuous")
+        disc_folder = self.input_tree.add_noncheckable_folder(logs_folder, "discrete")
+        bmp_folder = self.input_tree.add_noncheckable_folder(logs_folder, "bitmap")
+        comp_folder = self.input_tree.add_noncheckable_folder(well_folder, "Completions")
+
+    def _populate_tops_tree(self):
+        """Rebuild the new well tops tree from self.c_stratigraphy_root, preserving selections if possible."""
+        # Remember current selection by name
+        strat_prev_selected = set()
+        strat_root = self.c_stratigraphy_root
+        for i in range(strat_root.childCount()):
+            it = strat_root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                strat_prev_selected.add(it.data(0, Qt.UserRole))
+
+
+        # remove all children under the folder
+        strat_root.takeChildren()
+
+        faults_prev_selected = set()
+        faults_root = self.c_faults_root
+        for i in range(faults_root.childCount()):
+            it = faults_root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                faults_prev_selected.add(it.data(0, Qt.UserRole))
+
+        # remove all children under the folder
+        faults_root.takeChildren()
+
+        other_prev_selected = set()
+        other_root = self.c_other_root
+        for i in range(other_root.childCount()):
+            it = other_root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                other_prev_selected.add(it.data(0, Qt.UserRole))
+
+        # remove all children under the folder
+        other_root.takeChildren()
+
+        # add wells as children of "All wells"
+
+        strat_list = list(self.all_stratigraphy)
+
+        for strat_name in strat_list:
+            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
+                strat_it=self.input_tree.add_checkable_leaf(strat_root,strat_name)
+                strat_it.setData(0, Qt.UserRole, ("Tops","stratigraphy", strat_name))
+
+                # default: keep previous selection; else checked
+                if not strat_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in strat_prev_selected else Qt.Unchecked
+
+                strat_it.setCheckState(0, state)
+                #strat_root.addChild(strat_it)
+            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
+                fault_it = self.input_tree.add_checkable_leaf(faults_root,strat_name)
+                fault_it.setData(0, Qt.UserRole, ("Tops","fault",strat_name))
+
+                if not faults_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in faults_prev_selected else Qt.Unchecked
+                fault_it.setCheckState(0, state)
+                faults_root.addChild(fault_it)
+
+            elif self.all_stratigraphy[strat_name]['role'] == 'other':
+                other_it = self.input_tree.add_checkable_leaf(other_root, strat_name)
+                other_it.setData(0, Qt.UserRole, ("Tops","other",strat_name))
+
+                if not other_prev_selected:
+                    state = Qt.Checked
+                else:
+                    state = Qt.Checked if strat_name in other_prev_selected else Qt.Unchecked
+                other_it.setCheckState(0, state)
+                #other_root.addChild(other_it)
+
+        self.well_tree.blockSignals(False)
+
+    def _populate_log_tree(self):
+        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+        ### add logs as children of "All logs"
+        # delete all logs under the folder and rebuild from scratch
+        ### Remember current selection by name
+        ### First continous Logs
+
+        print("_populate_well_log_tree")
+
+        #blocker = QtCore.QSignalBlocker(self.input_tree)
+        self.input_tree.blockSignals(True)
+
+        prev_selected = set()
+        ### Start with populating the continous logs tree ###
+        root = self.cont_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+        # remove all wells under the folder
+        root.takeChildren()
+
+        log_names = set()
+        if self.all_logs:
+            for log in self.all_logs:
+                name = log
+                if name:
+                    log_names.add(name)
+            for name in sorted(log_names):
+                #state = True if (not prev_selected or name in prev_selected) else False
+                it = self.input_tree.add_checkable_leaf(root, name)
+                it.setData(0, Qt.UserRole, ("Logs", "Continuous_Log", name))
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                #root.addChild(it)
+
+        ### Second discrete Logs ###
+        prev_selected = set()
+        root = self.disc_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+        root.takeChildren()
+
+        dlog_names = set()
+        if self.all_discrete_logs:
+            for dlog in self.all_discrete_logs:
+                name = dlog
+                if dlog:
+                    dlog_names.add(name)
+            for name in sorted(dlog_names):
+                it = self.input_tree.add_checkable_leaf(root, name)
+
+                it.setData(0, Qt.UserRole, ("Logs", "DiscreteLog", name))
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                #root.addChild(it)
+
+        ### Third bitmap Logs ###
+        prev_selected = set()
+        root = self.bmp_folder
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+        root.takeChildren()
+
+        bmp_names = set()
+        if self.all_bitmaps:
+            for bmp in self.all_bitmaps:
+                name = bmp
+                if bmp:
+                    bmp_names.add(name)
+            for name in sorted(bmp_names):
+                it = self.input_tree.add_checkable_leaf(root, name)
+                it.setData(0, Qt.UserRole, ("Logs","Bitmap", name))
+                state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+                it.setCheckState(0, state)
+                #root.addChild(it)
+
+        self.input_tree.blockSignals(False)
+
+    def _populate_track_tree(self):
+
+        """Rebuild tracks subtree from self.tracks, showing track→log assignment."""
+
+        self.input_tree.blockSignals(True)
+
+        if self.all_tracks is None:
+            return
+        else:
+            tracks = self.all_tracks
+
+        root = self.c_well_track_folder
+
+        # remember previous checked tracks
+
+        prev_selected = set()
+        for i in range(root.childCount()):
+            it = root.child(i)
+            if it.checkState(0) == Qt.Checked:
+                prev_selected.add(it.data(0, Qt.UserRole))
+
+        root.takeChildren()
+
+        for track in self.all_tracks:
+            track_name = track.get("name") or "Track"
+            track_item = self.input_tree.add_checkable_leaf(root, track_name)
+            track_item.setData(0, Qt.UserRole, ("Track", track_name,"None"))
+
+            state = (
+                Qt.Checked
+                if (not prev_selected or track_name in prev_selected)
+                else Qt.Unchecked
+            )
+            track_item.setCheckState(0, state)
+
+            # add logs as children (structural only)
+            for log_cfg in track.get("logs", []):
+                log_name = log_cfg.get("log")
+                if not log_name:
+                    continue
+                log_item = self.input_tree.add_noncheckable_leaf(track_item,log_name)
+                log_item.setData(0, Qt.UserRole, ("Track", track_name,log_name ))
+
+
+        self.input_tree.blockSignals(False)
+        #self._rebuild_visible_tracks_from_tree()
 
     def _populate_well_tree(self):
 
@@ -1458,47 +1841,21 @@ class MainWindow(QMainWindow):
         #self._rebuild_well_panel_from_tree()
 
 
+
     def _populate_well_tops_tree(self):
+        if self.tops_tree_populated:
+            self._update_tops_tree()
+        else:
+            self._rebuild_well_tops_tree()
+            self.tops_tree_populated = True
 
-        Blocker = QSignalBlocker(self.ctree)
-        self.ctree.remove_all_descendants(self.cstrat_root)
+    def _update_tops_tree(self):
+        #self.well_tree_dict = self.input_tree.to_dict()
+        #self.input_tree.from_dict(self.well_tree_dict)
+        self._rebuild_well_tops_tree()
 
-        strat_list = list(self.all_stratigraphy)
-        astrat = self.all_stratigraphy
-        print(strat_list)
-        visible_tops = self.panel.get_visible_tops()
-        print (visible_tops)
-
-        # self.checkable_tree.build_tree(self.all_stratigraphy)
-        if not visible_tops:
-            self.cstrat_root.setCheckState(0, Qt.Checked)
-            self.cfault_root.setCheckState(0, Qt.Checked)
-            self.cother_root.setCheckState(0, Qt.Checked)
-
-        self.ctree.remove_all_descendants(self.cstrat_root)
-        self.ctree.remove_all_descendants(self.cfault_root)
-        self.ctree.remove_all_descendants(self.cother_root)
-
-        for strat_name in strat_list:
-            if self.all_stratigraphy[strat_name]['role'] == 'stratigraphy':
-                strat_it = self.ctree.add_leaf(self.cstrat_root, strat_name, astrat[strat_name]["uid"],
-                                               True if strat_name in visible_tops else False)
-
-                strat_it.setData(0, Qt.UserRole, strat_name)
-            elif self.all_stratigraphy[strat_name]['role'] == 'fault':
-                fault_it = self.ctree.add_leaf(self.cfault_root, strat_name, astrat[strat_name]["uid"],
-                                               True if strat_name in visible_tops else False)
-                fault_it.setData(0, Qt.UserRole, strat_name)
-            elif self.all_stratigraphy[strat_name]['role'] == 'other':
-                other_it = self.ctree.add_leaf(self.cfault_root, strat_name, astrat[strat_name]["uid"],
-                                               True if strat_name in visible_tops else False)
-                other_it.setData(0, Qt.UserRole, strat_name)
-
-        Blocker.unblock()
-        self._populate_well_tops_otree()
-
-    def _populate_well_tops_otree(self):
-        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+    def _rebuild_well_tops_tree(self):
+        """Old Rebuild the tree from self.all_wells, preserving selections if possible."""
         # Remember current selection by name
 
         self.well_tree.blockSignals(True)
@@ -1864,6 +2221,8 @@ class MainWindow(QMainWindow):
 
         #self.panel.set_draw_well_panel(True)
 
+
+
     def _select_all_wells(self):
         self.well_tree.blockSignals(True)
         root = self.well_tree.invisibleRootItem()
@@ -2188,6 +2547,8 @@ class MainWindow(QMainWindow):
         # 4) append to track
         track["logs"].append(log_cfg)
 
+        self.add_log_in_track_to_tree(track_name, log_name)
+
         # 5) propagate to well_panel & tree widgets
         #if self.panel.tracks is not None:
         #    self.panel.tracks = self.panel.tracks
@@ -2220,6 +2581,18 @@ class MainWindow(QMainWindow):
     def _action_remove_log_from_track(self, track_name: str, log_name: str):
         """Remove selected log from selected track."""
         self.remove_log_from_track(track_name, log_name)
+
+    def add_log_in_track_to_tree(self, track_name, log_name):
+        track_folder = self.c_well_track_folder
+        descendents = self.input_tree.get_items_in_folder(track_folder, include_folders=True)
+        for d in descendents:
+            data = d.data(0, Qt.UserRole)
+            print(f"data: {data}")
+            if data[1] == track_name:
+                track_item = self.input_tree.add_noncheckable_leaf(d, log_name)
+                track_item.setData(0, Qt.UserRole, ("Track", track_name, log_name))
+                return
+
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
@@ -2555,7 +2928,7 @@ class MainWindow(QMainWindow):
             tops[top_name] = depth
 
         # --- redraw well_panel with updated tops ---
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             self.panel.draw_well_panel()
 
@@ -2581,7 +2954,7 @@ class MainWindow(QMainWindow):
         self.all_wells.append(new_well)
 
         # Update well_panel wells (keep tracks & stratigraphy)
-        if hasattr(self, "well_panel"):
+        if hasattr(self, "panel"):
             self.panel.wells = self.all_wells
             # you might want to reset flattening or keep it; here we keep zoom/flatten
             self.panel.draw_well_panel()
@@ -2589,6 +2962,19 @@ class MainWindow(QMainWindow):
         # Refresh wells tree (and maybe other trees)
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
+
+        well_name = new_well.get("name")
+
+        self._add_new_well_to_tree(well_name)
+
+
+
+
+    def _action_show_well(self, path):
+        print("show well in path")
+
+    def _action_hide_well(self, path):
+        print ("hide well in path")
 
     def _action_add_discrete_track(self):
         """Create a new discrete track and append it to the project."""
@@ -2621,8 +3007,8 @@ class MainWindow(QMainWindow):
         self.all_tracks.append(new_track)
 
         # push to well_panel
-        if hasattr(self, "well_panel"):
-            self.panel.tracks = self.all_tracks
+        if hasattr(self, "panel"):
+            self.panel.tracks = self.tracks
             self.panel.draw_well_panel()
 
         # refresh track tree
@@ -3156,10 +3542,10 @@ class MainWindow(QMainWindow):
         self._ensure_bitmap_track_exists(track_name = res["track"])
 
         # push into well_panel & redraw
-        #if hasattr(self, "well_panel"):
-        self.panel.wells = self.all_wells
-        self.panel.tracks = self.all_tracks
-        self.panel.draw_well_panel()
+        # if hasattr(self, "panel"):
+        #     self.panel.wells = self.all_wells
+        #     self.panel.tracks = self.tracks
+        #     self.panel.draw_well_panel()
 
         # refresh tree (if you show bitmaps there)
 
@@ -3218,14 +3604,16 @@ class MainWindow(QMainWindow):
         key = "track"
 
         # Use the active well_panel (docked) if you implemented it; otherwise self.panel
-        well_panel = self.panel
+        #well_panel = getattr(self, "active_well_panel", None) or self.panel
+        well_panel = self.active_window
+
 
         dlg = BitmapPlacementDialog(
             parent=self,
             wells=self.all_wells,
             track_name=track_name,
             bitmap_key=key,
-            panel_widget=self.panel,
+            panel_widget=well_panel,
         )
         dlg.exec_()
 
@@ -3668,7 +4056,7 @@ class MainWindow(QMainWindow):
         """
         Yield central well_panel + dock well_panels (if available).
         """
-        if hasattr(self, "well_panel") and self.panel is not None:
+        if hasattr(self, "panel") and self.panel is not None:
             yield self.panel
         for dock in getattr(self, "_well_panel_docks", []) or []:
             if dock and getattr(dock, "well_panel", None) is not None:
@@ -4158,6 +4546,11 @@ class MainWindow(QMainWindow):
 
         return window_list
 
+    def _get_tree_dict(self):
+
+        tree_dict = self.input_tree.to_dict()
+        return tree_dict
+
     def _delete_bitmap_from_well(self, well_name: str, bitmap_key: str, confirm: bool = True):
         """
         Delete a bitmap with given key from a single well.
@@ -4426,7 +4819,7 @@ class MainWindow(QMainWindow):
 
 
         # ---- 3) reset central well_panel view state/filters ----
-        if hasattr(self, "well_panel") and self.panel is not None:
+        if hasattr(self, "panel") and self.panel is not None:
             p = self.panel
             p.wells = self.all_wells
             p.tracks = self.all_tracks
@@ -5030,97 +5423,359 @@ class MainWindow(QMainWindow):
 
         #uid_obj,uid_parent, uid_type = self.get_object_by_uid(uid)
 
-        #print(uid_obj, uid_parent, uid_type)
+    @QtCore.Slot(str, bool, object)
+    def on_item_toggled(self, path, checked, item):
+        msg = f"Item toggled: {path} -> {'checked' if checked else 'unchecked'}"
 
-        parent = ""
-        if " / " in path:
-            parent = path.split(" / ")[-1]
-        else: parent = path
+        if item.data(0, Qt.UserRole) is None:
+            return 0
 
-        if parent == "Stratigraphy" or parent == "Faults" or parent == "Other":
+        item_info = item.data(0, Qt.UserRole)
+        print(item_info)
+
+        if item_info[1] == "Wells":
+            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+            for d in descendents:
+                d_info = d.data(0, Qt.UserRole)
+                if d_info is not None:
+                    if checked:
+                        self.panel.add_visible_well_by_name(d_info[0])
+                    else:
+                        self.panel.remove_visible_well_by_name(d_info[0])
+
+        if item_info[1]== "Well":
             if checked:
-                visible_tops = list(self.all_stratigraphy.keys())
-                self.panel.set_visible_tops(visible_tops)
+                self.panel.add_visible_well_by_name(item_info[0])
             else:
-                self.panel.set_visible_tops([])
-            self.panel.draw_well_panel()
-
-        if parent == "Tops":
+                self.panel.remove_visible_well_by_name(item_info[0])
+        if item_info[1]== "stratigraphy":
             if checked:
-                visible_tops = list(self.all_stratigraphy.keys())
-                self.panel.set_visible_tops(visible_tops)
+                self.panel.add_visible_top_by_name(item_info[0])
             else:
-                self.panel.set_visible_tops([])
-            self.panel.draw_well_panel()
+                self.panel.remove_visible_top_by_name(item_info[0])
+
+        if item_info[1]== "Track":
+            if checked:
+                self.panel.add_visible_track_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_track_by_name(item_info[0])
+
+        if item_info[1]== "ContinuousLog":
+            if checked:
+                self.panel.add_visible_log_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_log_by_name(item_info[0])
+
+        if item_info[1]== "DiscreteLog":
+            if checked:
+                self.panel.add_visible_discrete_log_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_discrete_log_by_name(item_info[0])
+
+        if item_info[1]== "BitmapLog":
+            if checked:
+                self.panel.add_visible_bitmap_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_bitmap_by_name(item_info[0])
+
+
+
 
 
 
         self.statusBar().showMessage(msg)
 
-    @QtCore.Slot(str, str, bool)
-    def on_leaf_toggled(self, path, uid, checked):
-        #msg = f"LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
-        #print("UID:", uid)
+    @QtCore.Slot(str, bool, object)
+    def on_leaf_toggled(self, path, checked, item):
+        msg = f"Now LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
+        print(msg, item)
 
-        parent = ""
-        leaf = ""
-        root = ""
+        if item.data(0, Qt.UserRole) is None:
+            print("no user role")
+            return 0
 
-        uid_obj,uid_parent, uid_type = self.get_object_by_uid(uid)
+        item_info = item.data(0, Qt.UserRole)
+        print(item_info)
 
-        #print(uid_obj, uid_parent, uid_type)
+        if item_info[1] == "Wells":
+            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+            for d in descendents:
+                d_info = d.data(0, Qt.UserRole)
+                if d_info is not None:
+                    if checked:
+                        self.panel.add_visible_well_by_name(d_info[0])
+                    else:
+                        self.panel.remove_visible_well_by_name(d_info[0])
 
-        name = self.get_object_name_by_uid(uid)
-        type = uid_type
+        if item_info[1]== "Well":
+            if checked:
+                self.panel.add_visible_well_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_well_by_name(item_info[0])
+        if item_info[1]== "stratigraphy":
+            if checked:
+                self.panel.add_visible_top_by_name(item_info[2])
+            else:
+                self.panel.remove_visible_top_by_name(item_info[2])
+
+        if item_info[1]== "Track":
+            if checked:
+                self.panel.add_visible_track_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_track_by_name(item_info[0])
+
+        if item_info[1]== "ContinuousLog":
+            if checked:
+                self.panel.add_visible_log_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_log_by_name(item_info[0])
+
+        if item_info[1]== "DiscreteLog":
+            if checked:
+                self.panel.add_visible_discrete_log_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_discrete_log_by_name(item_info[0])
+
+        if item_info[1]== "BitmapLog":
+            if checked:
+                self.panel.add_visible_bitmap_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_bitmap_by_name(item_info[0])
 
 
 
-        if type == "stratigraphy":
-            self.panel.change_top_visibility(name, checked)
-            self.panel.draw_well_panel()
 
+
+
+        self.statusBar().showMessage(msg)
 
     @QtCore.Slot(str, str)
     def on_context_action(self, path, action):
+        print(f"Context action: {path} -> {action}")
         if path:
             print(f"CONTEXT action: {action} on {path}")
         else:
             print(f"CONTEXT action: {action}")
 
-    @QtCore.Slot(str, str)
-    def on_context_action(self, path, action):
-        # Optional: observe context menu actions
-        if path:
-            print(f"CONTEXT action: {action} on {path}")
-        else:
-            print(f"CONTEXT action: {action}")
-        # keep status bar useful but not too spammy
-        if path:
-            self.statusBar().showMessage(f"{action}: {path}")
-        else:
-            self.statusBar().showMessage(f"{action}")
+    @QtCore.Slot(str, bool, object)
+    def on_parent_toggled(self, path, checked, item):
+        msg = f"Parent toggled: {path} -> {'checked' if checked else 'unchecked'}"
+        print(msg)
+        self.statusBar().showMessage(msg)
+
+        if item.data(0, Qt.UserRole) is None:
+            print("no user role")
+            return 0
+
+        item_info = item.data(0, Qt.UserRole)
+        print(item_info)
+
+        if item_info[0] == "Wells":
+            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+            for d in descendents:
+                d_info = d.data(0, Qt.UserRole)
+                if d_info is not None:
+                    if checked:
+                        self.panel.add_visible_well_by_name(d_info[0])
+                    else:
+                        self.panel.remove_visible_well_by_name(d_info[0])
+
+        if item_info[1]== "Well":
+            if checked:
+                self.panel.add_visible_well_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_well_by_name(item_info[0])
+        if item_info[1]== "Stratigraphy" or item_info[0]== "Tops":
+            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+            self.active_window.redraw_requested = False
+            for d in descendents:
+                d_info = d.data(0, Qt.UserRole)
+                if d_info is not None:
+                    if checked:
+                        self.panel.add_visible_top_by_name(d_info[2], redraw=False)
+                    else:
+                        self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
+
+            self.active_window.draw_well_panel()
+
+        if item_info[1]== "Track":
+            if checked:
+                self.panel.add_visible_track_by_name(item_info[0])
+            else:
+                self.panel.remove_visible_track_by_name(item_info[0])
+
+        return
+
+    @QtCore.Slot(QtCore.QPoint, object)
+    def on_input_tree_context_menu(self, pos, item):
+        """
+        Show a context menu for logs in the tree:
+          - logs under the 'Logs' folder
+          - logs under each track in the 'Tracks' folder
+        """
+        #item = self.input_tree.itemAt(self.input_tree.viewport().mapFromGlobal(pos))
+        data = item.data(0, Qt.UserRole)
+        print(item, data)
+        print(pos)
+        #global_pos = (self.input_tree.viewport().mapToGlobal(pos))
+        print(self.input_tree.viewport().mapFromGlobal(pos))
+
+        menu = QMenu(self)
+
+        global_pos = pos
+
+        menu = QMenu(self)
+        #
+
+        if data[0] == "Wells":
+
+            act_add_well = menu.addAction("Add new well...")
+            act_edit_all_wells = menu.addAction("Edit all well settings ...")
+
+        #
+            chosen = menu.exec_(global_pos)
+            #
+            if chosen == act_add_well:
+                self._action_add_new_well()
+            elif chosen == act_edit_all_wells:
+               self._action_edit_all_wells()
+        if data[1] == "Well":
+            well_name = item.text(0)
+            act_edit_well = menu.addAction(f"Edit well '{well_name}'...")
+            act_left = menu.addAction(f"Move well left '{well_name}'...")
+            act_right = menu.addAction(f"Move well right '{well_name}'...")
+            act_load_bitmap = menu.addAction(f"Load bitmap '{well_name}'...")
+            act_delete_well = menu.addAction(f"Delete well '{well_name}'...")
+            menu.addSeparator()
+            act_expand_all = menu.addAction("Expand all")
+            act_collapse_all = menu.addAction("Collapse all")
+
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_edit_well:
+                self._action_edit_single_well_by_name(well_name)
+            elif chosen == act_left:
+                self._move_well(well_name, -1)
+            elif chosen == act_right:
+                self._move_well(well_name, +1)
+            if chosen == act_load_bitmap:
+                self._action_load_core_bitmap_to_well(default_well_name=well_name)
+            if chosen == act_delete_well:
+                self._delete_well_from_project(well_name, confirm = True)
+            elif chosen == act_expand_all:
+                self.expandAll()
+                self.contextAction.emit("", "expand_all")
+            elif chosen == act_collapse_all:
+                self.collapseAll()
+                self.contextAction.emit("", "collapse_all")
+        if data[0] == "Tops":
+            act_edit_stratigraphy = menu.addAction("Edit well tops ...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit_stratigraphy:
+                self._action_edit_stratigraphy()
+            return
+        # # --- case 1: logs under "Logs" folder ---
+        if data[0] == "Bitmap":
+            #menu = QMenu(self)
+            _, well_name, bitmap_key = data
+            act_del = menu.addAction(f"Delete bitmap from well {well_name}")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_del:
+                if well_name and bitmap_key:
+                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=True)
+                elif not well_name:
+                    for well in self.all_wells:
+                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
+            return
+        if data[0] == "Continuous_Log":
+
+            _, well_name, log_name = data
+
+            act_edit = menu.addAction("Edit log data (table)…")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit:
+                self._edit_well_log_table(well_name, log_name)
+            return
+        if data[0] == "Logs":
+            if data[1] == "Continuous_Log":
+                log_name = data[2]
+                act_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit:
+                    self._edit_log_display_settings(log_name)
+                return
+        if data[0] == "Tracks":
+            print (data)
+
+            act_add_track = menu.addAction("Add new track...")
+            act_add_disc_track = menu.addAction("Add new discrete track...")
+            chosen = menu.exec_(global_pos)
+
+            if chosen == act_add_track:
+                self._action_add_empty_track()
+            elif chosen == act_add_disc_track:
+                self._action_add_discrete_track()
+                return
+        if data[0] == "Track":
+            print(data)
+            track_name = data[1]
+            if not track_name:
+                return
+
+            for track in self.all_tracks:
+                if track.get("name") == track_name:
+                    track_cfg = track
+                    break
+
+            act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
+            if track.get("type") == "discrete":
+                #menu = QMenu(self)
+                act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_disc_colors:
+                    self._action_edit_discrete_colors_for_track(track_name)
+            elif track.get("type") == "bitmap":
+                #menu = QMenu(self)
+                act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
+                act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
+                act_delete_all = menu.addAction("Delete all bitmaps for this track…")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_add_core_bitmap:
+                    self._action_load_bitmap_into_bitmap_track(track_name)
+                elif chosen == act_edit_bitmap_track:
+                    self._action_edit_bitmap_positions(track_name=track_name)
+                elif chosen == act_delete_all:
+                    self._delete_bitmaps_for_bitmap_track(track_name, confirm=True)
+            elif track.get("type") == "continuous":
+                #menu = QMenu(self)
+                act_edit = menu.addAction(f"Edit display settings for '{track_name}'...")
+                act_add_log = menu.addAction(f"Add new log to track ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit:
+                    #self._edit_log_display_settings(track_name)
+                    self._action_edit_track_settings(track_name)
+                    menu.close()
+                elif chosen == act_add_log:
+                    self._action_add_log_to_track()
+            elif track.get("type") == "lithofacies":
+                #menu = QMenu(self)
+                act_edit_lithofacies_settings = menu.addAction("Edit lithofacies track settings ...")
+                chosen = menu.exec_(global_pos)
+                if chosen == act_edit_lithofacies_settings:
+                    self._action_edit_lithofacies_settings_for_track(track_name)
+
+            chosen = menu.exec_(global_pos)
+            if chosen == act_delete_track:
+                self._action_delete_track()
 
 
 
-def new_uid8() -> str:
-    """
-    Generate a compact universal ID:
-      - 64-bit random value (8 bytes)
-      - encoded as 8 URL-safe characters (base64url without padding)
+        menu.addSeparator()
+        act_expand_all = menu.addAction("Expand all")
+        act_collapse_all = menu.addAction("Collapse all")
 
-    Example: 'aZ3kP0Qm'
-    """
-    # 6 bytes -> 8 base64 chars; but we want 64-bit => 8 bytes.
-    # We encode 8 bytes and trim padding to keep compact.
-    raw = secrets.token_bytes(8)  # 64-bit
-    # base64 urlsafe without padding
-    import base64
-    s = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-    # s is typically 11 chars for 8 bytes; compress to 8 chars by using 6 bytes instead?
-    # If you truly require 8 chars, use 6 bytes (48-bit). Very low collision still for most projects.
-    return s[:8]
 
-def new_uid64() -> str:
-    import secrets, base64
-    raw = secrets.token_bytes(8)  # 64-bit
-    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")  # ~11 chars
+
+        return
+
+

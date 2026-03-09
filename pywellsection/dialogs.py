@@ -5,19 +5,12 @@ from PySide6.QtWidgets import (
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
-    QPushButton, QWidget, QListWidget, QGroupBox,
+    QPushButton, QWidget, QListWidget, QGroupBox,QAbstractItemView
 )
 
 from PySide6.QtCore import Qt
 
 
-
-
-# from PySide6.QtWidgets import (
-#     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-#     QPushButton, QDialogButtonBox, QMessageBox, QLabel, QLineEdit,
-#     QPlainTextEdit, QCheckBox, QSpinBox, QGroupBox, QFormLayout
-# )
 import numpy as np
 
 from matplotlib.figure import Figure
@@ -1181,7 +1174,7 @@ class LogDisplaySettingsDialog(QDialog):
         out["alpha"] = float(self.spin_alpha.value())
         out["decimate"] = int(self.spin_dec.value())
         out["clip"] = bool(self.chk_clip.isChecked())
-        out["mask_nan"] = not bool(self.chk_mask.isChecked())
+        out["mask_nan"] = bool(self.chk_mask.isChecked())
         out["zorder"] = int(self.spin_z.value())
 
         # line / points specific
@@ -3345,7 +3338,7 @@ class BitmapPlacementDialog(QDialog):
 
             # redraw
             if self.panel is not None:
-                self.panel.draw_well_panel()
+                self.panel.draw_panel()
 
         except Exception as e:
             QMessageBox.warning(self, "Apply bitmap edits", f"Failed to apply edits:\n{e}")
@@ -3400,7 +3393,6 @@ class BitmapPlacementDialog(QDialog):
         # optionally apply immediately and redraw
         self.apply_to_model()
         self._active_pick = None
-
 
 class FillEditDialog(QDialog):
     """
@@ -3714,7 +3706,6 @@ class TrackSettingsDialog(QDialog):
         if name:
             self.track["name"] = name
         self.accept()
-
 
 class EditWellLogTableDialog_old(QDialog):
     """
@@ -4814,6 +4805,7 @@ class ImportTopsAssignWellDialog(QDialog):
             "set_td": self.chk_set_td.isChecked(),
         }
 
+
 class MapLimitsDialog(QDialog):
     """
     Dialog to set map axis limits (xmin/xmax/ymin/ymax) for a MapPanelWidget.
@@ -4918,3 +4910,92 @@ class MapLimitsDialog(QDialog):
             self.map_panel.draw_panel()
 
         self.accept()
+
+class ResolveUnmatchedBasesDialog(QDialog):
+    """
+    For each unresolved Base name:
+      - choose a BEEE unit candidate (dropdown)
+      - OR type a custom name
+      - choose role: other/fault/stratigraphy
+    We then map Base(candidate) -> Top(underlying) if candidate chosen,
+    or use custom name directly as mapped top.
+    """
+    def __init__(self, parent, unresolved_rows, beee_idx):
+        super().__init__(parent)
+        self.setWindowTitle("Resolve Unmatched Base Tops")
+        self.resize(900, 420)
+
+        self._rows = unresolved_rows
+        self._idx = beee_idx
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "Select the equivalent BEEE stratigraphic unit for each Base pick, "
+            "or enter a custom name. For custom names, set role to 'other' or 'fault'.",
+            self
+        ))
+
+        self.tbl = QTableWidget(self)
+        self.tbl.setColumnCount(6)
+        self.tbl.setHorizontalHeaderLabels([
+            "Well", "MD", "SV Base Name",
+            "Match BEEE Unit (Base)", "Custom Name", "Role"
+        ])
+        self.tbl.setRowCount(len(unresolved_rows))
+        self.tbl.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.tbl)
+
+        for i, r in enumerate(unresolved_rows):
+            self.tbl.setItem(i, 0, QTableWidgetItem(str(r.get("well",""))))
+            self.tbl.setItem(i, 1, QTableWidgetItem("" if r.get("md") is None else f"{r['md']:.2f}"))
+            self.tbl.setItem(i, 2, QTableWidgetItem(str(r.get("sv_name",""))))
+
+            cmb = QComboBox(self.tbl)
+            cmb.addItem("")  # none
+            for k in (r.get("candidates") or []):
+                fn = self._idx["key_to_fullname"].get(k, "")
+                cmb.addItem(f"{k}  —  {fn}", userData=k)
+            self.tbl.setCellWidget(i, 3, cmb)
+
+            edit = QLineEdit(self.tbl)
+            edit.setPlaceholderText("Enter custom mapped TOP name (optional)")
+            self.tbl.setCellWidget(i, 4, edit)
+
+            role = QComboBox(self.tbl)
+            role.addItems(["other", "fault", "stratigraphy"])
+            role.setCurrentText("other")
+            self.tbl.setCellWidget(i, 5, role)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def results(self):
+        """
+        Returns list of dicts with:
+          well, md, sv_name, mapped_top (string), role
+        """
+        out = []
+        for i in range(self.tbl.rowCount()):
+            well = self.tbl.item(i, 0).text()
+            md_txt = self.tbl.item(i, 1).text().strip()
+            md = float(md_txt) if md_txt else None
+            sv_name = self.tbl.item(i, 2).text().strip()
+
+            cmb: QComboBox = self.tbl.cellWidget(i, 3)
+            chosen_key = cmb.currentData()
+            edit: QLineEdit = self.tbl.cellWidget(i, 4)
+            custom = edit.text().strip()
+            role: QComboBox = self.tbl.cellWidget(i, 5)
+            role_val = role.currentText().strip() or "other"
+
+            out.append({
+                "well": well,
+                "md": md,
+                "sv_name": sv_name,
+                "chosen_beee_base_key": chosen_key,
+                "custom_top": custom,
+                "role": role_val,
+            })
+        return out
