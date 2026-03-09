@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Tuple, Optional
 import openpyxl
 
 from pywellsection.dialogs import ImportTopsAssignWellDialog
-from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
+#from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 
 
 def _file_load_tops_from_csv(self, path: str):
