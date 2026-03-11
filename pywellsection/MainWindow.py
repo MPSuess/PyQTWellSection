@@ -76,6 +76,8 @@ from pywellsection.dialogs import MapLimitsDialog
 from pathlib import Path
 from collections import OrderedDict
 
+from pysection.log_calculator import LogCalculator
+
 from Import_LBEG_xlsx import load_LBEG_SV
 from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
 
