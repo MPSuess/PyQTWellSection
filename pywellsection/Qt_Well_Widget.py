@@ -1683,6 +1683,9 @@ class  WellPanelWidget(QWidget):
             True if removal happened,
             False if track not found or already hidden.
         """
+        if type(track_name) == "dict":
+            track_name = track_name.get("name", "")
+
         track_name = (track_name or "").strip()
         if not track_name:
             return False

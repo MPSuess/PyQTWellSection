@@ -8,6 +8,8 @@ from PySide6.QtCore import Qt
 
 import logging
 
+from shiboken6 import isValid
+
 LOG = logging.getLogger(__name__)
 LOG.setLevel("INFO")
 
@@ -1363,6 +1365,16 @@ class CheckableTree(QtWidgets.QTreeWidget):
             cur = cur.parent()
         return False
 
+    def get_path_to_item(self, item: QtWidgets.QTreeWidgetItem | None) -> str:
+        if item is None:
+            return ""
+        parts = []
+        cur = item
+        while cur is not None:
+            parts.append(cur.text(0))
+            cur = cur.parent()
+        return " / ".join(reversed(parts))
+
     def get_items_in_folder(
             self,
             folder_item: QtWidgets.QTreeWidgetItem,
@@ -1401,6 +1413,10 @@ class CheckableTree(QtWidgets.QTreeWidget):
         if folder_item is None:
             return []
 
+        if not isValid(folder_item):
+            QtMessageBox.critical(self, "Error", "Invalid folder item")
+            return []
+
         results = []
 
         def collect(item: QtWidgets.QTreeWidgetItem):
@@ -1425,12 +1441,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
 def setup_input_tree(self, root_label=None):
     self.input_tree = CheckableTree(self)
     self.input_tree.setHeaderHidden(True)
-
-    connect_input_tree(self)
-
     setup_well_tree(self)
-    #self.input_tree.clear_tree()
-    #setup_test_tree(self)
+    connect_input_tree(self)
 
 
 def connect_input_tree(self):
@@ -1443,6 +1455,72 @@ def connect_input_tree(self):
 
     self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
     self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+    on_tree_loaded(self)
+
+def on_tree_loaded(self):
+    descendents = self.input_tree.get_items_in_folder(self.input_tree.invisibleRootItem(), recursive=True)
+    for d in descendents:
+        data = d.data(0, Qt.UserRole)
+        if data and len(data) > 2:
+            if data[2] == "Folder":
+                if data[0]=="Wells":
+                    self.c_well_folder = d
+                if data[0]=="Tops":
+                    self.c_well_tops_folder = d
+                if data[0]=="Logs":
+                    self.c_well_logs_folder = d
+                if data[0]=="Tracks":
+                    self.c_well_track_folder = d
+
+    descendents = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=False)
+    if len(descendents) > 0:
+        for d in descendents:
+            data = d.data(0, Qt.UserRole)
+            if len(data) > 2:
+                if data[2] == "Subfolder":
+                    if data[1]=="Faults":
+                        self.c_faults_root = d
+
+
+def on_tree_loadedo(self):
+
+    descendents = self.input_tree.get_items_in_folder(self.input_tree.invisibleRootItem(), recursive=True)
+    for d in descendents:
+        data = d.data(0,Qt.UserRole)
+        if len(data) > 2:
+            if data[2] == "Folder":
+                if data[0]=="Wells":
+                    self.c_well_folder = d
+                if data[0]=="Tops":
+                    self.c_well_tops_folder = d
+                if data[0]=="Logs":
+                    self.c_well_logs_folder = d
+                if data[0]=="Tracks":
+                    self.c_well_track_folder = d
+
+    descendents = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=False)
+    for d in descendents:
+        if len(data) > 2:
+            if data[2] == "Subfolder":
+                if data[1]=="Faults":
+                    self.c_faults_root = d
+                if data[1]=="Stratigraphy":
+                    self.c_stratigraphy_root = d
+                if data[1]=="Other":
+                    self.c_other_root = d
+
+    descendents = self.input_tree.get_items_in_folder(self.c_well_logs_folder, recursive=False)
+    for d in descendents:
+        if len(data) > 2:
+            if data[2] == "Subfolder":
+                if data[1]=="continuous":
+                    self.cont_folder = d
+                if data[1]=="discrete":
+                    self.disc_folder = d
+                if data[1]=="bitmap":
+                    self.bmp_folder = d
+    return
+
 
 
 def setup_well_tree(self):
@@ -1453,45 +1531,39 @@ def setup_well_tree(self):
     self.c_well_logs_folder = self.input_tree.add_root("Logs")
     self.c_well_track_folder = self.input_tree.add_root("Tracks")
 
-    self.c_well_folder.setData(0, Qt.UserRole, ("Wells", "Root", "Folder"))
+    # Subfolders
+    # The Well Tops entries
+    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
+    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
+    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
+    # The Well Logs entries
+    self.cont_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "continuous")
+    self.disc_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "discrete")
+    self.bmp_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "bitmap")
 
+    # Set Data for identification
+    self.c_well_folder.setData(0, Qt.UserRole, ("Wells", "Root", "Folder"))
     self.c_well_tops_folder.setData(0,Qt.UserRole, ("Tops", "Root", "Folder"))
     self.c_well_logs_folder.setData(0,Qt.UserRole, ("Logs", "Root", "Folder"))
     self.c_well_track_folder.setData(0,Qt.UserRole, ("Tracks", "Root", "Folder"))
+    # --- subfolders ---
+    self.c_faults_root.setData(0, Qt.UserRole, ("Well Tops", "Faults", "Subfolder"))
+    self.c_stratigraphy_root.setData(0, Qt.UserRole, ("Well Tops", "Stratigraphy", "Subfolder"))
+    self.c_other_root.setData(0, Qt.UserRole, ("Well Tops", "Other", "Subfolder"))
 
 
-    # The Well Tops entries
-    self.c_stratigraphy_root = self.input_tree.add_parent(self.c_well_tops_folder, "Stratigraphy")
-    self.c_stratigraphy_root.setData(0, Qt.UserRole, ("Well Tops", "Stratigraphy", "None"))
-    self.c_faults_root = self.input_tree.add_parent(self.c_well_tops_folder, "Faults")
-    self.c_faults_root.setData(0, Qt.UserRole, ("Well Tops", "Faults", "None"))
-    self.c_other_root = self.input_tree.add_parent(self.c_well_tops_folder, "Other")
-    self.c_other_root.setData(0, Qt.UserRole, ("Well Tops", "Other", "None"))
+    self.cont_folder.setData(0, Qt.UserRole, ("Well Logs", "continuous", "Subfolder"))
+    self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Subfolder"))
+    self.bmp_folder.setData(0, Qt.UserRole, ("Well Logs", "bitmap", "Subfolder"))
 
+    self.input_tree.set_accept_children_drop(self.cont_folder, False)
+    self.input_tree.set_accept_children_drop(self.disc_folder, False)
+    self.input_tree.set_accept_children_drop(self.bmp_folder, False)
     self.input_tree.set_accept_children_drop(self.c_well_tops_folder, False)
     self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
     self.input_tree.set_accept_children_drop(self.c_faults_root, False)
     self.input_tree.set_accept_children_drop(self.c_other_root, False)
 
-
-    # it.setData(0, Qt.UserRole, well_name)
-    # state = Qt.Checked if well_name in self.panel.visible_wells else Qt.Unchecked
-    # it.setCheckState(0, state)
-    # self.input_tree.set_accept_children_drop(it, False)
-
-    # --- subfolders ---
-    self.c_well_logs_folder.setData(0, Qt.UserRole, ("Well Logs", "Folder", "None"))
-    self.cont_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "continuous")
-    self.disc_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "discrete")
-    self.bmp_folder = self.input_tree.add_noncheckable_folder(self.c_well_logs_folder, "bitmap")
-
-    self.cont_folder.setData(0, Qt.UserRole, ("Well Logs", "continuous", "Folder"))
-    self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Folder"))
-    self.bmp_folder.setData(0, Qt.UserRole, ("Well Logs", "bitmap", "Folder"))
-
-    self.input_tree.set_accept_children_drop(self.cont_folder, False)
-    self.input_tree.set_accept_children_drop(self.disc_folder, False)
-    self.input_tree.set_accept_children_drop(self.bmp_folder, False)
 
 
     #self.input_tree.setCurrentItem(c_wells_root)

@@ -244,8 +244,9 @@ def load_project_from_json(path):
     window_dict = data.get("window_dict", {})
     metadata = data.get("metadata", {})
     ui_layout = data.get("ui_layout", {})
+    tree_dict = data.get("tree_dict", {})
 
-    return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
+    return window_dict, wells, tracks, stratigraphy, ui_layout, tree_dict, metadata
 
 def load_project_from_json_old(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -263,7 +264,8 @@ def load_project_from_json_old(path):
 
     return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
 
-def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None, extra_metadata=None):
+def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None,
+                           tree_dict = None, extra_metadata=None):
     """
     Export the current project to a JSON file (NumPy-safe).
 
@@ -294,7 +296,8 @@ def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=N
         project["window_dict"] = window_dict
     if ui_layout is not None:
         project["ui_layout"] = ui_layout
-
+    if tree_dict is not None:
+        project["tree_dict"] = tree_dict
     with path.open("w", encoding="utf-8") as f:
         json.dump(project, f, indent=2, default=_json_serializer)
 
