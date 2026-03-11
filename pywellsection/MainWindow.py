@@ -76,7 +76,7 @@ from pywellsection.dialogs import MapLimitsDialog
 from pathlib import Path
 from collections import OrderedDict
 
-from pysection.log_calculator import LogCalculator
+from pywellsection.log_calculator import LogCalculatorDialog
 
 from Import_LBEG_xlsx import load_LBEG_SV
 from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
@@ -1463,10 +1463,29 @@ class MainWindow(QMainWindow):
 
         print (type (new_track), new_track, root)
 
-        track_item = self.input_tree.add_noncheckable_leaf(root, new_track)
+        track_item = self.input_tree.add_checkable_leaf(root, new_track)
         self.input_tree.set_accept_children_drop(track_item, False)
         self.input_tree.lock_leaf_movement(track_item)
         track_item.setData(0, Qt.UserRole, ("Track", new_track, "None"))
+        state = Qt.Unchecked
+        track_item.setCheckState(0, state)
+
+    def _add_log_to_logs(self, log_name, log_type):
+
+        print ("_add_log_to_logs", log_name, log_type)
+
+
+        if log_type == "continuous":
+            it = self.input_tree.add_checkable_leaf(self.cont_folder, log_name)
+        else:
+            it = self.input_tree.add_checkable_leaf(self.disc_folder, log_name)
+
+        it.setData(0, Qt.UserRole, ("Logs", log_type, log_name))
+        state = Qt.Unchecked
+        it.setCheckState(0, state)
+
+
+
 
     def _add_continuous_log_to_logs_in_input_tree(self, log_name):
         root = self.cont_folder
@@ -2728,6 +2747,25 @@ class MainWindow(QMainWindow):
             self.delete_track(name)
         except Exception as e:
             QMessageBox.critical(self, "Delete track", f"Failed to delete track:\n{e}")
+
+    def _action_open_log_calculator(self):
+
+        print("open log calculator")
+        panel = self.panel
+        all_wells = self.all_wells
+        dlg = LogCalculatorDialog(self,panel, all_wells)
+        dlg.exec_()
+
+        result = dlg.result()
+
+        print(f"result: {result}")
+
+        #self._add_continuous_log_to_logs_in_input_tree(result)
+        self._add_log_to_logs(result[0], result[1])
+
+        panel.set_wells(all_wells)
+        self._populate_well_log_tree()
+        self._populate_well_tree()
 
     def _action_edit_stratigraphy(self):
         """Open table dialog to edit/add stratigraphy for the project."""
@@ -5151,9 +5189,11 @@ class MainWindow(QMainWindow):
             _, well_name, log_name = data
             act_continuous_log_edit = menu.addAction("Edit log data (table)…")
         if data[0] == "Logs":
+            #act_open_log_calculator = menu.addAction("Open log calculator...")
             if data[1] == "Continuous_Log":
                 log_name = data[2]
                 act_Logs_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
+                act_open_log_calculator = menu.addAction("Open log calculator...")
         if data[0] == "Tracks":
             act_add_new_track = menu.addAction("Add new track...")
             act_add_disc_track = menu.addAction("Add new discrete track...")
@@ -5192,6 +5232,14 @@ class MainWindow(QMainWindow):
         try:
             if chosen == act_Logs_edit:
                 self._edit_log_display_settings(log_name)
+            if chosen == act_open_log_calculator:
+                log = self._action_open_log_calculator()
+                print ("logcalculator:", log)
+                if log is not None:
+                    self._add_new_log_to_tree({"name":log, "type":"continuous"})
+
+
+                return
             return
         except:
             pass

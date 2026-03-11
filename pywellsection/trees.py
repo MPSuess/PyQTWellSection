@@ -1472,6 +1472,7 @@ def on_tree_loaded(self):
                 if data[0]=="Tracks":
                     self.c_well_track_folder = d
 
+
     descendents = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=False)
     if len(descendents) > 0:
         for d in descendents:
@@ -1480,6 +1481,25 @@ def on_tree_loaded(self):
                 if data[2] == "Subfolder":
                     if data[1]=="Faults":
                         self.c_faults_root = d
+                    if data[1]=="Stratigraphy":
+                        self.c_stratigraphy_root = d
+                    if data[1]=="Other":
+                        self.c_other_root = d
+
+    descendents = self.input_tree.get_items_in_folder(self.c_well_logs_folder, recursive=False)
+    if len(descendents) > 0:
+        for d in descendents:
+            data = d.data(0, Qt.UserRole)
+            if len(data) > 2:
+                if data[2] == "Subfolder":
+                    if data[1]=="continuous":
+                        self.cont_folder = d
+                    if data[1]=="discrete":
+                        self.disc_folder = d
+                    if data[1]=="bitmap":
+                        self.bmp_folder = d
+    return
+
 
 
 def on_tree_loadedo(self):
@@ -1556,13 +1576,13 @@ def setup_well_tree(self):
     self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Subfolder"))
     self.bmp_folder.setData(0, Qt.UserRole, ("Well Logs", "bitmap", "Subfolder"))
 
-    self.input_tree.set_accept_children_drop(self.cont_folder, False)
-    self.input_tree.set_accept_children_drop(self.disc_folder, False)
-    self.input_tree.set_accept_children_drop(self.bmp_folder, False)
-    self.input_tree.set_accept_children_drop(self.c_well_tops_folder, False)
-    self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
-    self.input_tree.set_accept_children_drop(self.c_faults_root, False)
-    self.input_tree.set_accept_children_drop(self.c_other_root, False)
+    # self.input_tree.set_accept_children_drop(self.cont_folder, False)
+    # self.input_tree.set_accept_children_drop(self.disc_folder, False)
+    # self.input_tree.set_accept_children_drop(self.bmp_folder, False)
+    # self.input_tree.set_accept_children_drop(self.c_well_tops_folder, False)
+    # self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
+    # self.input_tree.set_accept_children_drop(self.c_faults_root, False)
+    # self.input_tree.set_accept_children_drop(self.c_other_root, False)
 
 
 

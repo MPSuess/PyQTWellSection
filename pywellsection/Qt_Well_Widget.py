@@ -1750,7 +1750,10 @@ class  WellPanelWidget(QWidget):
             return True
 
         if log_name not in vl:
-            vl.append(log_name)
+            if type(vl) == "list":
+                vl.append(log_name)
+            else:
+                vl.add(log_name)
 
         if redraw:
             self.draw_well_panel()
