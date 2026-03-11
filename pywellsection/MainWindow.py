@@ -1456,32 +1456,14 @@ class MainWindow(QMainWindow):
         print("_add_new_track_to_input_tree")
         root = self.c_well_track_folder
 
-        if type(new_track) == OrderedDict:
+        if type(new_track) == dict:
             new_track = new_track["name"]
 
         print (type (new_track), new_track, root)
 
-        # tracks = self.input_tree.get_items_in_folder(root)
-        #
-        # if not tracks:
-        #     QMessageBox.information(self, "New Track", "No tracks in project yet. Create one first.")
-        #     return
-        # print(new_track)
-        #
-        # for track in tracks:
-        #     if track.data(0, Qt.UserRole) == (new_track),"Track"):
-        #         QMessageBox.warning(self, "Track already exists",
-        #                             "Track already exists in the project.")
-        #         return
-
         track_item = self.input_tree.add_noncheckable_leaf(root, new_track)
-        track_item.setData(0, Qt.UserRole, (new_track,"Track"))
         self.input_tree.set_accept_children_drop(track_item, False)
         self.input_tree.lock_leaf_movement(track_item)
-
-
-
-        track_item = self.input_tree.add_checkable_leaf(root, new_track)
         track_item.setData(0, Qt.UserRole, ("Track", new_track, "None"))
 
     def _add_continuous_log_to_logs_in_input_tree(self, log_name):
@@ -2713,28 +2695,32 @@ class MainWindow(QMainWindow):
 
         self.all_tracks.append(new_track)
 
+        print (f"action_add_empty_track: new track: {new_track}")
+
         self._add_new_track_to_input_tree(new_track)
 
         self._populate_well_track_tree()
 
-    def _action_delete_track(self):
+    def _action_delete_track(self, name = None):
         """Ask user which track to delete, then call delete_track."""
         if not getattr(self, "all_tracks", None):
             QMessageBox.information(self, "Delete track", "There are no tracks to delete.")
             return
 
-        track_names = [t.get("name", f"Track {i + 1}") for i, t in enumerate(self.all_tracks)]
 
-        name, ok = QInputDialog.getItem(
-            self,
-            "Delete track",
-            "Select track to delete:",
-            track_names,
-            0,
-            False,
-        )
-        if not ok or not name:
-            return
+
+        if not name:
+            track_names = [t.get("name", f"Track {i + 1}") for i, t in enumerate(self.all_tracks)]
+            name, ok = QInputDialog.getItem(
+                self,
+                "Delete track",
+                "Select track to delete:",
+                track_names,
+                0,
+                False,
+            )
+            if not ok or not name:
+                return
 
         try:
             self.delete_track(name)
@@ -5050,19 +5036,17 @@ class MainWindow(QMainWindow):
                         self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
 
             self.active_window.draw_well_panel()
-
         if item_info[0]== "Tracks":
             descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
             for d in descendents:
                 d_info = d.data(0, Qt.UserRole)
+                print(f"d_info: {d_info}")
                 if checked:
                     self.panel.add_visible_track_by_name(d_info[1], redraw=False)
                 else:
                     self.panel.remove_visible_track_by_name(d_info[1], redraw=False)
             self.panel.draw_well_panel()
-
-
-        if item_info[0]== "Well Logs":
+        if item_info[0]== "Logs":
             descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
             for d in descendents:
                 d_info = d.data(0, Qt.UserRole)
@@ -5174,8 +5158,9 @@ class MainWindow(QMainWindow):
         if data[0] == "Track":
             track_name = data[1]
             for track in self.all_tracks:
-                if track.get(name) == track_name:
+                if track.get("name") == track_name:
                     break
+
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             if track.get("type") == "discrete":
                 act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
@@ -5285,7 +5270,9 @@ class MainWindow(QMainWindow):
             pass
         try:
             if chosen == act_delete_track:
-                self._action_delete_track()
+                self._action_delete_track(track_name)
+                self.input_tree.remove_item(item)
+
         except:
             pass
 

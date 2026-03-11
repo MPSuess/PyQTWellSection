@@ -1647,6 +1647,9 @@ class  WellPanelWidget(QWidget):
             True if track is valid and visible afterwards,
             False if track name does not exist.
         """
+
+        print ("add_visible_track_by_name", track_name)
+
         track_name = (track_name or "").strip()
         if not track_name:
             return False
@@ -1683,12 +1686,16 @@ class  WellPanelWidget(QWidget):
             True if removal happened,
             False if track not found or already hidden.
         """
+
+        print ("remove_visible_track_by_name", track_name, type(track_name))
+
+        if not track_name:
+            return False
+
         if type(track_name) == "dict":
             track_name = track_name.get("name", "")
 
         track_name = (track_name or "").strip()
-        if not track_name:
-            return False
 
         tracks = getattr(self, "tracks", []) or []
         all_names = [t.get("name", "") for t in tracks if t.get("name")]
