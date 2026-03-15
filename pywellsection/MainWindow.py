@@ -114,6 +114,8 @@ class MainWindow(QMainWindow):
         self.well_tree_populated = False
         self.well_tree_dict = {}
 
+        self.toggle_on = True
+
         self.project = PWSProject(name="My Project", crs="EPSG:32632", units={"xy": "m", "depth": "m"})
 
         # The Windows
@@ -1311,12 +1313,12 @@ class MainWindow(QMainWindow):
             self.all_wells = self.project.all_wells
             self._populate_well_tops_tree()
             self._populate_well_tree()
-            self._populate_input_tree()
+#            self._populate_input_tree()
 
             if self.global_stratigraphy:
                 import_sv_tops_using_beee(self,self.project, path,self.global_stratigraphy)
             #            self._refresh_all_panels()
-            self._populate_tops_tree()
+#            self._populate_tops_tree()
 #            self._populate_well_tree()
 
     def _build_well_tree_dock(self):
@@ -1388,7 +1390,8 @@ class MainWindow(QMainWindow):
         for i in range(root.childCount()):
             it = root.child(i)
             if it.checkState(0) == Qt.Checked:
-                prev_selected.add(it.data(0, Qt.UserRole))
+                data = it.data(0, Qt.UserRole)
+                prev_selected.add(data[0])
 
         self.input_tree.remove_all_children(root)
 
@@ -2575,6 +2578,39 @@ class MainWindow(QMainWindow):
                 track_item = self.input_tree.add_noncheckable_leaf(d, log_name)
                 track_item.setData(0, Qt.UserRole, ("Track", track_name, log_name))
                 return
+
+    def add_top_to_tree(self, top_name: str, top_type: str, state = Qt.Checked):
+        """Add a new stratigraphic top to the tree."""
+        tops_folder = self.c_stratigraphy_root
+
+        if top_type == "fault":
+            tops_folder = self.c_faults_root
+        elif top_type == "other":
+            tops_folder = self.c_other_root
+
+        descendents = self.input_tree.get_items_in_folder(tops_folder, include_folders=True)
+        for d in descendents:
+            data = d.data(0, Qt.UserRole)
+            if data[2] == top_name:
+                return
+
+        it = self.input_tree.add_checkable_leaf(tops_folder, top_name)
+        it.setData(0, Qt.UserRole, ("Tops", top_type, top_name))
+        it.setCheckState(0, state)
+        tops_folder.addChild(it)
+
+    def remove_top_from_tree(self, top_name: str):
+        descendents = self.input_tree.get_items_in_folder(self.c_well_tops_folder, include_folders=True)
+        for d in descendents:
+            if d.data(0, Qt.UserRole)[2] == top_name:
+                self.input_tree.remove_item_from_tree(d)
+                break
+        return
+
+
+
+
+
 
 
     def _action_add_log_to_track(self):
@@ -4975,56 +5011,59 @@ class MainWindow(QMainWindow):
 
         item_info = item.data(0, Qt.UserRole)
         print(item_info)
-
-        if item_info[1] == "Wells":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                if d_info is not None:
-                    if checked:
-                        self.panel.add_visible_well_by_name(d_info[0])
-                    else:
-                        self.panel.remove_visible_well_by_name(d_info[0])
-
-        if item_info[1]== "Well":
-            if checked:
-                self.panel.add_visible_well_by_name(item_info[0])
-            else:
-                self.panel.remove_visible_well_by_name(item_info[0])
-        if item_info[1]== "stratigraphy":
-            if checked:
-                self.panel.add_visible_top_by_name(item_info[2])
-            else:
-                self.panel.remove_visible_top_by_name(item_info[2])
-
-        if item_info[0]== "Track":
-            if checked:
-                self.panel.add_visible_track_by_name(item_info[1])
-            else:
-                self.panel.remove_visible_track_by_name(item_info[1])
-
-        if item_info[1]== "Continuous_Log":
-            if checked:
-                self.panel.add_visible_log_by_name(item_info[2])
-            else:
-                self.panel.remove_visible_log_by_name(item_info[2])
-
-        if item_info[1]== "DiscreteLog":
-            if checked:
-                self.panel.add_visible_discrete_log_by_name(item_info[0])
-            else:
-                self.panel.remove_visible_discrete_log_by_name(item_info[0])
-
-        if item_info[1]== "Bitmap":
-            if checked:
-                self.panel.add_visible_bitmap_by_name(item_info[0])
-            else:
-                self.panel.remove_visible_bitmap_by_name(item_info[0])
-
-
-
-
-
+        if self.toggle_on:
+            if item_info[1] == "Wells":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    if d_info is not None:
+                        if checked:
+                            self.panel.add_visible_well_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_well_by_name(d_info[0], redraw=False)
+                self.panel.draw_well_panel()
+            elif item_info[1]== "Well":
+                if checked:
+                    self.panel.add_visible_well_by_name(item_info[0])
+                else:
+                    self.panel.remove_visible_well_by_name(item_info[0])
+            elif item_info[0]== "Tops":
+                if checked:
+                    self.panel.add_visible_top_by_name(item_info[2])
+                else:
+                    self.panel.remove_visible_top_by_name(item_info[2])
+            elif item_info[0]== "Track":
+                if checked:
+                    self.panel.add_visible_track_by_name(item_info[1])
+                else:
+                    self.panel.remove_visible_track_by_name(item_info[1])
+            elif item_info[1]== "Continuous_Log":
+                if checked:
+                    if not self.panel.log_is_visible(item_info[2]):
+                        self.panel.add_visible_log_by_name(item_info[2], redraw = True)
+                else:
+                    if self.panel.log_is_visible(item_info[2]):
+                        self.panel.remove_visible_log_by_name(item_info[2], redraw = True)
+            elif item_info[1]== "DiscreteLog":
+                if checked:
+                    if not self.panel.log_is_visible(item_info[2]):
+                        self.panel.add_visible_discrete_log_by_name(item_info[0])
+                else:
+                    if self.panel.log_is_visible(item_info[2]):
+                        self.panel.remove_visible_discrete_log_by_name(item_info[0])
+            elif item_info[1]== "Bitmap":
+                if checked:
+                    if not self.panel.log_is_visible(item_info[2]):
+                        self.panel.add_visible_bitmap_by_name(item_info[0])
+                else:
+                    if self.panel.log_is_visible(item_info[2]):
+                        self.panel.remove_visible_bitmap_by_name(item_info[0])
+            self.toggle_on = False
+            return
+        else:
+            print("toggle on again")
+            self.toggle_on = True
+            return
 
         self.statusBar().showMessage(msg)
 
@@ -5038,115 +5077,132 @@ class MainWindow(QMainWindow):
 
     @QtCore.Slot(str, bool, object)
     def on_parent_toggled(self, path, checked, item):
-        msg = f"Parent toggled: {path} -> {'checked' if checked else 'unchecked'}"
-        print(msg)
-        self.statusBar().showMessage(msg)
+        if self.toggle_on:
+            msg = f"Parent toggled: {path} -> {'checked' if checked else 'unchecked'}"
+            print(msg)
+            self.statusBar().showMessage(msg)
 
-        if item.data(0, Qt.UserRole) is None:
-            print("no user role")
-            return 0
+            if item.data(0, Qt.UserRole) is None:
+                print("no user role")
+                return 0
 
-        item_info = item.data(0, Qt.UserRole)
-        print(item_info)
+            item_info = item.data(0, Qt.UserRole)
+            print(item_info)
 
-        if item_info[0] == "Wells":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                if d_info is not None and d_info[1] == "Well":
-                    if checked:
-                        self.panel.add_visible_well_by_name(d_info[0], redraw=False)
-                    else:
-                        self.panel.remove_visible_well_by_name(d_info[0], redraw=False)
-            self.panel.draw_well_panel()
-        if item_info[1]== "Well":
-            if checked:
-                self.panel.add_visible_well_by_name(item_info[0])
-            else:
-                self.panel.remove_visible_well_by_name(item_info[0])
-        if item_info[1]== "Stratigraphy" or item_info[0]== "Tops":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            self.active_window.redraw_requested = False
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                if d_info is not None:
-                    if checked:
-                        self.panel.add_visible_top_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
-
-            self.active_window.draw_well_panel()
-        if item_info[0]== "Tracks":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                print(f"d_info: {d_info}")
+            if item_info[0] == "Wells":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    if d_info is not None and d_info[1] == "Well":
+                        if checked:
+                            self.panel.add_visible_well_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_well_by_name(d_info[0], redraw=False)
+                self.panel.draw_well_panel()
+            elif item_info[1]== "Well":
                 if checked:
-                    self.panel.add_visible_track_by_name(d_info[1], redraw=False)
+                    self.panel.add_visible_well_by_name(item_info[0])
                 else:
-                    self.panel.remove_visible_track_by_name(d_info[1], redraw=False)
-            self.panel.draw_well_panel()
-        if item_info[0]== "Logs":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                if d_info is not None and d_info[1] == "Continuous_Log":
-                    if checked:
-                        self.panel.add_visible_log_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_log_by_name(d_info[2], redraw=False)
-                if d_info is not None and d_info[1] == "DiscreteLog":
-                    if checked:
-                        self.panel.add_visible_discrete_log_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_discrete_log_by_name(d_info[2], redraw=False)
-                if d_info is not None and d_info[1] == "Bitmap":
-                    if checked:
-                        self.panel.add_visible_bitmap_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_bitmap_by_name(d_info[2], redraw=False)
+                    self.panel.remove_visible_well_by_name(item_info[0])
+            elif item_info[0]== "Well Tops":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                #self.active_window.redraw_requested = False
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    d_state = d.checkState(0)
+                    print(d_info, d_state)
+                    if d_info is not None:
+                        if checked:
+                            self.panel.add_visible_top_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
+                self.panel.draw_well_panel()
 
-            self.panel.draw_well_panel()
+            elif item_info[0]== "Tracks":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    print(f"d_info: {d_info}")
+                    if checked:
+                        self.panel.add_visible_track_by_name(d_info[1], redraw=False)
+                    else:
+                        self.panel.remove_visible_track_by_name(d_info[1], redraw=False)
+                self.panel.draw_well_panel()
+            elif item_info[0]== "Logs":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    print (f"d_info: {d_info}")
+                    if d_info is not None and d_info[1] == "Continuous_Log":
+                        if checked:
+                            self.panel.add_visible_log_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_log_by_name(d_info[2], redraw=False)
+                    if d_info is not None and d_info[1] == "DiscreteLog":
+                        if checked:
+                            self.panel.add_visible_discrete_log_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_discrete_log_by_name(d_info[2], redraw=False)
+                    if d_info is not None and d_info[1] == "Bitmap":
+                        if checked:
+                            self.panel.add_visible_bitmap_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_bitmap_by_name(d_info[2], redraw=False)
 
-        if len(item_info) >  2 and item_info[2]== "Subfolder":
-            descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
-            for d in descendents:
-                d_info = d.data(0, Qt.UserRole)
-                if d_info is not None and d_info[1] == "Well":
-                    if checked:
-                        self.panel.add_visible_well_by_name(d_info[0], redraw=False)
-                    else:
-                        self.panel.remove_visible_well_by_name(d_info[0], redraw=False)
-                if d_info is not None and d_info[1] == "Track":
-                    if checked:
-                        self.panel.add_visible_track_by_name(d_info[0], redraw=False)
-                    else:
-                        self.panel.remove_visible_track_by_name(d_info[0], redraw=False)
-                if d_info is not None and d_info[1] == "stratigraphy":
-                    if checked:
-                        self.panel.add_visible_top_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
-                if d_info is not None and d_info[1] == "Continuous_Log":
-                    if checked:
-                        self.panel.add_visible_log_by_name(d_info[2], redraw=False)
-                    else:
-                        self.panel.remove_visible_log_by_name(d_info[2], redraw=False)
-                if d_info is not None and d_info[1] == "Discrete_Log":
-                    if checked:
-                        self.panel.add_visible_discrete_log_by_name(d_info[0], redraw=False)
-                    else:
-                        self.panel.remove_visible_discrete_log_by_name(d_info[0], redraw=False)
-                if d_info is not None and d_info[1] == "Bitmap":
-                    if checked:
-                        self.panel.add_visible_bitmap_by_name(d_info[0], redraw=False)
-                    else:
-                        self.panel.remove_visible_bitmap_by_name(d_info[0], redraw=False)
+                self.panel.draw_well_panel()
+            elif item_info[0]== "Track":
+                if checked:
+                    self.panel.add_visible_track_by_name(item_info[1], redraw=False)
+                else:
+                    self.panel.remove_visible_track_by_name(item_info[1], redraw=False)
+                self.panel.draw_well_panel()
+            elif len(item_info) >  2 and item_info[2]== "Subfolder":
+                descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
+                for d in descendents:
+                    d_info = d.data(0, Qt.UserRole)
+                    print(d_info)
+                    if d_info is not None and d_info[1] == "Well":
+                        if checked:
+                            self.panel.add_visible_well_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_well_by_name(d_info[0], redraw=False)
+                    if d_info is not None and d_info[1] == "Track":
+                        if checked:
+                            self.panel.add_visible_track_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_track_by_name(d_info[0], redraw=False)
+                    if d_info is not None and d_info[0] == "Tops":
+                        if checked:
+                            self.panel.add_visible_top_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_top_by_name(d_info[2], redraw=False)
+                    if d_info is not None and d_info[1] == "Continuous_Log":
+                        if checked:
+                            self.panel.add_visible_log_by_name(d_info[2], redraw=False)
+                        else:
+                            self.panel.remove_visible_log_by_name(d_info[2], redraw=False)
+                    if d_info is not None and d_info[1] == "Discrete_Log":
+                        if checked:
+                            self.panel.add_visible_discrete_log_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_discrete_log_by_name(d_info[0], redraw=False)
+                    if d_info is not None and d_info[1] == "Bitmap":
+                        if checked:
+                            self.panel.add_visible_bitmap_by_name(d_info[0], redraw=False)
+                        else:
+                            self.panel.remove_visible_bitmap_by_name(d_info[0], redraw=False)
 
 
-            self.panel.draw_well_panel()
+                self.panel.draw_well_panel()
+            self.toggle_on = False
+            return
 
+        else:
+            print("toggle on again")
+            self.toggle_on = True
+            return
         return
+
 
     @QtCore.Slot(QtCore.QPoint, object)
     def on_input_tree_context_menu(self, pos, item):

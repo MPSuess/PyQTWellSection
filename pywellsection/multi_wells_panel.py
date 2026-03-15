@@ -198,7 +198,7 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
 
 
-    print(f"global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
+    print(f"DRAWING         global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
 
 
 
@@ -401,6 +401,10 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
+
+    #
+
+
 
     print("now axes limits are:",axes[0].get_ylim())
 

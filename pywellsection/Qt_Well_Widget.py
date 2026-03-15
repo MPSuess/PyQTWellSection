@@ -451,9 +451,10 @@ class  WellPanelWidget(QWidget):
                 d = float(val["depth"] if isinstance(val, dict) else val)
                 dist = abs(d - depth_true)
                 if min_dist is None or dist < min_dist:
-                    min_dist = dist
-                    nearest_name = name
-                    nearest_depth = d
+                    if name in self.visible_tops:
+                        min_dist = dist
+                        nearest_name = name
+                        nearest_depth = d
 
         if nearest_name is not None:
             self._picked_depth = nearest_depth
@@ -1215,10 +1216,6 @@ class  WellPanelWidget(QWidget):
         self.gap_min_factor = settings.get("gap_min_factor",0.8)
         self.gap_max_factor = settings.get("gap_max_factor",8.0)
 
-
-
-
-
     def set_vertical_scale(self, vertical_scale):
         self.vertical_scale = vertical_scale
         self.draw_well_panel()
@@ -1383,7 +1380,6 @@ class  WellPanelWidget(QWidget):
 
         # set matplotlib figure size in inches to match pixel size
         self.fig.set_size_inches(width_px / dpi, height_px / dpi, forward=True)
-
 
     def enable_track_mouse_scrolling(self):
         """Enable mouse-wheel scrolling inside tracks (pan/zoom depth window)."""
@@ -1587,7 +1583,10 @@ class  WellPanelWidget(QWidget):
             vt = list()
 
         if top_name not in vt:
-            vt.append(top_name)
+            if type(vt) is list:
+                vt.append(top_name)
+            else:
+                vt.add(top_name)
 
         if redraw:
             self.draw_well_panel()
@@ -1674,6 +1673,10 @@ class  WellPanelWidget(QWidget):
         if redraw:
             self.draw_well_panel()
 
+        print (f"add_visible_track_by_name done:, {vt}")
+
+        self.visible_tracks = vt
+
         return True
 
     def remove_visible_track_by_name(self, track_name: str, *, redraw: bool = True) -> bool:
@@ -1716,6 +1719,8 @@ class  WellPanelWidget(QWidget):
         if redraw:
             self.draw_well_panel()
 
+        print(f"remove_visible_track_by_name done:, {self.visible_tracks}")
+
         return True
 
     def add_visible_log_by_name(self, log_name: str, *, redraw: bool = True) -> bool:
@@ -1729,6 +1734,7 @@ class  WellPanelWidget(QWidget):
             False if log name does not exist.
         """
         log_name = (log_name or "").strip()
+        print ("add_visible_log_by_name", log_name)
         if not log_name:
             return False
 
@@ -1750,10 +1756,14 @@ class  WellPanelWidget(QWidget):
             return True
 
         if log_name not in vl:
-            if type(vl) == "list":
+            if type(vl) is list:
                 vl.append(log_name)
             else:
                 vl.add(log_name)
+
+        self.visible_logs = vl
+
+        print(f"add_visible_log_by_name done:, {self.visible_logs}")
 
         if redraw:
             self.draw_well_panel()
@@ -1795,6 +1805,8 @@ class  WellPanelWidget(QWidget):
 
         if redraw:
             self.draw_well_panel()
+
+        #self.visible_logs = vl
 
         return True
 
@@ -1952,9 +1964,53 @@ class  WellPanelWidget(QWidget):
 
         return True
 
+    def log_is_visible(self, log_name: str) -> bool:
+        if not log_name:
+            return False
+        if log_name in self.visible_logs:
+            return True
+        else:
+            return False
 
+    def track_is_visible(self, track_name: str) -> bool:
+        if not track_name:
+            return False
+        if track_name in self.visible_tracks:
+            return True
+        else:
+            return False
 
+    def well_is_visible(self, well_name: str) -> bool:
+        if not well_name:
+            return False
+        if well_name in self.visible_wells:
+            return True
+        else:
+            return False
 
+    def bitmap_is_visible(self, bitmap_name: str) -> bool:
+        if not bitmap_name:
+            return False
+        if bitmap_name in self.visible_bitmaps:
+            return True
+        else:
+            return False
+
+    def discrete_log_is_visible(self, discrete_log_name: str) -> bool:
+        if not discrete_log_name:
+            return False
+        if discrete_log_name in self.visible_discrete_logs:
+            return True
+        else:
+            return False
+
+    def top_is_visible(self, top_name: str) -> bool:
+        if not top_name:
+            return False
+        if top_name in self.visible_tops:
+            return True
+        else:
+            return False
 
 class WellPanelDock(QDockWidget):
     activated = pyqtSignal(object)  # emits self when activated

@@ -5219,14 +5219,14 @@
       "bitmaps": {
         "cp001": {
           "name": "bitmap",
-          "path": "/Users/suess/PythonProject/PyQTWellSection/P9.pdj/Well A_cp001.png",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
           "top_depth": 0.0,
           "base_depth": 100.0,
           "track": "core"
         },
         "cp002": {
           "name": "bitmap2",
-          "path": "/Users/suess/PythonProject/PyQTWellSection/P9.pdj/Well A_cp002.png",
+          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
           "top_depth": 100.0,
           "base_depth": 300.0,
           "track": "core"
@@ -5234,14 +5234,14 @@
       },
       "cp001": {
         "name": "bitmap",
-        "path": "/Users/suess/PythonProject/PyQTWellSection/P9.pdj/Well A_cp001.png",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
         "top_depth": 0.0,
         "base_depth": 100.0,
         "track": "core"
       },
       "cp002": {
         "name": "bitmap2",
-        "path": "/Users/suess/PythonProject/PyQTWellSection/P9.pdj/Well A_cp002.png",
+        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
         "top_depth": 100.0,
         "base_depth": 300.0,
         "track": "core"
@@ -11569,11 +11569,6 @@
         "default_color": "#e45c53",
         "missing": "-999"
       }
-    },
-    {
-      "name": "tt",
-      "logs": [],
-      "type": "continuous"
     }
   ],
   "stratigraphy": {
@@ -11663,21 +11658,20 @@
         }
       },
       "visible_logs": [
-        "PHI",
-        "GR",
         "RT",
         "RHOB",
-        "CAL"
+        "CAL",
+        "GR",
+        "PHI"
       ],
       "visible_tracks": [
         "core",
-        "RHOB-PHI",
-        "tt",
-        "GR-CAL",
-        "LithoFacies",
         "RT-RHOB",
-        "Facies",
-        "f3"
+        "f3",
+        "GR-CAL",
+        "RHOB-PHI",
+        "LithoFacies",
+        "Facies"
       ],
       "visible_wells": [
         "Well A",
@@ -11754,8 +11748,8 @@
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAAByQAAAVLAAAABwAAADUAAAckAAAFSwAAAAAAAAAACgAAAAAHAAAANQAAByQAAAVL",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAE5PwCAAAAAfwAAAAYAAAE5AAAASEA/////AEAAAAC/AAAAAAAAAH1AAAAlQD////6AAAAAgEAAAAD+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////7AAAAEgBOAGUAdwAgAEkAbgBwAHUAdAEAAAAA/////wAAAEoA/////AAAAfYAAAUoAAAAlwD////8AgAAAAP7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADEBAAAAGAAAArwAAAAAAAAAAPsAAAAoAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAATgBOAFcALQBTAFMARQEAAAAYAAAEXgAAAKsA/////AAABHcAAACFAAAAdQEAABT6AAAAAAEAAAAD+wAAABAAQwBvAG0AbQBhAG4AZABzAQAAAAD/////AAAASgD////7AAAABgBMAG8AZwEAAAAA/////wAAAEoA////+wAAAA4AQwBvAG4AcwBvAGwAZQEAAAHkAAACEwAAAEoA////AAAAAQAAAyYAAAUL/AIAAAAG+wAAABwAVwBlAGwAbABfAFMAZQBjAHQAaQBvAG4AXwAyAQAAABgAAAFWAAAAAAAAAAD7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADMBAAABbwAAAL0AAAAAAAAAAPwAAAAYAAACiAAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQgEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAAAAA/gAAALMAAAAXwD////8AAAAGAAABQsAAAAAAP////oAAAAAAQAAAAL7AAAAHABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEEBAAAEDQAAANUAAAAAAAAAAPsAAAAgAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAARQAtAFcAAAAAAP////8AAABfAP////sAAAAWAFMAZQBjAHQAaQBvAG4AIABOAC0AUwEAAAAYAAABtwAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAHQAAABtAAAAAAAAAAAAAAAAAAABOQAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
+    "geometry_b64": "AdnQywADAAAAAAHAAAAAjAAABvkAAAQWAAABwAAAAKgAAAb5AAAEFgAAAAAAAAAACgAAAAHAAAAAqAAABvkAAAQW",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAU6AAADPPwCAAAAAfwAAAAYAAADPAAAASEA/////AEAAAAC/AAAAAAAAAFwAAAAlQD////6AAAAAgEAAAAD+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////7AAAAEgBOAGUAdwAgAEkAbgBwAHUAdAEAAAAA/////wAAAEoA/////AAAAXEAAAPJAAAAlwD////8AgAAAAP7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADEBAAAAGAAAArwAAAAAAAAAAPsAAAAoAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAATgBOAFcALQBTAFMARQEAAAAYAAACwwAAAKsA/////AAAAtwAAAB4AAAAdQEAABT6AAAAAAEAAAAD+wAAABAAQwBvAG0AbQBhAG4AZABzAQAAAAD/////AAAASgD////7AAAABgBMAG8AZwEAAAAA/////wAAAEoA////+wAAAA4AQwBvAG4AcwBvAGwAZQEAAAHkAAACEwAAAEoA////AAAAAQAAAyYAAAUL/AIAAAAG+wAAABwAVwBlAGwAbABfAFMAZQBjAHQAaQBvAG4AXwAyAQAAABgAAAFWAAAAAAAAAAD7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADMBAAABbwAAAL0AAAAAAAAAAPwAAAAYAAACiAAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQgEAAAAA/////wAAAAAAAAAA+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAAAAA/gAAALMAAAAXwD////8AAAAGAAABQsAAAAAAP////oAAAAAAQAAAAL7AAAAHABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEEBAAAEDQAAANUAAAAAAAAAAPsAAAAgAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAARQAtAFcAAAAAAP////8AAABfAP////sAAAAWAFMAZQBjAHQAaQBvAG4AIABOAC0AUwEAAAAYAAABtwAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwEAAAHQAAABtAAAAAAAAAAAAAAAAAAAAzwAAAAEAAAABAAAAAgAAAAI/AAAAAA=",
     "tab_groups": [
       [
         "Console",
@@ -12298,7 +12292,7 @@
         "policy": null,
         "check_state": "CheckState.Checked",
         "movable": true,
-        "drop_flags": 0,
+        "drop_flags": 1,
         "expanded": false,
         "children": [
           {
@@ -12307,7 +12301,7 @@
             "policy": null,
             "check_state": "CheckState.Checked",
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": true,
             "children": [
               {
@@ -12413,7 +12407,7 @@
             "policy": null,
             "check_state": null,
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": false,
             "children": [],
             "data": [
@@ -12428,7 +12422,7 @@
             "policy": null,
             "check_state": null,
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": false,
             "children": [],
             "data": [
@@ -12451,7 +12445,7 @@
         "check_state": "CheckState.Checked",
         "movable": true,
         "drop_flags": 1,
-        "expanded": false,
+        "expanded": true,
         "children": [
           {
             "text": "continuous",
@@ -12459,7 +12453,7 @@
             "policy": 3,
             "check_state": null,
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": true,
             "children": [
               {
@@ -12550,7 +12544,7 @@
             "policy": 3,
             "check_state": null,
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": true,
             "children": [
               {
@@ -12596,7 +12590,7 @@
             "policy": 3,
             "check_state": null,
             "movable": true,
-            "drop_flags": 0,
+            "drop_flags": 1,
             "expanded": true,
             "children": [
               {
@@ -12650,7 +12644,7 @@
         "check_state": "CheckState.Checked",
         "movable": true,
         "drop_flags": 1,
-        "expanded": false,
+        "expanded": true,
         "children": [
           {
             "text": "LithoFacies",
@@ -12832,21 +12826,6 @@
             "data": [
               "Track",
               "f3",
-              "None"
-            ]
-          },
-          {
-            "text": "tt",
-            "type": "leaf",
-            "policy": 2,
-            "check_state": null,
-            "movable": false,
-            "drop_flags": 0,
-            "expanded": false,
-            "children": [],
-            "data": [
-              "Track",
-              "tt",
               "None"
             ]
           }

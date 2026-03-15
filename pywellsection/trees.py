@@ -1202,7 +1202,7 @@ class CheckableTree(QtWidgets.QTreeWidget):
               )
 
         if not self._has_checkbox(item):
-            print("WARNING: non-checkable item toggled")
+            print("WARNING: non-checkable item toggled", item.text(0))
             return
 
         state = item.checkState(0)
@@ -1211,8 +1211,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         if item.childCount() > 0:
             # folder toggled (only checkable folders can reach here)
-            print("WARNING: folder toggled")
-            self.parentToggled.connect(lambda : print("WARNING: folder toggled"))
+            print("WARNING: folder toggled", item.text(0))
+#            self.parentToggled.connect(lambda : print("WARNING: folder toggled", item.text(0)))
 
             self.parentToggled.emit(self._item_path(item), checked, item)
             print(id(self), "Toggled emitted")
@@ -1227,8 +1227,9 @@ class CheckableTree(QtWidgets.QTreeWidget):
             return
 
         # checkable leaf toggled
-        print("WARNING: leaf toggled")
+        print("WARNING: leaf toggled", item.text(0))
         self.itemToggled.emit(self._item_path(item), checked, item)
+        print (id(self), "Toggled emitted")
         try:
             self._updating = True
             self._update_parents(item)
@@ -1570,7 +1571,6 @@ def setup_well_tree(self):
     self.c_faults_root.setData(0, Qt.UserRole, ("Well Tops", "Faults", "Subfolder"))
     self.c_stratigraphy_root.setData(0, Qt.UserRole, ("Well Tops", "Stratigraphy", "Subfolder"))
     self.c_other_root.setData(0, Qt.UserRole, ("Well Tops", "Other", "Subfolder"))
-
 
     self.cont_folder.setData(0, Qt.UserRole, ("Well Logs", "continuous", "Subfolder"))
     self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Subfolder"))

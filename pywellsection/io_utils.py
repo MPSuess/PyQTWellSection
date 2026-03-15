@@ -20,6 +20,7 @@ import openpyxl
 
 from pywellsection.dialogs import ImportTopsAssignWellDialog
 #from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
+from pywellsection.Bee_SV_load import bgr_sv_load_tree
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -1642,7 +1643,7 @@ def import_schichtenverzeichnisv2(parent, project, xlsx_path):
 
     return True
 
-def import_schichtenverzeichnis(parent, project, xlsx_path):
+def import_schichtenverzeichnis_xx(parent, project, xlsx_path):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1743,7 +1744,7 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
 
     return True
 
-def import_schichtenverzeichnis_bee(parent, project, xlsx_path):
+def import_schichtenverzeichnis(parent, project, xlsx_path):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1829,12 +1830,18 @@ def import_schichtenverzeichnis_bee(parent, project, xlsx_path):
         strat.setdefault(key, {}).update(meta)
 
     tops_dict = target_well.setdefault("tops", {})
+
+    parent.panel.set_draw_well_panel(False)
+
     for t in tops:
         tops_dict[t["key"]] = {
             "depth": t["depth"],
             "role": t["role"],
             "level": strat.get(t["key"], {}).get("level", "formation"),
         }
+        parent.add_top_to_tree(t["key"], t["role"])
+
+    parent.panel.set_draw_well_panel(True)
 
     QMessageBox.information(
         parent,
