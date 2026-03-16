@@ -404,8 +404,6 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 
     #
 
-
-
     print("now axes limits are:",axes[0].get_ylim())
 
     return axes, well_main_axes

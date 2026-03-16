@@ -216,31 +216,32 @@ class MainWindow(QMainWindow):
 
         ### Setup the Dock
 
-        self.well_dock = QDockWidget("Input Data", self)
-        self.well_dock.setObjectName("Input")
-        self.well_dock.setWidget(self.well_tree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+        # self.well_dock = QDockWidget("Input Data", self)
+        # self.well_dock.setObjectName("Input")
+        # self.well_dock.setWidget(self.well_tree)
+        # self.addDockWidget(Qt.LeftDockWidgetArea, self.well_dock)
+
+        self.Input_Dock = QDockWidget("Input Data", self)
+        self.Input_Dock.setObjectName("Input")
+        self.Input_Dock.setWidget(self.input_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.Input_Dock)
 
         self.window_dock = QDockWidget("Windows", self)
         self.window_dock.setObjectName("Windows")
         self.window_dock.setWidget(self.window_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.window_dock)
 
-        self.Input_Dock = QDockWidget("New Input", self)
-        self.Input_Dock.setObjectName("New Input")
-        self.Input_Dock.setWidget(self.input_tree)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.Input_Dock)
-
-        self.splitDockWidget(self.well_dock, self.dock, Qt.Horizontal)
+        self.splitDockWidget(self.Input_Dock, self.dock, Qt.Horizontal)
         self.splitDockWidget(self.dock, self.dock_console, Qt.Vertical)
         self.resizeDocks([self.dock, self.dock_console], [4, 1], Qt.Vertical)
 
         self.tabifyDockWidget(self.dock_console, self.dock_commands)
         self.tabifyDockWidget(self.dock_commands, self.dock_logger)
-        self.tabifyDockWidget(self.well_dock, self.window_dock)
-        self.tabifyDockWidget(self.window_dock, self.Input_Dock)
+ #       self.tabifyDockWidget(self.well_dock, self.window_dock)
+        self.tabifyDockWidget(self.Input_Dock, self.window_dock)
         self.dock_console.raise_()
-        self.well_dock.raise_()
+#        self.well_dock.raise_()
+        self.Input_Dock.raise_()
 
         # --- intial build of the well tree
         self._populate_well_tree()
@@ -577,7 +578,7 @@ class MainWindow(QMainWindow):
                                 bitmap_cfg["path"] = str(os.path.join(p_path,f"{self.project_name}.pdj",fname))
                                 self.all_bitmaps.append(bitmap)
                                 well[bitmap] = bitmap_cfg
-                                print (bitmap_cfg)
+                                #print (bitmap_cfg)
                     self.project.all_bitmaps = self.all_bitmaps
 
             #self.panel.panel_settings = window_dict[0]["panel_settings"]
@@ -644,8 +645,8 @@ class MainWindow(QMainWindow):
             #self.setup_test_tree()
             self._populate_well_tops_tree()
             if type(tree_dict) is dict and len(tree_dict) > 0:
-                print("rebuilding input tree from dict")
-                print(id(self.input_tree))
+                #print("rebuilding input tree from dict")
+                #print(id(self.input_tree))
                 self.input_tree.from_dict(tree_dict)
                 connect_input_tree(self)
 
@@ -671,8 +672,13 @@ class MainWindow(QMainWindow):
             # ✅ Trigger full redraw
             #            self.redraw_requested = True
             self.panel_settings["redraw_requested"] = True
+            #self._set_tree_from_well_panel()
+            self._rebuild_well_panel_from_tree()
+
             #self.panel.draw_well_panel()
             self._redraw_all_panels()
+
+
 
         except Exception as e:
             QMessageBox.critical(self, "Open Error", str(e))
@@ -1308,7 +1314,7 @@ class MainWindow(QMainWindow):
             return
         ok = import_schichtenverzeichnis(self, self.project, path)
         if ok:
-            print (self.project.all_stratigraphy)
+            #print (self.project.all_stratigraphy)
             self.all_stratigraphy = self.project.all_stratigraphy
             self.all_wells = self.project.all_wells
             self._populate_well_tops_tree()
@@ -1438,7 +1444,7 @@ class MainWindow(QMainWindow):
                     dlog_item = self.input_tree.add_noncheckable_leaf(disc_folder, dlog_name)
                     self.input_tree.set_accept_children_drop(dlog_item, False)
                     self.input_tree.lock_leaf_movement(dlog_item)
-                    dlog_item.setData(0, Qt.UserRole, ("Discrete_Log", well_name, dlog_name))
+                    dlog_item.setData(0, Qt.UserRole, ("DiscreteLog", well_name, dlog_name))
 
             # --- bitmaps ---
             blogs = (w.get("bitmaps", None) or {})
@@ -1458,13 +1464,13 @@ class MainWindow(QMainWindow):
         return
 
     def _add_new_track_to_input_tree(self,new_track):
-        print("_add_new_track_to_input_tree")
+        #print("_add_new_track_to_input_tree")
         root = self.c_well_track_folder
 
         if type(new_track) == dict:
             new_track = new_track["name"]
 
-        print (type (new_track), new_track, root)
+        #print (type (new_track), new_track, root)
 
         track_item = self.input_tree.add_checkable_leaf(root, new_track)
         self.input_tree.set_accept_children_drop(track_item, False)
@@ -1475,7 +1481,7 @@ class MainWindow(QMainWindow):
 
     def _add_log_to_logs(self, log_name, log_type):
 
-        print ("_add_log_to_logs", log_name, log_type)
+        #print ("_add_log_to_logs", log_name, log_type)
 
 
         if log_type == "continuous":
@@ -1486,9 +1492,6 @@ class MainWindow(QMainWindow):
         it.setData(0, Qt.UserRole, ("Logs", log_type, log_name))
         state = Qt.Unchecked
         it.setCheckState(0, state)
-
-
-
 
     def _add_continuous_log_to_logs_in_input_tree(self, log_name):
         root = self.cont_folder
@@ -1507,7 +1510,7 @@ class MainWindow(QMainWindow):
             return
         wells = self.input_tree.get_items_in_folder(root)
         for well in wells:
-            print(well.text(0))
+            #print(well.text(0))
             if well.text(0) == well_name:
                 folder = self.input_tree.get_items_in_folder(well)
                 for f in folder:
@@ -1524,13 +1527,13 @@ class MainWindow(QMainWindow):
     def _add_core_bitmap_to_input_tree(self, name, well_name, track_name):
         """Add a core bitmap to the input tree."""
         # Add bitmap to well tree
-        print(f"Adding bitmap to well tree: {name} ({well_name}, {track_name})")
+        #print(f"Adding bitmap to well tree: {name} ({well_name}, {track_name})")
         root = self.c_well_folder
         if not root:
             return
         wells = self.input_tree.get_items_in_folder(root)
         for well in wells:
-            print (well.text(0))
+            #print (well.text(0))
             if well.text(0) == well_name:
                 folder = self.input_tree.get_items_in_folder(well)
                 for f in folder:
@@ -1573,7 +1576,7 @@ class MainWindow(QMainWindow):
             root = self.disc_folder
             name = log.get("name")
             it = self.input_tree.add_checkable_leaf(root, name)
-            it.setData(0, Qt.UserRole, ("Logs", "Discrete_Log", name))
+            it.setData(0, Qt.UserRole, ("Logs", "DiscreteLog", name))
             state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
             it.setCheckState(0, state)
         elif log.get("type") == "bitmap":
@@ -1684,7 +1687,7 @@ class MainWindow(QMainWindow):
         ### Remember current selection by name
         ### First continous Logs
 
-        print("_populate_well_log_tree")
+        #print("_populate_well_log_tree")
 
         #blocker = QtCore.QSignalBlocker(self.input_tree)
         self.input_tree.blockSignals(True)
@@ -1906,7 +1909,6 @@ class MainWindow(QMainWindow):
         self.well_tree.blockSignals(False)
         self._rebuild_well_panel_from_tree()
 
-
     def _populate_well_tops_tree(self):
         if self.tops_tree_populated:
             self._update_tops_tree()
@@ -2022,7 +2024,8 @@ class MainWindow(QMainWindow):
         ### Remember current selection by name
         ### First continous Logs
 
-        print ("_populate_well_log_tree")
+
+        #print ("_populate_well_log_tree")
 
         self.well_tree.blockSignals(True)
         prev_selected = set()
@@ -2215,7 +2218,7 @@ class MainWindow(QMainWindow):
     def _on_well_tree_item_changed(self, item: QTreeWidgetItem, _col: int):
         """Recompute displayed wells whenever a checkbox changes."""
 
-        print(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
+        #print(f"on_tree_item_changed! {item.data(0, Qt.UserRole)} {item.checkState(0)}")
         #self.panel.set_draw_well_panel(False)
 
         if item.data(0, Qt.UserRole) is None:
@@ -2257,8 +2260,6 @@ class MainWindow(QMainWindow):
 
         #self.panel.set_draw_well_panel(True)
 
-
-
     def _select_all_wells(self):
         self.well_tree.blockSignals(True)
         root = self.well_tree.invisibleRootItem()
@@ -2277,73 +2278,168 @@ class MainWindow(QMainWindow):
 
     def _set_tree_from_well_panel(self):
 
-        #LOG.debug("Setting well tree ... .")
-        self.well_tree.itemChanged.connect(self.do_nothing)
+        self.input_tree.blockSignals(True)
 
         wells = self.panel.get_visible_wells()
 
         if wells is not None:
             nb_wells = len(wells)
         checked_names = set()
-        root = self.well_root_item
 
         self.panel.panel_settings["redraw_requested"] = False
 
-        for i in range(root.childCount()):
-            it = root.child(i)
+        descendants = self.input_tree.get_items_in_folder(self.c_well_folder, recursive=True)
+
+        for it in descendants:
             state = Qt.Unchecked
             if wells is not None:
                 for well in wells:
-                    if well == it.data(0, Qt.UserRole):
-                        state = Qt.Checked
+                    data = it.data(0, Qt.UserRole)
+                    if data is not None:
+                        if well == data[0]:
+                            print("found and checked")
+                            state = Qt.Checked
             it.setCheckState(0, state)
 
         tops = self.panel.get_visible_tops()
         #LOG.debug("visible tops:", tops)
-        root = self.stratigraphy_root
-        for i in range(root.childCount()):
-            it = root.child(i)
+        #root = self.stratigraphy_root
+        #root = self.c_well_tops_folder
+
+        descendants = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=True)
+
+        for it in descendants:
             state = Qt.Unchecked
             if tops is not None:
                 for top in tops:
-                    if top == it.data(0, Qt.UserRole):
-                        state = Qt.Checked
+                    data = it.data(0, Qt.UserRole)
+                    if data is not None:
+                        if top == data[2]:
+                            print("found and checked", top)
+                            state = Qt.Checked
             it.setCheckState(0, state)
 
         tracks = self.panel.get_visible_tracks()
         #LOG.debug ("getting visible tracks", tracks)
-        root = self.track_root_item
-        for i in range(root.childCount()):
-            it = root.child(i)
+        descendants = self.input_tree.get_items_in_folder(self.c_well_track_folder, recursive=True)
+
+        for it in descendants:
             state = Qt.Unchecked
             if tracks is not None:
                 for track in tracks:
-                    if track == it.data(0, Qt.UserRole):
+                    data = it.data(0, Qt.UserRole)
+                    if data is not None:
+                        if track == data[1]:
+                            print("found and checked", track)
                         #LOG.debug ("track is ",track)
-                        state = Qt.Checked
+                            state = Qt.Checked
             it.setCheckState(0, state)
 
-        logs = self.panel.get_visible_logs()
-        #LOG.debug("getting visible logs", logs)
-        root = self.continous_logs_folder
-        for i in range(root.childCount()):
-            it = root.child(i)
+        descendants = self.input_tree.get_items_in_folder(self.c_well_logs_folder, recursive=True)
+
+        for d in descendants:
             state = Qt.Unchecked
-            if logs is not None:
-                for log in logs:
-                    if log == it.data(0, Qt.UserRole):
-                        #LOG.debug("log is ", log)
-                        state = Qt.Checked
-            it.setCheckState(0, state)
+            d_info = d.data(0, Qt.UserRole)
+            logs = []
+            if d_info is not None:
+                data = d_info[2]
+                print (f"d_info: {d_info}")
+                if d_info is not None and d_info[1] == "Continuous_Log":
+                    logs = self.panel.get_visible_logs()
+                    print (logs)
+                elif d_info is not None and d_info[1] == "DiscreteLog":
+                    logs = self.panel.get_visible_discrete_logs()
+                    print (logs)
+                elif d_info is not None and d_info[1] == "Bitmap":
+                    logs = self.panel.get_visible_bitmaps()
+
+                if logs is not None:
+                    for log in logs:
+                        if log == data:
+                            print("log is ", log)
+                            state = Qt.Checked
+            d.setCheckState(0, state)
+
 
         self.panel.panel_settings["redraw_requested"] = True
-        self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
+        #self.well_tree.itemChanged.connect(self._on_well_tree_item_changed)
+        self.input_tree.blockSignals(False)
         #self.panel.draw_well_panel()
 
     def do_nothing(self):
         return
 
     def _rebuild_well_panel_from_tree(self):
+        """Rebuild the well panel from the tree."""
+        print ("_rebuild_well_panel_from_tree")
+        descendants = self.input_tree.get_items_in_folder(self.c_well_folder, recursive=True)
+        visible=[]
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                if item_info[1] == "Well":
+                    #print("well is ", item_info[0])
+                    visible.append(item_info[0])
+        self.panel.set_visible_wells(visible)
+
+        descendants = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=True)
+        visible=[]
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                #print("top is ", item_info[2])
+                if len(item_info) > 2:
+                    if item_info[1] == "stratigraphy":
+                        visible.append(item_info[2])
+        self.panel.set_visible_tops(visible)
+
+        descendants = self.input_tree.get_items_in_folder(self.c_well_track_folder, recursive=True)
+        visible=[]
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                #print ("track is ", item_info[1])
+                if len(item_info) > 2:
+                    if item_info[0] == "Track":
+                        visible.append(item_info[1])
+        self.panel.set_visible_tracks(visible)
+
+        descendants = self.input_tree.get_items_in_folder(self.cont_folder, recursive=True)
+        visible = []
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                print ("log is ", item_info)
+                if len(item_info) >2:
+                    if item_info[1] == "Continuous_Log" and item_info[2] != "Subfolder":
+                        visible.append(item_info[2])
+        self.panel.set_visible_logs(visible)
+
+        descendants = self.input_tree.get_items_in_folder(self.bmp_folder, recursive=True)
+        visible = []
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                print("log is ", item_info)
+                if len(item_info) > 2:
+                    if item_info[1] == "Bitmap" and item_info[2] != "Subfolder":
+                        visible.append(item_info[2])
+        self.panel.set_visible_bitmaps(visible)
+
+        descendants = self.input_tree.get_items_in_folder(self.disc_folder, recursive=True)
+        visible = []
+        for d in descendants:
+            item_info = d.data(0, Qt.UserRole)
+            if d.checkState(0) == Qt.Checked:
+                print("log is ", item_info)
+                if len(item_info) > 2:
+                    if item_info[1] == "DiscreteLog" and item_info[2] != "Subfolder":
+                        visible.append(item_info[2])
+        self.panel.set_visible_discrete_logs(visible)
+
+
+
+    def _rebuild_well_panel_from_tree_o(self):
         """Collect checked wells (by name) and send to well_panel."""
         checked_names = set()
 
@@ -2573,7 +2669,7 @@ class MainWindow(QMainWindow):
         descendents = self.input_tree.get_items_in_folder(track_folder, include_folders=True)
         for d in descendents:
             data = d.data(0, Qt.UserRole)
-            print(f"data: {data}")
+            #print(f"data: {data}")
             if data[1] == track_name:
                 track_item = self.input_tree.add_noncheckable_leaf(d, log_name)
                 track_item.setData(0, Qt.UserRole, ("Track", track_name, log_name))
@@ -2606,12 +2702,6 @@ class MainWindow(QMainWindow):
                 self.input_tree.remove_item_from_tree(d)
                 break
         return
-
-
-
-
-
-
 
     def _action_add_log_to_track(self):
         """Show dialog to add a log to a track, then apply."""
@@ -2752,7 +2842,7 @@ class MainWindow(QMainWindow):
 
         self.all_tracks.append(new_track)
 
-        print (f"action_add_empty_track: new track: {new_track}")
+        #print (f"action_add_empty_track: new track: {new_track}")
 
         self._add_new_track_to_input_tree(new_track)
 
@@ -2786,7 +2876,7 @@ class MainWindow(QMainWindow):
 
     def _action_open_log_calculator(self):
 
-        print("open log calculator")
+        #print("open log calculator")
         panel = self.panel
         all_wells = self.all_wells
         dlg = LogCalculatorDialog(self,panel, all_wells)
@@ -2794,7 +2884,7 @@ class MainWindow(QMainWindow):
 
         result = dlg.result()
 
-        print(f"result: {result}")
+        #print(f"result: {result}")
 
         #self._add_continuous_log_to_logs_in_input_tree(result)
         self._add_log_to_logs(result[0], result[1])
@@ -3466,7 +3556,7 @@ class MainWindow(QMainWindow):
           well["bitmaps"][key] = {path, top_depth, base_depth, ...}
         """
 
-        print("Loading core bitmap to well...")
+        #print("Loading core bitmap to well...")
 
         if not getattr(self, "all_wells", None):
             QMessageBox.information(self, "Load core bitmap", "No wells in project.")
@@ -3549,7 +3639,7 @@ class MainWindow(QMainWindow):
         #if hasattr(self, "_populate_well_tree"):
         #    self._populate_well_tree()
 
-        print("Now adding bitmap to input_tree")
+        #print("Now adding bitmap to input_tree")
 
         self._add_core_bitmap_to_input_tree(res["key"], res["well_name"], res["track"])
 
@@ -3749,7 +3839,7 @@ class MainWindow(QMainWindow):
         Called whenever a docked well_panel is clicked/focused.
         Sets active well_panel and rebuilds tree (and anything else you want).
         """
-        print(f"_on_panel_activated: {dock}")
+        #print(f"_on_panel_activated: {dock}")
 
         if dock is None:
             return
@@ -3795,10 +3885,7 @@ class MainWindow(QMainWindow):
         self.active_window = dock
         self.panel = dock.well_panel
 
-
-
         #LOG.debug(f"Activated new window")
-
         self.panel.set_draw_well_panel(False)
         self._set_tree_from_well_panel()
         self.panel.set_draw_well_panel(True)
@@ -4034,13 +4121,13 @@ class MainWindow(QMainWindow):
                 self.panel.wells = self.all_wells
                 self.panel.draw_well_panel()
         self._redraw_all_panels()
-        print(f"Deleted well '{well_name}'")
+        #print(f"Deleted well '{well_name}'")
         #self._delete_well_from_input_tree(well_name, confirm=False)
 
     def _delete_well_from_input_tree (self, well_name: str, item: QTreeWidgetItem,
                                       confirm: bool = True):
 
-        print ("delete well from input tree: ", well_name)
+        #print ("delete well from input tree: ", well_name)
 
         if confirm:
             res = QMessageBox.question(
@@ -4092,8 +4179,8 @@ class MainWindow(QMainWindow):
         data = item.data(0, Qt.UserRole)
         parent_data = parent.data(0, Qt.UserRole) if parent else None
 
-        print (item, data)
-        print (parent, parent_data)
+        #print (item, data)
+        #print (parent, parent_data)
 
         if item is self.well_root_item:
             #menu = QMenu(self)
@@ -4303,14 +4390,14 @@ class MainWindow(QMainWindow):
 
     def _on_window_item_changed(self, item, column):
         """Called when a window is checked/unchecked in the tree."""
-        print(f"Window item changed: {item.text(0)}")
+        #print(f"Window item changed: {item.text(0)}")
 
         win_name = item.data(0, Qt.UserRole)
 
         if win_name is None:
             return
 
-        print (f"Window item changed: {win_name}")
+        #print (f"Window item changed: {win_name}")
 
         self._deactivate_all_windows()
 
@@ -4333,7 +4420,7 @@ class MainWindow(QMainWindow):
         new_title = item.text(0).strip()
 
         if win_title !=new_title:
-            print(f"change the name of the window!:{win_title}, {new_title}")
+            #print(f"change the name of the window!:{win_title}, {new_title}")
             for win in self.WindowList:
                 if win.title == win_title:
                     win.set_title(new_title)
@@ -4363,7 +4450,7 @@ class MainWindow(QMainWindow):
         elif item.parent() == self.window_root:
             data = item.data(0, Qt.UserRole)
             type = item.data(1, Qt.UserRole)
-            print (data)
+            #print (data)
             #menu = QMenu(self)
             window_name = item.text(0)
             act_delete_window = menu.addAction(f"Delete window '{window_name}'...")
@@ -4946,7 +5033,7 @@ class MainWindow(QMainWindow):
             return 0
 
         item_info = item.data(0, Qt.UserRole)
-        print(item_info)
+        #print(item_info)
 
         if item_info[1] == "Wells":
             descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
@@ -4975,7 +5062,7 @@ class MainWindow(QMainWindow):
             else:
                 self.panel.remove_visible_track_by_name(item_info[0])
 
-        if item_info[1]== "ContinuousLog":
+        if item_info[1]== "Continuous_Log":
             if checked:
                 self.panel.add_visible_log_by_name(item_info[0])
             else:
@@ -5003,14 +5090,14 @@ class MainWindow(QMainWindow):
     @QtCore.Slot(str, bool, object)
     def on_leaf_toggled(self, path, checked, item):
         msg = f"Now LEAF toggled:   {path} -> {'checked' if checked else 'unchecked'}"
-        print(msg, item)
+        #print(msg, item)
 
         if item.data(0, Qt.UserRole) is None:
-            print("no user role")
+            #print("no user role")
             return 0
 
         item_info = item.data(0, Qt.UserRole)
-        print(item_info)
+        #print(item_info)
         if self.toggle_on:
             if item_info[1] == "Wells":
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
@@ -5061,7 +5148,7 @@ class MainWindow(QMainWindow):
             self.toggle_on = False
             return
         else:
-            print("toggle on again")
+            #print("toggle on again")
             self.toggle_on = True
             return
 
@@ -5069,7 +5156,7 @@ class MainWindow(QMainWindow):
 
     @QtCore.Slot(str, str)
     def on_context_action(self, path, action):
-        print(f"Context action: {path} -> {action}")
+        #print(f"Context action: {path} -> {action}")
         if path:
             print(f"CONTEXT action: {action} on {path}")
         else:
@@ -5079,15 +5166,15 @@ class MainWindow(QMainWindow):
     def on_parent_toggled(self, path, checked, item):
         if self.toggle_on:
             msg = f"Parent toggled: {path} -> {'checked' if checked else 'unchecked'}"
-            print(msg)
+            #print(msg)
             self.statusBar().showMessage(msg)
 
             if item.data(0, Qt.UserRole) is None:
-                print("no user role")
+                #print("no user role")
                 return 0
 
             item_info = item.data(0, Qt.UserRole)
-            print(item_info)
+            #print(item_info)
 
             if item_info[0] == "Wells":
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
@@ -5110,7 +5197,7 @@ class MainWindow(QMainWindow):
                 for d in descendents:
                     d_info = d.data(0, Qt.UserRole)
                     d_state = d.checkState(0)
-                    print(d_info, d_state)
+                    #print(d_info, d_state)
                     if d_info is not None:
                         if checked:
                             self.panel.add_visible_top_by_name(d_info[2], redraw=False)
@@ -5122,7 +5209,7 @@ class MainWindow(QMainWindow):
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
                 for d in descendents:
                     d_info = d.data(0, Qt.UserRole)
-                    print(f"d_info: {d_info}")
+                    #print(f"d_info: {d_info}")
                     if checked:
                         self.panel.add_visible_track_by_name(d_info[1], redraw=False)
                     else:
@@ -5132,7 +5219,7 @@ class MainWindow(QMainWindow):
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
                 for d in descendents:
                     d_info = d.data(0, Qt.UserRole)
-                    print (f"d_info: {d_info}")
+                    #print (f"d_info: {d_info}")
                     if d_info is not None and d_info[1] == "Continuous_Log":
                         if checked:
                             self.panel.add_visible_log_by_name(d_info[2], redraw=False)
@@ -5160,7 +5247,7 @@ class MainWindow(QMainWindow):
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
                 for d in descendents:
                     d_info = d.data(0, Qt.UserRole)
-                    print(d_info)
+                    #print(d_info)
                     if d_info is not None and d_info[1] == "Well":
                         if checked:
                             self.panel.add_visible_well_by_name(d_info[0], redraw=False)
@@ -5181,7 +5268,7 @@ class MainWindow(QMainWindow):
                             self.panel.add_visible_log_by_name(d_info[2], redraw=False)
                         else:
                             self.panel.remove_visible_log_by_name(d_info[2], redraw=False)
-                    if d_info is not None and d_info[1] == "Discrete_Log":
+                    if d_info is not None and d_info[1] == "DiscreteLog":
                         if checked:
                             self.panel.add_visible_discrete_log_by_name(d_info[0], redraw=False)
                         else:
@@ -5198,7 +5285,7 @@ class MainWindow(QMainWindow):
             return
 
         else:
-            print("toggle on again")
+            #print("toggle on again")
             self.toggle_on = True
             return
         return
@@ -5214,13 +5301,13 @@ class MainWindow(QMainWindow):
         #item = self.input_tree.itemAt(self.input_tree.viewport().mapFromGlobal(pos))
         data = item.data(0, Qt.UserRole)
         if data is None:
-            print("no user role")
+            #print("no user role")
             return
-        print(item, data)
-        print(pos)
+        #print(item, data)
+        #print(pos)
         #print(self.input_tree.get_path_to_item(item))
         #global_pos = (self.input_tree.viewport().mapToGlobal(pos))
-        print(self.input_tree.viewport().mapFromGlobal(pos))
+        #print(self.input_tree.viewport().mapFromGlobal(pos))
         global_pos = pos
         well_name = item.text(0) #if we need a well name, this is where to find it.
 
@@ -5290,7 +5377,7 @@ class MainWindow(QMainWindow):
                 self._edit_log_display_settings(log_name)
             if chosen == act_open_log_calculator:
                 log = self._action_open_log_calculator()
-                print ("logcalculator:", log)
+                #print ("logcalculator:", log)
                 if log is not None:
                     self._add_new_log_to_tree({"name":log, "type":"continuous"})
 
@@ -5403,7 +5490,7 @@ class MainWindow(QMainWindow):
             print(item.data(0, Qt.UserRole))
 
         if chosen == act_remove_this:
-            print ("Removing this item")
+            #print ("Removing this item")
             self.input_tree.remove_item(item)
             return
 

@@ -1194,15 +1194,15 @@ class CheckableTree(QtWidgets.QTreeWidget):
     def _handle_user_toggle(self, item: QtWidgets.QTreeWidgetItem):
         # Enforce policy and ignore non-checkable items
         self._apply_check_policy(item)
-        print(f"handle_user_toggle: {item.text(0)}",
-              "children=", item.childCount(),
-              "has_checkbox=", self._has_checkbox(item),
-              "policy=", self.check_policy(item),
-              "state=", item.data(0, QtCore.Qt.CheckStateRole),
-              )
+        #print(f"handle_user_toggle: {item.text(0)}",
+        #      "children=", item.childCount(),
+        #      "has_checkbox=", self._has_checkbox(item),
+        #      "policy=", self.check_policy(item),
+        #      "state=", item.data(0, QtCore.Qt.CheckStateRole),
+        #      )
 
         if not self._has_checkbox(item):
-            print("WARNING: non-checkable item toggled", item.text(0))
+            #print("WARNING: non-checkable item toggled", item.text(0))
             return
 
         state = item.checkState(0)
@@ -1211,12 +1211,12 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         if item.childCount() > 0:
             # folder toggled (only checkable folders can reach here)
-            print("WARNING: folder toggled", item.text(0))
+            #print("WARNING: folder toggled", item.text(0))
 #            self.parentToggled.connect(lambda : print("WARNING: folder toggled", item.text(0)))
 
             self.parentToggled.emit(self._item_path(item), checked, item)
-            print(id(self), "Toggled emitted")
-            print(item.flags() & QtCore.Qt.ItemIsUserCheckable)
+            #print(id(self), "Toggled emitted")
+            #print(item.flags() & QtCore.Qt.ItemIsUserCheckable)
 
             try:
                 self._updating = True
@@ -1227,9 +1227,9 @@ class CheckableTree(QtWidgets.QTreeWidget):
             return
 
         # checkable leaf toggled
-        print("WARNING: leaf toggled", item.text(0))
+        #print("WARNING: leaf toggled", item.text(0))
         self.itemToggled.emit(self._item_path(item), checked, item)
-        print (id(self), "Toggled emitted")
+        #print (id(self), "Toggled emitted")
         try:
             self._updating = True
             self._update_parents(item)

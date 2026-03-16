@@ -1647,7 +1647,7 @@ class  WellPanelWidget(QWidget):
             False if track name does not exist.
         """
 
-        print ("add_visible_track_by_name", track_name)
+        #print ("add_visible_track_by_name", track_name)
 
         track_name = (track_name or "").strip()
         if not track_name:
@@ -1673,7 +1673,7 @@ class  WellPanelWidget(QWidget):
         if redraw:
             self.draw_well_panel()
 
-        print (f"add_visible_track_by_name done:, {vt}")
+        #print (f"add_visible_track_by_name done:, {vt}")
 
         self.visible_tracks = vt
 
@@ -1690,7 +1690,7 @@ class  WellPanelWidget(QWidget):
             False if track not found or already hidden.
         """
 
-        print ("remove_visible_track_by_name", track_name, type(track_name))
+        #print ("remove_visible_track_by_name", track_name, type(track_name))
 
         if not track_name:
             return False
@@ -1719,7 +1719,7 @@ class  WellPanelWidget(QWidget):
         if redraw:
             self.draw_well_panel()
 
-        print(f"remove_visible_track_by_name done:, {self.visible_tracks}")
+        #print(f"remove_visible_track_by_name done:, {self.visible_tracks}")
 
         return True
 
@@ -1734,7 +1734,7 @@ class  WellPanelWidget(QWidget):
             False if log name does not exist.
         """
         log_name = (log_name or "").strip()
-        print ("add_visible_log_by_name", log_name)
+        #print ("add_visible_log_by_name", log_name)
         if not log_name:
             return False
 
@@ -1763,7 +1763,7 @@ class  WellPanelWidget(QWidget):
 
         self.visible_logs = vl
 
-        print(f"add_visible_log_by_name done:, {self.visible_logs}")
+        #print(f"add_visible_log_by_name done:, {self.visible_logs}")
 
         if redraw:
             self.draw_well_panel()
