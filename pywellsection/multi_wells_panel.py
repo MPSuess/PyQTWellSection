@@ -189,14 +189,15 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 
-    if offsets[0] != 0.0:
-        w = selected_wells[0]
-        top_ref_depth = w["reference_depth"] - offsets[0]
-        bottom_ref_depth = top_ref_depth + w["total_depth"]
-        print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
-        global_top_plot = min(top_ref_depth, global_top_plot)
-        global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
+    # if offsets[0] != 0.0:
+    #     w = selected_wells[0]
+    #     top_ref_depth = w["reference_depth"] - offsets[0]
+    #     bottom_ref_depth = top_ref_depth + w["total_depth"]
+    #     print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
+    #     global_top_plot = min(top_ref_depth, global_top_plot)
+    #     global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
 
+    global_top_plot, global_bottom_plot = depth_window
 
     print(f"DRAWING         global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
 

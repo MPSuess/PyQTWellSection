@@ -84,6 +84,8 @@ from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
 import logging
 import os
 
+from deepdiff import DeepDiff, Delta
+
 # This file is part of the `pywellsection` project and licensed under
 # EUPL 1.2
 # M. Peter Süss 2025
@@ -2909,7 +2911,50 @@ class MainWindow(QMainWindow):
             return
 
         # 1) update project-level stratigraphy
-        self.stratigraphy = new_strat
+        old_strat = self.all_stratigraphy
+
+        def compareList(old, new):
+
+            added = []
+            deleted = []
+            unchanged = []
+
+            position = 0
+            while position <= len(new) - 1:
+                if new[position] in old:
+                    unchanged.append(new[position])
+                elif new[position] not in old:
+                    added.append(new[position])
+
+                position += 1
+
+            index = 0
+            while index <= len(old) - 1:
+                if old[index] not in new:
+                    deleted.append(old[index])
+
+                index += 1
+
+            return added, deleted, unchanged
+
+
+
+        old = list(self.all_stratigraphy.keys())
+        new = list(new_strat.keys())
+
+        added, deleted, _ = compareList(old, new)
+
+        if len(added) > 0:
+            for a in added:
+                l = self.input_tree.add_checkable_leaf(self.c_well_tops_folder, a)
+                l.setData(0, Qt.UserRole, ("Tops", "stratigraphy", a))
+        if len(deleted) > 0:
+            for d in deleted:
+                for i in self.input_tree.get_items_in_folder(self.c_well_tops_folder, include_folders=True):
+                    if i.data(0, Qt.UserRole)[2] == d:
+                        self.input_tree.remove_item(i)
+                        break
+
         self.all_stratigraphy = new_strat
 
         # 2) push into well_panel

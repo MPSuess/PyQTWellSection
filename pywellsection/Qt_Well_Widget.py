@@ -199,8 +199,10 @@ class  WellPanelWidget(QWidget):
                 bottom_true = max(y0, y1)
                 self.offset0 = offset0
 
-                if self.current_depth_window is None:
-                    self.current_depth_window = (top_true, bottom_true)
+#                if self.current_depth_window is None:
+                    #self.current_depth_window = (top_true, bottom_true)
+                vtop, vbottom = self.get_visible_depth_range()
+                self.current_depth_window = (vtop, vbottom)
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
@@ -471,10 +473,17 @@ class  WellPanelWidget(QWidget):
         act_move_well = None
 
                 # distance threshold based on TRUE depth range
+
+        visible_top_depth, visible_bottom_depth = self.get_visible_depth_range()
+        print ("visible_top_depth, visible_bottom_depth:", visible_top_depth, visible_bottom_depth)
+
         ref_depth = well["reference_depth"]
         well_td = ref_depth + well["total_depth"]
-        depth_range = abs(well_td - ref_depth) or 1.0
-        max_pick_distance = depth_range * 0.02
+        #depth_range = abs(well_td - ref_depth) or 1.0
+        depth_range = abs(visible_top_depth - visible_bottom_depth-visible_bottom_depth) or 1.0
+        max_pick_distance = depth_range * 0.001
+        print ("max_pick_distance:", max_pick_distance)
+
         if min_dist > max_pick_distance or tops is None:
             act_add = menu.addAction(f"Add top '{depth_true:.2f} m'...'")
             act_move_well = menu.addAction(f"Move well relative position ...")
@@ -891,6 +900,51 @@ class  WellPanelWidget(QWidget):
                     return tops[idx_l[idx-1]]["depth"],tops[idx_l[idx+1]]["depth"]
 
         return min_bound, max_bound
+
+    def get_visible_depth_range(self):
+        """
+        Return the currently visible depth range of the panel in TRUE depth.
+
+        Returns:
+            (top_depth, bottom_depth) in meters (or project units)
+            or None if no axes available
+        """
+
+        # axes should be stored from last draw
+        if not hasattr(self, "axes") or not self.axes:
+            return None
+
+        # use first non-spacer axis
+        ax = None
+        for a in self.axes:
+            if a and a.get_visible():
+                ax = a
+                break
+
+        if ax is None:
+            return None
+
+        # get current ylim (plot coordinates!)
+        y0, y1 = ax.get_ylim()
+
+        # handle inverted axis (depth increases downward)
+        top_plot = min(y0, y1)
+        bottom_plot = max(y0, y1)
+
+        # convert to TRUE depth using offset
+        # (flattening shifts depth by offset)
+        offsets = getattr(self, "flatten_depths", None)
+
+        if offsets:
+            # use first well offset as reference (all axes aligned)
+            offset = offsets[0] if len(offsets) > 0 else 0.0
+        else:
+            offset = 0.0
+
+        top_true = top_plot + offset
+        bottom_true = bottom_plot + offset
+
+        return float(top_true), float(bottom_true)
 
     def _add_formation_top_at_depth(self, well_index: int, depth: float):
         """
