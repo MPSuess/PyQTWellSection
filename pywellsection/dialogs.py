@@ -34,7 +34,7 @@ import os
 
 import pandas as pd
 
-
+import random
 
 
 class HelpDialog(QDialog):
@@ -667,184 +667,6 @@ class NewTrackDialog(QDialog):
 
     def result_track(self):
         return self._result
-
-class StratigraphyEditorDialog(QDialog):
-    """
-    Table dialog to edit/add stratigraphy for the project.
-
-    Stratigraphy dict structure:
-        {
-          "Unit_A": {
-              "level": "formation",
-              "role":  "stratigraphy",   # NEW
-              "color": "#ff0000",
-              "hatch": "",
-          },
-          "Fault_1": {
-              "level": "fault",
-              "role":  "fault",
-              "color": "#0000ff",
-              "hatch": "//",
-          },
-          ...
-        }
-    """
-
-    COL_NAME  = 0
-    COL_LEVEL = 1
-    COL_ROLE  = 2
-    COL_COLOR = 3
-    COL_HATCH = 4
-
-    def __init__(self, parent, stratigraphy: dict | None):
-        super().__init__(parent)
-        self.setWindowTitle("Edit Stratigraphy")
-        self.resize(700, 400)
-
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(QLabel(
-            "Edit stratigraphic units (top = shallowest, bottom = deepest).\n"
-            "Columns:\n"
-            "  • Level – e.g. formation/member/fault/etc.\n"
-            "  • Role  – e.g. stratigraphy/fault/other, used to distinguish surfaces.",
-            self
-        ))
-
-        # Table
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Name", "Level", "Role", "Color", "Hatch"]
-        )
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table)
-
-        # Buttons: Add / Delete row
-        btn_row_layout = QHBoxLayout()
-        self.btn_add = QPushButton("Add row", self)
-        self.btn_del = QPushButton("Delete selected row(s)", self)
-        btn_row_layout.addWidget(self.btn_add)
-        btn_row_layout.addWidget(self.btn_del)
-        btn_row_layout.addStretch(1)
-        layout.addLayout(btn_row_layout)
-
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
-
-        # OK/Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        self._accepted_strat = None
-        self._load_from_stratigraphy(stratigraphy or {})
-
-    # ---------- populate / helpers ----------
-
-    def _load_from_stratigraphy(self, stratigraphy: dict):
-        """
-        Fill table from existing stratigraphy dict, preserving order.
-        """
-        keys = list(stratigraphy.keys())
-        self.table.setRowCount(len(keys))
-
-        for row, name in enumerate(keys):
-            meta  = stratigraphy.get(name, {}) or {}
-            level = meta.get("level", "")
-            role  = meta.get("role", "stratigraphy")  # default role
-            color = meta.get("color", "")
-            hatch = meta.get("hatch", "")
-
-            self.table.setItem(row, self.COL_NAME,
-                               QTableWidgetItem(str(name)))
-            self.table.setItem(row, self.COL_LEVEL,
-                               QTableWidgetItem(str(level)))
-            self.table.setItem(row, self.COL_ROLE,
-                               QTableWidgetItem(str(role)))
-            self.table.setItem(row, self.COL_COLOR,
-                               QTableWidgetItem(str(color)))
-            self.table.setItem(row, self.COL_HATCH,
-                               QTableWidgetItem(str(hatch)))
-
-    def _add_row(self):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-        # Everything starts blank; user fills Name, Level, Role, Color, Hatch
-
-    def _delete_selected_rows(self):
-        rows = sorted({idx.row() for idx in self.table.selectedIndexes()},
-                      reverse=True)
-        for r in rows:
-            self.table.removeRow(r)
-
-    def _on_accept(self):
-        """
-        Validate and build new stratigraphy OrderedDict.
-        Enforces:
-          - Name not empty
-          - Name unique
-        """
-        new_strat = OrderedDict()
-        n_rows = self.table.rowCount()
-
-        for row in range(n_rows):
-            name_item = self.table.item(row, self.COL_NAME)
-            if name_item is None:
-                continue
-
-            name = name_item.text().strip()
-            if not name:
-                # Check if the rest of row is empty; if not, complain
-                row_items = [
-                    self.table.item(row, c)
-                    for c in (self.COL_LEVEL, self.COL_ROLE,
-                              self.COL_COLOR, self.COL_HATCH)
-                ]
-                if not any(it and it.text().strip() for it in row_items):
-                    # fully empty row => skip
-                    continue
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Stratigraphy",
-                        f"Row {row+1} has metadata but no Name. "
-                        "Please fill Name or clear the row."
-                    )
-                    return
-
-            if name in new_strat:
-                QMessageBox.warning(
-                    self,
-                    "Stratigraphy",
-                    f"Duplicate unit name '{name}' in row {row+1}. "
-                    "Names must be unique."
-                )
-                return
-
-            def _get(col):
-                it = self.table.item(row, col)
-                return it.text().strip() if it is not None else ""
-
-            level = _get(self.COL_LEVEL)
-            role  = _get(self.COL_ROLE) or "stratigraphy"  # default
-            color = _get(self.COL_COLOR)
-            hatch = _get(self.COL_HATCH)
-
-            new_strat[name] = {
-                "level": level,
-                "role":  role,
-                "color": color,
-                "hatch": hatch,
-            }
-
-        self._accepted_strat = new_strat
-        self.accept()
-
-    def result_stratigraphy(self):
-        """Return OrderedDict or None."""
-        return self._accepted_strat
 
 class LayoutSettingsDialog(QDialog):
     def __init__(self, parent, well_gap_factor: float, track_width: float, vertical_scale: float,
@@ -4752,3 +4574,573 @@ class ResolveUnmatchedBasesDialog(QDialog):
                 "role": role_val,
             })
         return out
+
+def random_strat_color() -> str:
+    """Return a readable random hex color."""
+    r = random.randint(80, 220)
+    g = random.randint(80, 220)
+    b = random.randint(80, 220)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+class ColorButton(QPushButton):
+    def __init__(self, color="#cccccc", parent=None):
+        super().__init__(parent)
+        self._color = color or "#cccccc"
+        self.setText("")
+        self.setFixedWidth(42)
+        self.clicked.connect(self.choose_color)
+        self._update_style()
+
+    def _update_style(self):
+        self.setStyleSheet(
+            f"QPushButton {{ background-color: {self._color}; border: 1px solid #666; }}"
+        )
+
+    def choose_color(self):
+        col = QColorDialog.getColor(QColor(self._color), self, "Select color")
+        if col.isValid():
+            self._color = col.name()
+            self._update_style()
+
+    def color(self) -> str:
+        return self._color
+
+    def set_color(self, color: str):
+        self._color = color or "#cccccc"
+        self._update_style()
+
+
+class EditStratigraphyDialog(QDialog):
+    """
+    Table editor for self.stratigraphy dict:
+        {
+            "Formation A": {"level":"formation","color":"#ffcc00","hatch":"-","role":"stratigraphy", ...},
+            ...
+        }
+    """
+
+    COL_NAME = 0
+    COL_LEVEL = 1
+    COL_ROLE = 2
+    COL_COLOR = 3
+    COL_HATCH = 4
+
+    LEVEL_OPTIONS = [
+        "group", "supergroup", "system", "series", "formation", "member", "bed", "fault", "other"
+    ]
+    ROLE_OPTIONS = ["stratigraphy", "other", "fault"]
+    HATCH_OPTIONS = [
+        "", "-", "|", "/", "\\", "+", "x", "o", "O", ".", "*"
+    ]
+
+    def __init__(self, parent=None, stratigraphy=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Stratigraphy")
+        self.resize(920, 560)
+
+        # work on a copy
+        self._stratigraphy = dict(stratigraphy or {})
+
+        main_layout = QVBoxLayout(self)
+
+        # ---------------- filters ----------------
+        filter_layout = QHBoxLayout()
+
+        filter_layout.addWidget(QLabel("Name filter:"))
+        self.ed_name_filter = QLineEdit(self)
+        self.ed_name_filter.setPlaceholderText("Filter by unit name...")
+        filter_layout.addWidget(self.ed_name_filter)
+
+        filter_layout.addWidget(QLabel("Role filter:"))
+        self.cmb_role_filter = QComboBox(self)
+        self.cmb_role_filter.addItems(["all", "stratigraphy", "other", "fault"])
+        filter_layout.addWidget(self.cmb_role_filter)
+
+        main_layout.addLayout(filter_layout)
+
+        # ---------------- table ----------------
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Name", "Level", "Role", "Color", "Hatch"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
+        main_layout.addWidget(self.table)
+
+        # ---------------- row buttons ----------------
+        btn_layout = QHBoxLayout()
+
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_delete = QPushButton("Delete row", self)
+        self.btn_up = QPushButton("Move up", self)
+        self.btn_down = QPushButton("Move down", self)
+
+        btn_layout.addWidget(self.btn_add)
+        btn_layout.addWidget(self.btn_delete)
+        btn_layout.addSpacing(16)
+        btn_layout.addWidget(self.btn_up)
+        btn_layout.addWidget(self.btn_down)
+        btn_layout.addStretch()
+
+        main_layout.addLayout(btn_layout)
+
+        # ---------------- dialog buttons ----------------
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self
+        )
+        main_layout.addWidget(self.button_box)
+
+        # signals
+        self.btn_add.clicked.connect(self.add_row)
+        self.btn_delete.clicked.connect(self.delete_selected_row)
+        self.btn_up.clicked.connect(self.move_selected_row_up)
+        self.btn_down.clicked.connect(self.move_selected_row_down)
+
+        self.ed_name_filter.textChanged.connect(self.apply_filters)
+        self.cmb_role_filter.currentTextChanged.connect(self.apply_filters)
+
+        self.button_box.accepted.connect(self._on_accept)
+        self.button_box.rejected.connect(self.reject)
+
+        self.populate_table()
+
+    # ------------------------------------------------------------------
+    # table helpers
+    # ------------------------------------------------------------------
+    def populate_table(self):
+        self.table.setRowCount(0)
+
+        for name, props in self._stratigraphy.items():
+            self._append_table_row(
+                name=name,
+                level=props.get("level", "formation"),
+                role=props.get("role", "stratigraphy"),
+                color=props.get("color", random_strat_color()),
+                hatch=props.get("hatch", "-"),
+            )
+
+        self.apply_filters()
+
+    def _append_table_row(self, name, level, role, color, hatch):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        # name
+        name_item = QTableWidgetItem(str(name))
+        self.table.setItem(row, self.COL_NAME, name_item)
+
+        # level
+        cmb_level = QComboBox(self.table)
+        cmb_level.addItems(self.LEVEL_OPTIONS)
+        if level in self.LEVEL_OPTIONS:
+            cmb_level.setCurrentText(level)
+        else:
+            cmb_level.setCurrentText("formation")
+        self.table.setCellWidget(row, self.COL_LEVEL, cmb_level)
+
+        # role
+        cmb_role = QComboBox(self.table)
+        cmb_role.addItems(self.ROLE_OPTIONS)
+        if role in self.ROLE_OPTIONS:
+            cmb_role.setCurrentText(role)
+        else:
+            cmb_role.setCurrentText("stratigraphy")
+        self.table.setCellWidget(row, self.COL_ROLE, cmb_role)
+
+        # color
+        color_btn = ColorButton(color=color, parent=self.table)
+        self.table.setCellWidget(row, self.COL_COLOR, color_btn)
+
+        # hatch
+        cmb_hatch = QComboBox(self.table)
+        cmb_hatch.addItems(self.HATCH_OPTIONS)
+        if hatch in self.HATCH_OPTIONS:
+            cmb_hatch.setCurrentText(hatch)
+        else:
+            cmb_hatch.setCurrentText("-")
+        self.table.setCellWidget(row, self.COL_HATCH, cmb_hatch)
+
+    def add_row(self):
+        self._append_table_row(
+            name="NewUnit",
+            level="formation",
+            role="stratigraphy",
+            color=random_strat_color(),
+            hatch="-",
+        )
+        row = self.table.rowCount() - 1
+        self.table.selectRow(row)
+        self.apply_filters()
+
+    def delete_selected_row(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        self.table.removeRow(row)
+
+    def move_selected_row_up(self):
+        row = self.table.currentRow()
+        if row <= 0:
+            return
+        self._swap_rows(row, row - 1)
+        self.table.selectRow(row - 1)
+
+    def move_selected_row_down(self):
+        row = self.table.currentRow()
+        if row < 0 or row >= self.table.rowCount() - 1:
+            return
+        self._swap_rows(row, row + 1)
+        self.table.selectRow(row + 1)
+
+    def _swap_rows(self, r1, r2):
+        """Swap row contents including widgets."""
+        # extract row 1
+        name1 = self.table.item(r1, self.COL_NAME).text() if self.table.item(r1, self.COL_NAME) else ""
+        level1 = self.table.cellWidget(r1, self.COL_LEVEL).currentText()
+        role1 = self.table.cellWidget(r1, self.COL_ROLE).currentText()
+        color1 = self.table.cellWidget(r1, self.COL_COLOR).color()
+        hatch1 = self.table.cellWidget(r1, self.COL_HATCH).currentText()
+
+        # extract row 2
+        name2 = self.table.item(r2, self.COL_NAME).text() if self.table.item(r2, self.COL_NAME) else ""
+        level2 = self.table.cellWidget(r2, self.COL_LEVEL).currentText()
+        role2 = self.table.cellWidget(r2, self.COL_ROLE).currentText()
+        color2 = self.table.cellWidget(r2, self.COL_COLOR).color()
+        hatch2 = self.table.cellWidget(r2, self.COL_HATCH).currentText()
+
+        # rewrite row 1
+        self.table.item(r1, self.COL_NAME).setText(name2)
+        self.table.cellWidget(r1, self.COL_LEVEL).setCurrentText(level2)
+        self.table.cellWidget(r1, self.COL_ROLE).setCurrentText(role2)
+        self.table.cellWidget(r1, self.COL_COLOR).set_color(color2)
+        self.table.cellWidget(r1, self.COL_HATCH).setCurrentText(hatch2)
+
+        # rewrite row 2
+        self.table.item(r2, self.COL_NAME).setText(name1)
+        self.table.cellWidget(r2, self.COL_LEVEL).setCurrentText(level1)
+        self.table.cellWidget(r2, self.COL_ROLE).setCurrentText(role1)
+        self.table.cellWidget(r2, self.COL_COLOR).set_color(color1)
+        self.table.cellWidget(r2, self.COL_HATCH).setCurrentText(hatch1)
+
+    # ------------------------------------------------------------------
+    # filtering
+    # ------------------------------------------------------------------
+    def apply_filters(self):
+        name_filter = self.ed_name_filter.text().strip().lower()
+        role_filter = self.cmb_role_filter.currentText().strip().lower()
+
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, self.COL_NAME)
+            name_val = name_item.text().strip().lower() if name_item else ""
+            role_val = self.table.cellWidget(row, self.COL_ROLE).currentText().strip().lower()
+
+            visible = True
+
+            if name_filter and name_filter not in name_val:
+                visible = False
+
+            if role_filter != "all" and role_val != role_filter:
+                visible = False
+
+            self.table.setRowHidden(row, not visible)
+
+    # ------------------------------------------------------------------
+    # output
+    # ------------------------------------------------------------------
+    def get_stratigraphy(self):
+        """
+        Return updated stratigraphy dict, preserving table order.
+        """
+        out = {}
+
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, self.COL_NAME)
+            if not name_item:
+                continue
+
+            name = name_item.text().strip()
+            if not name:
+                continue
+
+            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
+            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
+            color = self.table.cellWidget(row, self.COL_COLOR).color()
+            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
+
+            out[name] = {
+                "level": level,
+                "role": role,
+                "color": color,
+                "hatch": hatch,
+            }
+
+        return out
+
+    def acceptxs(self):
+        # validate duplicate names
+        names = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, self.COL_NAME)
+            if item:
+                nm = item.text().strip()
+                if nm:
+                    names.append(nm)
+
+        if len(names) != len(set(names)):
+            QMessageBox.warning(self, "Duplicate names", "Stratigraphic unit names must be unique.")
+            return
+
+        super().accept()
+
+    def _on_accept(self):
+        """
+        Validate and build new stratigraphy OrderedDict.
+        Enforces:
+          - Name not empty
+          - Name unique
+        """
+        new_strat = OrderedDict()
+        n_rows = self.table.rowCount()
+
+        for row in range(n_rows):
+            name_item = self.table.item(row, self.COL_NAME)
+            print(name_item)
+            if name_item is None:
+                continue
+
+            name = name_item.text().strip()
+            if not name:
+                # Check if the rest of row is empty; if not, complain
+                row_items = [
+                    self.table.item(row, c)
+                    for c in (self.COL_LEVEL, self.COL_ROLE,
+                              self.COL_COLOR, self.COL_HATCH)
+                ]
+                if not any(it and it.text().strip() for it in row_items):
+                    # fully empty row => skip
+                    continue
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Stratigraphy",
+                        f"Row {row+1} has metadata but no Name. "
+                        "Please fill Name or clear the row."
+                    )
+                    return
+
+            if name in new_strat:
+                QMessageBox.warning(
+                    self,
+                    "Stratigraphy",
+                    f"Duplicate unit name '{name}' in row {row+1}. "
+                    "Names must be unique."
+                )
+                return
+
+            def _get(col):
+                it = self.table.item(row, col)
+
+                return it.text().strip() if it is not None else ""
+
+
+            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
+            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
+            color = self.table.cellWidget(row, self.COL_COLOR).color()
+            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
+
+            new_strat[name] = {
+                "level": level,
+                "role":  role,
+                "color": color,
+                "hatch": hatch,
+            }
+
+        self._accepted_strat = new_strat
+        self.accept()
+
+    def result_stratigraphy(self):
+        """Return OrderedDict or None."""
+        return self._accepted_strat
+
+
+
+class StratigraphyEditorDialog(QDialog):
+    """
+    Table dialog to edit/add stratigraphy for the project.
+
+    Stratigraphy dict structure:
+        {
+          "Unit_A": {
+              "level": "formation",
+              "role":  "stratigraphy",   # NEW
+              "color": "#ff0000",
+              "hatch": "",
+          },
+          "Fault_1": {
+              "level": "fault",
+              "role":  "fault",
+              "color": "#0000ff",
+              "hatch": "//",
+          },
+          ...
+        }
+    """
+
+    COL_NAME  = 0
+    COL_LEVEL = 1
+    COL_ROLE  = 2
+    COL_COLOR = 3
+    COL_HATCH = 4
+
+    def __init__(self, parent, stratigraphy: dict | None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Stratigraphy")
+        self.resize(700, 400)
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "Edit stratigraphic units (top = shallowest, bottom = deepest).\n"
+            "Columns:\n"
+            "  • Level – e.g. formation/member/fault/etc.\n"
+            "  • Role  – e.g. stratigraphy/fault/other, used to distinguish surfaces.",
+            self
+        ))
+
+        # Table
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(
+            ["Name", "Level", "Role", "Color", "Hatch"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        # Buttons: Add / Delete row
+        btn_row_layout = QHBoxLayout()
+        self.btn_add = QPushButton("Add row", self)
+        self.btn_del = QPushButton("Delete selected row(s)", self)
+        btn_row_layout.addWidget(self.btn_add)
+        btn_row_layout.addWidget(self.btn_del)
+        btn_row_layout.addStretch(1)
+        layout.addLayout(btn_row_layout)
+
+        self.btn_add.clicked.connect(self._add_row)
+        self.btn_del.clicked.connect(self._delete_selected_rows)
+
+        # OK/Cancel
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._accepted_strat = None
+        self._load_from_stratigraphy(stratigraphy or {})
+
+    # ---------- populate / helpers ----------
+
+    def _load_from_stratigraphy(self, stratigraphy: dict):
+        """
+        Fill table from existing stratigraphy dict, preserving order.
+        """
+        keys = list(stratigraphy.keys())
+        self.table.setRowCount(len(keys))
+
+        for row, name in enumerate(keys):
+            meta  = stratigraphy.get(name, {}) or {}
+            level = meta.get("level", "")
+            role  = meta.get("role", "stratigraphy")  # default role
+            color = meta.get("color", "")
+            hatch = meta.get("hatch", "")
+
+            self.table.setItem(row, self.COL_NAME,
+                               QTableWidgetItem(str(name)))
+            self.table.setItem(row, self.COL_LEVEL,
+                               QTableWidgetItem(str(level)))
+            self.table.setItem(row, self.COL_ROLE,
+                               QTableWidgetItem(str(role)))
+            self.table.setItem(row, self.COL_COLOR,
+                               QTableWidgetItem(str(color)))
+            self.table.setItem(row, self.COL_HATCH,
+                               QTableWidgetItem(str(hatch)))
+
+    def _add_row(self):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        # Everything starts blank; user fills Name, Level, Role, Color, Hatch
+
+    def _delete_selected_rows(self):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()},
+                      reverse=True)
+        for r in rows:
+            self.table.removeRow(r)
+
+    def _on_accept(self):
+        """
+        Validate and build new stratigraphy OrderedDict.
+        Enforces:
+          - Name not empty
+          - Name unique
+        """
+        new_strat = OrderedDict()
+        n_rows = self.table.rowCount()
+
+        for row in range(n_rows):
+            name_item = self.table.item(row, self.COL_NAME)
+            if name_item is None:
+                continue
+
+            name = name_item.text().strip()
+            if not name:
+                # Check if the rest of row is empty; if not, complain
+                row_items = [
+                    self.table.item(row, c)
+                    for c in (self.COL_LEVEL, self.COL_ROLE,
+                              self.COL_COLOR, self.COL_HATCH)
+                ]
+                if not any(it and it.text().strip() for it in row_items):
+                    # fully empty row => skip
+                    continue
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Stratigraphy",
+                        f"Row {row+1} has metadata but no Name. "
+                        "Please fill Name or clear the row."
+                    )
+                    return
+
+            if name in new_strat:
+                QMessageBox.warning(
+                    self,
+                    "Stratigraphy",
+                    f"Duplicate unit name '{name}' in row {row+1}. "
+                    "Names must be unique."
+                )
+                return
+
+            def _get(col):
+                it = self.table.item(row, col)
+                return it.text().strip() if it is not None else ""
+
+            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
+            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
+            color = self.table.cellWidget(row, self.COL_COLOR).color()
+            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
+
+
+            new_strat[name] = {
+                "level": level,
+                "role":  role,
+                "color": color,
+                "hatch": hatch,
+            }
+
+        self._accepted_strat = new_strat
+        self.accept()
+
+    def result_stratigraphy(self):
+        """Return OrderedDict or None."""
+        return self._accepted_strat

@@ -153,11 +153,12 @@ class  WellPanelWidget(QWidget):
         self._flatten_depths = []
         self.current_depth_window = None  # (top_true, bottom_true) or None
 
-        self.draw_well_panel()
+        #self.draw_well_panel()
         self.enable_top_picking()
         self.offset0 = 0
 
     def draw_well_panel(self):
+
 
 
         redraw_requested = self.panel_settings.get("redraw_requested",None)
@@ -1244,7 +1245,7 @@ class  WellPanelWidget(QWidget):
 
     def set_visible_tracks(self, visible_tracks):
         self.visible_tracks = visible_tracks
-        self.draw_well_panel()
+        #self.draw_well_panel()
 
     def get_visible_tracks(self):
         return  self.visible_tracks
@@ -2101,7 +2102,7 @@ class WellPanelDock(QDockWidget):
 
         self.well_panel = WellPanelWidget(wells, tracks, stratigraphy, panel_settings, title)
         self.setWidget(self.well_panel)
-        self.well_panel.draw_well_panel()
+        #self.well_panel.draw_well_panel()
 
         self.title_background_color = None
         self.window_activated()
