@@ -3108,7 +3108,7 @@ class BitmapPlacementDialog(QDialog):
 
         self._active_pick = {"well_name": wname, "which": which}
 
-        # Call into panel to arm one-click pick
+        #Call into panel to arm one-click pick
         if self.panel is None or not hasattr(self.panel, "arm_bitmap_pick"):
             QMessageBox.warning(
                 self, "Pick",

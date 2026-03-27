@@ -185,6 +185,8 @@ def setup_well_widget_tree(self):
     self.stratigraphy_root_item.setCheckState(0, Qt.Unchecked)
     self.well_tree.addTopLevelItem(self.stratigraphy_root_item)
 
+    self.well_tree.hide()
+
 def build_stratigraphic_column_tree(tree_widget, strat_data):
     """
     Build a root item "Stratigraphic column" in a QTreeWidget and populate up to 7 levels.

@@ -1947,6 +1947,10 @@ class MainWindow(QMainWindow):
         self._rebuild_well_panel_from_tree()
 
     def _populate_well_tops_tree(self):
+        """Rebuild the tree from self.all_wells, preserving selections if possible."""
+        print("Populate Well Log Tree. No more implemented to be replaced")
+
+    def _populate_well_tops_treexx(self):
         if self.tops_tree_populated:
             self._update_tops_tree()
         else:
@@ -2494,50 +2498,6 @@ class MainWindow(QMainWindow):
 
         return
 
-
-    def _rebuild_well_panel_from_tree_o(self):
-        """Collect checked wells (by name) and send to well_panel."""
-        checked_names = set()
-
-        #LOG.debug("rebuild_well_panel_from_tree")
-
-        root = self.stratigraphy_root
-        for i in range(root.childCount()):
-            it = root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                checked_names.add(it.data(0, Qt.UserRole))
-        selected = checked_names
-
-        self.panel.set_visible_tops(selected)
-
-        checked_names = set()
-
-        root = self.track_root_item
-        for i in range(root.childCount()):
-            it = root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                checked_names.add(it.data(0, Qt.UserRole))
-        selected = checked_names
-
-        #LOG.debug (f"rebuild_well_panel tracks{selected}")
-
-        self.panel.set_visible_tracks(selected)
-
-        checked_names = set()
-
-        root = self.well_root_item
-        for i in range(root.childCount()):
-            it = root.child(i)
-            if it.checkState(0) == Qt.Checked:
-                checked_names.add(it.data(0, Qt.UserRole))
-
-        # Map names → well dicts (keep original order)
-        selected = [w for w in self.all_wells if (w.get("name") in checked_names)]
-        # If none selected, you can either show none or all; here: show none
-        #self.panel.set_wells(selected)
-
-        self.panel.set_visible_wells(checked_names)
-
     def _rebuild_wells_from_tree(self):
         """Collect checked wells (by name) and send to well_panel."""
         checked_names = set()
@@ -2657,7 +2617,6 @@ class MainWindow(QMainWindow):
         #if visible and len(visible) == descendants.childCount():
 
         self.panel.set_visible_tracks(visible)
-
 
     def _rebuild_visible_tracks_from_treex(self):
         """Collect checked tracks and inform the well_panel."""
@@ -3835,7 +3794,7 @@ class MainWindow(QMainWindow):
 
         # Use the active well_panel (docked) if you implemented it; otherwise self.panel
         #well_panel = getattr(self, "active_well_panel", None) or self.panel
-        well_panel = self.active_window
+        well_panel = self.panel
 
 
         dlg = BitmapPlacementDialog(

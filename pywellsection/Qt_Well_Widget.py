@@ -1543,7 +1543,10 @@ class  WellPanelWidget(QWidget):
 
 
         if well_name not in vw:
-            vw.append(well_name)
+            if type(vw) is not list:
+                vw.add(well_name)
+            else:
+                vw.append(well_name)
 
         self.visible_wells = vw
 
