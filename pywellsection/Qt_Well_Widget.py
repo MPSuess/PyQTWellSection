@@ -1520,6 +1520,12 @@ class  WellPanelWidget(QWidget):
 
         Returns True if the well was added (or already present), False if name not found in panel.wells.
         """
+
+        print ("add_visible_well_by_name", well_name)
+
+        if well_name in self.visible_wells:
+            return True
+
         well_name = (well_name or "").strip()
         if not well_name:
             return False
@@ -1534,13 +1540,12 @@ class  WellPanelWidget(QWidget):
         vw = getattr(self, "visible_wells", None)
         if vw is None:
             vw = list(all_names)  # start from "all"
-            self.visible_wells = vw
 
-        if vw == set():
-            vw = list()
 
         if well_name not in vw:
             vw.append(well_name)
+
+        self.visible_wells = vw
 
         # Keep optional explicit ordering consistent
         if hasattr(self, "well_order"):
@@ -1551,6 +1556,7 @@ class  WellPanelWidget(QWidget):
                 wo.append(well_name)
 
         if redraw:
+            self.set_draw_well_panel(True)
             self.draw_well_panel()
 
         return True
@@ -1723,7 +1729,10 @@ class  WellPanelWidget(QWidget):
             return True
 
         if track_name not in vt:
-            vt.append(track_name)
+            if type(vt) is list:
+                vt.append(track_name)
+            else:
+                vt.add(track_name)
 
         if redraw:
             self.draw_well_panel()
@@ -1974,7 +1983,10 @@ class  WellPanelWidget(QWidget):
             return True
 
         if bitmap_name not in vbl:
-            vbl.append(bitmap_name)
+            if type(vbl) is list:
+                vbl.append(bitmap_name)
+            else:
+                vbl.add(bitmap_name)
 
         if redraw:
             self.draw_well_panel()

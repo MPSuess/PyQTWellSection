@@ -103,6 +103,8 @@ LOG.setLevel("ERROR")
 
 PROJECT_FILE_VERSION = 1.0  # bump when you change project schema
 
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -717,6 +719,10 @@ class MainWindow(QMainWindow):
                 return
 
         # enforce .pws extension
+
+        if not path.lower():
+            return
+
         if path.lower().endswith(".json"):
             path = path[:-5] + ".pwj"
         if not path.lower().endswith(".pwj"):
@@ -912,7 +918,8 @@ class MainWindow(QMainWindow):
             wi["logs"] = logs
 
             self.all_wells.append(wi)
-            self._add_new_well_to_tree(new_name)
+            #self._add_new_well_to_tree(new_name)
+            self._add_new_well_to_input_tree(new_name)
             for mnem, _ in logs.items():
                 #target_well["logs"][mnem] = log_def
                 self._add_log_to_well_in_input_tree(new_name, mnem)
@@ -928,13 +935,17 @@ class MainWindow(QMainWindow):
             self._add_continuous_log_to_logs_in_input_tree(mnem)
 
         # Update well_panel + tree views
-        self.panel.set_wells(self.all_wells)
-        self.panel.draw_well_panel()
+
 
         # refresh tree sections
-        self._populate_well_tree()
+#        self._populate_well_tree()
         #self._populate_well_log_tree()
         self._populate_well_track_tree()
+
+        self.panel.set_wells(self.all_wells)
+
+
+        self.panel.draw_well_panel()
 
         QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
 
@@ -1308,6 +1319,11 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+
+
+
+
+
         ok = import_schichtenverzeichnis(self, self.project, path)
         if ok:
             #print (self.project.all_stratigraphy)
@@ -1403,7 +1419,7 @@ class MainWindow(QMainWindow):
 
             well_folder = self.input_tree.add_parent(root,well_name)
             self.input_tree.set_accept_children_drop(well_folder, False)
-            well_folder.setData(0, Qt.UserRole, (w.get("name"),"Well"))
+            well_folder.setData(0, Qt.UserRole, (w.get("name"),"Well","None"))
 
             # --- subfolders ---
             logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
@@ -1471,8 +1487,9 @@ class MainWindow(QMainWindow):
         self.input_tree.set_accept_children_drop(track_item, False)
         self.input_tree.lock_leaf_movement(track_item)
         track_item.setData(0, Qt.UserRole, ("Track", new_track, "None"))
-        state = Qt.Unchecked
+        state = Qt.Checked
         track_item.setCheckState(0, state)
+        self.panel.draw_well_panel()
 
     def _add_log_to_logs(self, log_name, log_type):
 
@@ -1487,6 +1504,24 @@ class MainWindow(QMainWindow):
         it.setData(0, Qt.UserRole, ("Logs", log_type, log_name))
         state = Qt.Unchecked
         it.setCheckState(0, state)
+
+    def _add_new_well_to_input_tree(self,well_name):
+        root = self.c_well_folder
+        well_folder = self.input_tree.add_parent(root, well_name)
+        self.input_tree.set_accept_children_drop(well_folder, False)
+        well_folder.setData(0, Qt.UserRole, (well_name, "Well", "None"))
+
+        # --- subfolders ---
+        logs_folder = self.input_tree.add_noncheckable_folder(well_folder, "Logs")
+        self.input_tree.set_accept_children_drop(logs_folder, False)
+        self.input_tree.lock_leaf_movement(logs_folder)
+
+        cont_folder = self.input_tree.add_noncheckable_folder(logs_folder, "continuous")
+        disc_folder = self.input_tree.add_noncheckable_folder(logs_folder, "discrete")
+        bmp_folder = self.input_tree.add_noncheckable_folder(logs_folder, "bitmap")
+        comp_folder = self.input_tree.add_noncheckable_folder(well_folder, "Completions")
+
+#        self.panel.draw_well_panel()
 
     def _add_continuous_log_to_logs_in_input_tree(self, log_name):
         root = self.cont_folder
@@ -1519,7 +1554,8 @@ class MainWindow(QMainWindow):
                                 item.setData(0, Qt.UserRole, ("Continuous_Log", well_name, log_name))
                             break
 
-    def _add_core_bitmap_to_input_tree(self, name, well_name, track_name):
+
+    def _add_core_bitmap_to_input_tree(self, key, well_name, track_name, label = "test"):
         """Add a core bitmap to the input tree."""
         # Add bitmap to well tree
         #print(f"Adding bitmap to well tree: {name} ({well_name}, {track_name})")
@@ -1533,31 +1569,31 @@ class MainWindow(QMainWindow):
                 folder = self.input_tree.get_items_in_folder(well)
                 for f in folder:
                     if f.text(0) == "bitmap":
-                        item = self.input_tree.add_checkable_leaf(f, name)
-                        item.setData(0, Qt.UserRole, ("Bitmap", well_name, name))
+                        item = self.input_tree.add_noncheckable_leaf(f, label)
+                        item.setData(0, Qt.UserRole, ("Bitmap", well_name, key))
                         break
         # Add bitmap to track
-        root = self.c_well_track_folder
-        if not root:
-            return
-        tracks = self.input_tree.get_items_in_folder(root)
-        found = False
-        for track in tracks:
-            if track.text(0) == track_name:
-                folder = self.input_tree.get_items_in_folder(track)
-                item = self.input_tree.add_noncheckable_leaf(folder, name)
-                found = True
-                break
-        if not found:
-            folder = self.input_tree.add_checkable_leaf(root, track_name)
-            folder.setData(0, Qt.UserRole, ("Track", track_name, "None"))
-            #item = self.input_tree.add_noncheckable_leaf(folder, name)
+        # root = self.c_well_track_folder
+        # if not root:
+        #     return
+        # tracks = self.input_tree.get_items_in_folder(root)
+        # found = False
+        # for track in tracks:
+        #     if track.text(0) == track_name:
+        #         folder = self.input_tree.get_items_in_folder(track)
+        #         item = self.input_tree.add_noncheckable_leaf(folder, name)
+        #         found = True
+        #         break
+        # if not found:
+        #     folder = self.input_tree.add_checkable_leaf(root, track_name)
+        #     folder.setData(0, Qt.UserRole, ("Track", track_name, "None"))
+        #     #item = self.input_tree.add_noncheckable_leaf(folder, name)
         # Add bitmap to logs
         root = self.bmp_folder
         if not root:
             return
-        it = self.input_tree.add_checkable_leaf(root, name)
-        it.setData(0, Qt.UserRole, ("Logs", "Bitmap", name))
+        it = self.input_tree.add_checkable_leaf(root, label)
+        it.setData(0, Qt.UserRole, ("Logs", "Bitmap", key))
 
     def _add_new_log_to_tree(self, log = {}):
         if log.get("type") == "continuous":
@@ -2173,6 +2209,7 @@ class MainWindow(QMainWindow):
 
         self.well_tree.blockSignals(False)
         self._rebuild_visible_tracks_from_tree()
+        self.panel.draw_well_panel()
 
     def _populate_window_tree(self):
         """Populate the tree of windows in the main window."""
@@ -2607,6 +2644,22 @@ class MainWindow(QMainWindow):
         self.panel.set_visible_bitmaps(visible_set)
 
     def _rebuild_visible_tracks_from_tree(self):
+
+        descendants = self.input_tree.get_items_in_folder(self.c_well_track_folder, recursive=True)
+
+        visible = set()
+        for d in descendants:
+            if d.checkState(0) == Qt.Checked:
+                item_info = d.data(0, Qt.UserRole)
+                nm = item_info[1]
+                if nm:
+                    visible.add(nm)
+        #if visible and len(visible) == descendants.childCount():
+
+        self.panel.set_visible_tracks(visible)
+
+
+    def _rebuild_visible_tracks_from_treex(self):
         """Collect checked tracks and inform the well_panel."""
         root = self.track_root_item
         visible = set()
@@ -3526,6 +3579,10 @@ class MainWindow(QMainWindow):
                 return window
         return None
 
+    def test(self, key, name, track_name):
+        print("test")
+        return
+
     def _action_load_bitmap_into_bitmap_track(self, track_name: str):
         """
         Load an image and assign it to a selected well under the bitmap key
@@ -3546,15 +3603,15 @@ class MainWindow(QMainWindow):
             if t.get("name") == track_name:
                 track = t
                 break
-        if track is None or "bitmaps" not in track:
+        if track is None or "bitmap" not in track:
             QMessageBox.warning(self, "Load bitmap", f"Track '{track_name}' is not a bitmap track.")
             return
 
         bmp_cfg = track.get("bitmap", {}) or {}
-        key = bmp_cfg.get("key", None)
-        if not key:
-            QMessageBox.warning(self, "Load bitmap", "Bitmap track has no 'key' configured.")
-            return
+        #key = bmp_cfg.get("key", None)
+        #if not key:
+        #    QMessageBox.warning(self, "Load bitmap", "Bitmap track has no 'key' configured.")
+        key = new_uid8()
 
         well_names = [w.get("name") for w in self.all_wells if w.get("name")]
         if not well_names:
@@ -3571,6 +3628,9 @@ class MainWindow(QMainWindow):
 
         project_path = self.current_project_path
 
+        if project_path is None:
+            QMessageBox.warning(self, "Load bitmap", "First save the project!")
+
         base_dir = os.path.dirname(os.path.abspath(project_path))
         project_stem = os.path.splitext(os.path.basename(project_path))[0]  # _project_name
         if project_stem.endswith(".json"):
@@ -3578,7 +3638,7 @@ class MainWindow(QMainWindow):
         data_dir_name = f"{project_stem}.pdj"
         data_dir = os.path.join(base_dir, data_dir_name)
 
-        bitmap_name, bitmap_extention = os.path.splitext(res["bitmap_path"])
+        bitmap_name, bitmap_extention = os.path.splitext(res["path"])
 
         new_bitmap_path = os.path.join(data_dir,f"{res['well_name']}_{key}.{bitmap_extention}" )
 
@@ -3587,8 +3647,6 @@ class MainWindow(QMainWindow):
 
         bitmap_copy = shutil.copy2(bitmap_path, data_dir)
         os.rename(bitmap_copy, new_bitmap_path)
-
-
 
         # Resolve well
         well = None
@@ -3603,15 +3661,25 @@ class MainWindow(QMainWindow):
         # Store under this track key
         bitmaps = well.setdefault("bitmaps", {})
         bitmaps[key] = {
-            "path": res["path"],
+            "name": res["label"],
+            "path": new_bitmap_path,
             "top_depth": res["top_depth"],
             "base_depth": res["base_depth"],
-            "label": res["label"],
-            "alpha": res["alpha"],
-            "interpolation": res["interpolation"],
-            "cmap": res["cmap"],
-            "flip_vertical": res["flip_vertical"],
+            "track": track_name,
+            "flip_vertical":res["flip_vertical"],
         }
+
+        print(f"Bitmap loaded into track '{track_name}' for well '{res['well_name']}'")
+
+        self._add_core_bitmap_to_input_tree(key, res["well_name"], track_name, label = res["label"])
+
+        #key = res["key"]
+        #well_name = res["well_name"]
+
+
+        print(key, well_name,track_name)
+
+        #self.test(res["key"], res["well_name"], track_name)
 
         # Redraw
         if hasattr(self, "panel"):
@@ -3631,7 +3699,7 @@ class MainWindow(QMainWindow):
           well["bitmaps"][key] = {path, top_depth, base_depth, ...}
         """
 
-        #print("Loading core bitmap to well...")
+        print("Loading core bitmap to well...")
 
         if not getattr(self, "all_wells", None):
             QMessageBox.information(self, "Load core bitmap", "No wells in project.")
@@ -3692,10 +3760,6 @@ class MainWindow(QMainWindow):
             "top_depth": res["top_depth"],
             "base_depth": res["base_depth"],
             "track": res["track"],
-            # "alpha": res["alpha"],
-            # "cmap": res["cmap"],
-            # "interpolation": res["interpolation"],
-            # "flip_vertical": res["flip_vertical"],
         }
 
         # ensure we have a bitmap track to display it
@@ -3716,7 +3780,7 @@ class MainWindow(QMainWindow):
 
         #print("Now adding bitmap to input_tree")
 
-        self._add_core_bitmap_to_input_tree(res["key"], res["well_name"], res["track"])
+        self._add_core_bitmap_to_input_tree(res["key"], res["well_name"], res["track"], label = res["name"])
 
     def _action_add_well_panel_dock(self):
         dock = WellPanelDock(
@@ -4048,50 +4112,21 @@ class MainWindow(QMainWindow):
         dlg = LogDisplaySettingsDialog(self, log_name, base_cfg)
         if dlg.exec_() == QDialog.Accepted:
             new_cfg = dlg.result_config()
-            if new_cfg:
-                # store back into the track configuration
-                base_cfg.update(new_cfg)
+        if new_cfg:
+             #store back into the track configuration
+            base_cfg.update(new_cfg)
+        #
+        # for track in self.all_tracks:
+        #     for log_cfg in track.get("logs", []):
+        #         if log_cfg.get("log") != log_name:
+        #             continue
+        #         else:
+        #             log_cfg = base_cfg
 
                 # redraw
-                self.panel.draw_well_panel()
+            self.panel.draw_well_panel()
 
-        # color = base_cfg.get("color", "black")
-        # xscale = base_cfg.get("xscale", "linear")
-        # direction = base_cfg.get("direction", "normal")
-        # xlim = base_cfg.get("xlim", None)
-        #
-        # # 2) Open dialog
-        # dlg = LogDisplaySettingsDialog(self, log_name, color, xscale, direction, xlim)
-        # if dlg.exec_() != QDialog.Accepted:
-        #     return
-        #
-        # new_color, new_xscale, new_direction, new_xlim = dlg.values()
-        #
-        # 3) Apply updated settings to ALL track configs with this log
-        for track in self.all_tracks:
-            for log_cfg in track.get("logs", []):
-                if log_cfg.get("log") != log_name:
-                    continue
-                else:
-                    log_cfg = base_cfg
 
-        #         if new_color is not None:
-        #             log_cfg["color"] = new_color
-        #         else:
-        #             log_cfg.pop("color", None)
-        #
-        #         log_cfg["xscale"] = new_xscale or "linear"
-        #         log_cfg["direction"] = new_direction or "normal"
-        #
-        #         if new_xlim is not None:
-        #             log_cfg["xlim"] = new_xlim
-        #         else:
-        #             log_cfg.pop("xlim", None)  # auto scale
-        #
-        # # 4) Sync with well_panel and redraw
-        # if hasattr(self, "panel"):
-        #     self.panel.tracks = self.all_tracks
-        #     self.panel.draw_well_panel()
 
     def _move_well(self, well_name: str, direction: int):
         """
@@ -4227,6 +4262,39 @@ class MainWindow(QMainWindow):
         #     print(well.text(0))
         #     if well.text(0) == well_name:
         #         print(f"well found: {well.text(0)}")
+
+    def _delete_bitmap_from_input_tree (self, bitmap_name: str, item: QTreeWidgetItem,
+                                      confirm: bool = True):
+        if confirm:
+            res = QMessageBox.question(
+                self,
+                "Delete bitmap",
+                f"Delete bitmap '{bitmap_name}' from the project?\n\n"
+                "This removes the bitmap.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if res != QMessageBox.Yes:
+                return
+
+
+        if bitmap_name in self.all_bitmaps:
+            self.all_bitmaps.remove(bitmap_name)
+            self.panel.remove_visible_bitmap_by_name(bitmap_name)
+
+        #
+        # for bitmap in self.all_bitmaps:
+        #     if bitmap.get("name") == bitmap_name:
+        #         self.all_bitmaps.remove(bitmap)
+        #         break
+
+        descendants = self.input_tree.get_items_in_folder(self.bmp_folder, include_folders=True)
+        for d in descendants:
+            if d.text(0) == bitmap_name:
+                self.input_tree.remove_item(d)
+                break
+
+        self.input_tree.remove_item(item)
 
     def _iter_all_well_panels(self):
         """
@@ -4744,6 +4812,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
+
+
     def _delete_bitmap_key_from_all_wells(self, bitmap_key: str, confirm: bool = True):
         """
         Delete a bitmap key from ALL wells (useful for 'delete track images').
@@ -4790,6 +4860,8 @@ class MainWindow(QMainWindow):
         """
         Resolve bitmap key from bitmap track and delete it from all wells.
         """
+
+
         track = next((t for t in getattr(self, "tracks", []) if t.get("name") == track_name), None)
         if track is None or "bitmap" not in track:
             QMessageBox.information(self, "Delete bitmaps", "Selected track is not a bitmap track.")
@@ -5174,7 +5246,7 @@ class MainWindow(QMainWindow):
             return 0
 
         item_info = item.data(0, Qt.UserRole)
-        #print(item_info)
+        print(item_info,"toggle on is:", self.toggle_on)
         if self.toggle_on:
             if item_info[1] == "Wells":
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
@@ -5217,11 +5289,11 @@ class MainWindow(QMainWindow):
                         self.panel.remove_visible_discrete_log_by_name(item_info[0])
             elif item_info[1]== "Bitmap":
                 if checked:
-                    if not self.panel.log_is_visible(item_info[2]):
-                        self.panel.add_visible_bitmap_by_name(item_info[0])
+                    if not self.panel.bitmap_is_visible(item_info[2]):
+                        self.panel.add_visible_bitmap_by_name(item_info[2])
                 else:
-                    if self.panel.log_is_visible(item_info[2]):
-                        self.panel.remove_visible_bitmap_by_name(item_info[0])
+                    if self.panel.bitmap_is_visible(item_info[2]):
+                        self.panel.remove_visible_bitmap_by_name(item_info[2])
             self.toggle_on = False
             return
         else:
@@ -5264,9 +5336,10 @@ class MainWindow(QMainWindow):
                 self.panel.draw_well_panel()
             elif item_info[1]== "Well":
                 if checked:
-                    self.panel.add_visible_well_by_name(item_info[0])
+                    self.panel.add_visible_well_by_name(item_info[0], redraw=True)
                 else:
-                    self.panel.remove_visible_well_by_name(item_info[0])
+                    self.panel.remove_visible_well_by_name(item_info[0], redraw=True)
+
             elif item_info[0]== "Well Tops":
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
                 #self.active_window.redraw_requested = False
@@ -5291,7 +5364,7 @@ class MainWindow(QMainWindow):
                             self.panel.add_visible_track_by_name(d_info[1], redraw=False)
                         else:
                             self.panel.remove_visible_track_by_name(d_info[1], redraw=False)
-                    self.panel.draw_well_panel()
+                self.panel.draw_well_panel()
             elif item_info[0]== "Logs":
                 descendents = self.input_tree.get_items_in_folder(item, include_folders=True)
                 for d in descendents:
@@ -5352,7 +5425,7 @@ class MainWindow(QMainWindow):
                             self.panel.remove_visible_discrete_log_by_name(d_info[0], redraw=False)
                     if d_info is not None and d_info[1] == "Bitmap":
                         if checked:
-                            self.panel.add_visible_bitmap_by_name(d_info[0], redraw=False)
+                            self.panel.add_visible_bitmap_by_name(d_info[2], redraw=False)
                         else:
                             self.panel.remove_visible_bitmap_by_name(d_info[0], redraw=False)
 
@@ -5532,11 +5605,14 @@ class MainWindow(QMainWindow):
             if chosen == act_del_bitmap_from_well:
                 # menu = QMenu(self)
                 _, well_name, bitmap_key = data
+
+                self._delete_bitmap_from_input_tree(bitmap_key, item, confirm=True)
+
                 if well_name and bitmap_key:
-                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=True)
+                    self._delete_bitmap_from_well(well_name, bitmap_key, confirm=False)
                 elif not well_name:
                     for well in self.all_wells:
-                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=True)
+                        self._delete_bitmap_from_well(well.get("name"), bitmap_key, confirm=False)
         except:
             pass
         try:
@@ -5581,3 +5657,24 @@ class MainWindow(QMainWindow):
             print(f"CONTEXT action: {action} on {path}")
         else:
             print(f"CONTEXT action: {action}")
+
+
+import secrets
+
+def new_uid8() -> str:
+    """
+    Generate a compact universal ID:
+      - 64-bit random value (8 bytes)
+      - encoded as 8 URL-safe characters (base64url without padding)
+
+    Example: 'aZ3kP0Qm'
+    """
+    # 6 bytes -> 8 base64 chars; but we want 64-bit => 8 bytes.
+    # We encode 8 bytes and trim padding to keep compact.
+    raw = secrets.token_bytes(8)  # 64-bit
+    # base64 urlsafe without padding
+    import base64
+    s = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    # s is typically 11 chars for 8 bytes; compress to 8 chars by using 6 bytes instead?
+    # If you truly require 8 chars, use 6 bytes (48-bit). Very low collision still for most projects.
+    return s[:8]

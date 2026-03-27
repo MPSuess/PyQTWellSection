@@ -600,7 +600,11 @@ class NewTrackDialog(QDialog):
         track_type = self.cmb_type.currentText().strip().lower()
 
         # Base track skeleton
-        track = {"name": name, "logs": [], "type": track_type}
+
+        if track_type == "bitmap":
+            track = {"name": name, "type": track_type}
+        else:
+            track = {"name": name, "logs": [], "type": track_type}
 
         if track_type == "continuous":
             # nothing else needed
@@ -648,14 +652,13 @@ class NewTrackDialog(QDialog):
             key = self.bmp_key.text().strip() or "core"
             cmap_txt = self.bmp_cmap.currentText().strip()
             cmap = None if cmap_txt == "(none)" else cmap_txt
-
             track["bitmap"] = {
-                "key": key,  # will resolve per well: well["bitmaps"][key]
-                "label": label,
                 "alpha": float(self.bmp_alpha.value()),
-                "interpolation": self.bmp_interp.currentText().strip(),
                 "cmap": cmap,
+                "interpolation": self.bmp_interp.currentText().strip(),
                 "flip_vertical": bool(self.bmp_flip.isChecked()),
+                "label": label,
+                "key": key,
             }
 
         else:
@@ -913,15 +916,6 @@ class LogDisplaySettingsDialog(QDialog):
         self.spin_z.setRange(-100, 100)
         self.spin_z.setValue(int(self._cfg_in.get("zorder", 2)))
         form.addRow("Z-order:", self.spin_z)
-
-        #--- Colormap selection - --
-
-        # self.cmb_colorscale = QComboBox(self)
-        # self.cmb_colorscale.addItem("")  # means no colormap
-        # self.cmb_colorscale.addItems(list(colormaps))
-        # self.cmb_colorscale.setCurrentText(self._cfg_in.get("colorscale", ""))
-
-        #form.addRow("Color scale (optional):", self.cmb_colorscale)
 
         self.cmb_cmap = self.build_colormap_combo(self._cfg_in.get("colorscale", ""))
         form.addRow("Color scale:", self.cmb_cmap)
@@ -2838,9 +2832,9 @@ class LoadBitmapForTrackDialog(QDialog):
         form.addRow("Well:", self.cmb_well)
 
         # Track key (locked)
-        key = self._bitmap_cfg.get("key", "bitmap")
-        self.lbl_key = QLabel(key, self)
-        form.addRow("Bitmap key:", self.lbl_key)
+        # key = self._bitmap_cfg.get("key", "bitmap")
+        # self.lbl_key = QLabel(key, self)
+        # form.addRow("Bitmap key:", self.lbl_key)
 
         # File path + browse
         self.ed_path = QLineEdit(self)
@@ -2893,7 +2887,7 @@ class LoadBitmapForTrackDialog(QDialog):
 
         # Flip defaults from track
         self.chk_flip = QCheckBox("Flip vertically", self)
-        self.chk_flip.setChecked(bool(self._bitmap_cfg.get("flip_vertical", False)))
+        self.chk_flip.setChecked(bool(self._bitmap_cfg.get("flip_vertical", True)))
         form.addRow("Orientation:", self.chk_flip)
 
         # OK/Cancel
@@ -3091,7 +3085,7 @@ class BitmapPlacementDialog(QDialog):
 
             # redraw
             if self.panel is not None:
-                self.panel.draw_panel()
+                self.panel.draw_well_panel()
 
         except Exception as e:
             QMessageBox.warning(self, "Apply bitmap edits", f"Failed to apply edits:\n{e}")
@@ -3459,192 +3453,6 @@ class TrackSettingsDialog(QDialog):
         if name:
             self.track["name"] = name
         self.accept()
-
-class EditWellLogTableDialog_old(QDialog):
-    """
-    Edit one continuous well log (depth, value) in a table.
-    - two editable columns: Depth, Value
-    - add/remove rows
-    - sort by depth
-    - filter (simple substring match on either column)
-    """
-
-    def __init__(self, parent, well_name: str, log_name: str, depth, data):
-        super().__init__(parent)
-        self.setWindowTitle(f"Edit Log: {log_name} • {well_name}")
-        self.resize(760, 560)
-
-        self._well_name = well_name
-        self._log_name = log_name
-
-        depth = [] if depth is None else list(depth)
-        data = [] if data is None else list(data)
-        n = min(len(depth), len(data))
-
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(QLabel(
-            "Edit depth/value pairs. Use 'Sort by depth' before OK if you changed ordering.\n"
-            "Rows with non-numeric values will be rejected on OK.",
-            self
-        ))
-
-        # Filter row
-        row_filter = QHBoxLayout()
-        row_filter.addWidget(QLabel("Filter:", self))
-        self.ed_filter = QLineEdit(self)
-        self.ed_filter.setPlaceholderText("type to filter rows…")
-        row_filter.addWidget(self.ed_filter, 1)
-
-        self.btn_clear_filter = QPushButton("Clear", self)
-        row_filter.addWidget(self.btn_clear_filter)
-        layout.addLayout(row_filter)
-
-        # Table
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Depth", "Value"])
-        self.table.setRowCount(n)
-        for i in range(n):
-            self._set_cell(i, 0, depth[i])
-            self._set_cell(i, 1, data[i])
-        self.table.resizeColumnsToContents()
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table, 1)
-
-        # Buttons
-        row_btns = QHBoxLayout()
-        self.btn_add = QPushButton("Add row", self)
-        self.btn_del = QPushButton("Delete selected", self)
-        self.btn_sort = QPushButton("Sort by depth", self)
-        row_btns.addWidget(self.btn_add)
-        row_btns.addWidget(self.btn_del)
-        row_btns.addStretch(1)
-        row_btns.addWidget(self.btn_sort)
-        layout.addLayout(row_btns)
-
-        # OK/Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_ok)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        # connections
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
-        self.btn_sort.clicked.connect(self._sort_by_depth)
-        self.ed_filter.textChanged.connect(self._apply_filter)
-        self.btn_clear_filter.clicked.connect(lambda: self.ed_filter.setText(""))
-
-        self._apply_filter()
-
-        self._result_depth = None
-        self._result_data = None
-
-    def _set_cell(self, r: int, c: int, v):
-        it = QTableWidgetItem("" if v is None else str(v))
-        it.setFlags(it.flags() | Qt.ItemIsEditable)
-        self.table.setItem(r, c, it)
-
-    def _add_row(self):
-        r = self.table.rowCount()
-        self.table.insertRow(r)
-        self._set_cell(r, 0, "")
-        self._set_cell(r, 1, "")
-        self.table.setCurrentCell(r, 0)
-
-    def _delete_selected_rows(self):
-        rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
-        if not rows:
-            return
-        for r in rows:
-            self.table.removeRow(r)
-
-    def _sort_by_depth(self):
-        # Read all numeric rows
-        rows = []
-        for r in range(self.table.rowCount()):
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-            if not d_txt and not v_txt:
-                continue
-            try:
-                d = float(d_txt.replace(",", "."))
-                v = float(v_txt.replace(",", "."))
-                rows.append((d, v))
-            except Exception:
-                # keep non-numeric rows at end unsorted
-                rows.append((np.nan, np.nan))
-
-        # Sort numeric first, preserve NaNs last
-        rows_num = [(d, v) for d, v in rows if np.isfinite(d) and np.isfinite(v)]
-        rows_nan = [(d, v) for d, v in rows if not (np.isfinite(d) and np.isfinite(v))]
-        rows_num.sort(key=lambda t: t[0])
-        rows_sorted = rows_num + rows_nan
-
-        # Refill table
-        self.table.setRowCount(len(rows_sorted))
-        for i, (d, v) in enumerate(rows_sorted):
-            self._set_cell(i, 0, "" if not np.isfinite(d) else d)
-            self._set_cell(i, 1, "" if not np.isfinite(v) else v)
-
-        self.table.resizeColumnsToContents()
-        self._apply_filter()
-
-    def _apply_filter(self):
-        s = (self.ed_filter.text() or "").strip().lower()
-        for r in range(self.table.rowCount()):
-            if not s:
-                self.table.setRowHidden(r, False)
-                continue
-            d = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").lower()
-            v = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()
-            self.table.setRowHidden(r, (s not in d and s not in v))
-
-    def _on_ok(self):
-        depth = []
-        data = []
-
-        for r in range(self.table.rowCount()):
-            # include hidden rows too: user can filter but still wants full dataset
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-
-            # allow skipping blank rows
-            if not d_txt and not v_txt:
-                continue
-
-            try:
-                d = float(d_txt.replace(",", "."))
-                v = float(v_txt.replace(",", "."))
-            except Exception:
-                QMessageBox.warning(
-                    self, "Invalid value",
-                    f"Row {r+1} contains non-numeric Depth/Value:\n"
-                    f"Depth='{d_txt}', Value='{v_txt}'"
-                )
-                return
-
-            depth.append(d)
-            data.append(v)
-
-        if len(depth) == 0:
-            res = QMessageBox.question(
-                self, "Empty log",
-                "This will result in an empty log. Continue?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if res != QMessageBox.Yes:
-                return
-
-        self._result_depth = depth
-        self._result_data = data
-        self.accept()
-
-    def result_arrays(self):
-        """Return (depth, data) as lists after OK, else (None, None)."""
-        return self._result_depth, self._result_data
 
 class EditWellLogTableDialog(QDialog):
     """
@@ -4328,6 +4136,14 @@ class ImportTopsAssignWellDialog(QDialog):
         form = QFormLayout()
         layout.addLayout(form)
 
+        self.ed_bee_path = QLineEdit(self)
+        btn_browse = QPushButton("Browse", self)
+        row_path = QHBoxLayout()
+        row_path.addWidget(self.ed_bee_path)
+        row_path.addWidget(btn_browse)
+        form.addRow("BEE path:", row_path)
+        btn_browse.clicked.connect(self._on_browse_bee_path)
+
         # --- Sheet selection ---
         self.cmb_sheet = QComboBox(self)
         self.cmb_sheet.addItems(sheet_names)
@@ -4361,6 +4177,17 @@ class ImportTopsAssignWellDialog(QDialog):
         self.chk_new.toggled.connect(self._update_enabled)
         self._update_enabled(False)
 
+    def _on_browse_bee_path(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Bee xlsx file",
+            "",
+            "Images (*.xlsx);;All files (*.*)"
+        )
+        if path:
+            self.ed_bee_path.setText(path)
+
+
     def _update_enabled(self, is_new: bool):
         self.cmb_well.setEnabled(not is_new)
         self.ed_new_name.setEnabled(is_new)
@@ -4378,6 +4205,7 @@ class ImportTopsAssignWellDialog(QDialog):
             "existing_name": self.cmb_well.currentText().strip(),
             "new_name": self.ed_new_name.text().strip(),
             "set_td": self.chk_set_td.isChecked(),
+            "bee_path": self.ed_bee_path.text().strip(),
         }
 
 

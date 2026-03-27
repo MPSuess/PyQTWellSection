@@ -1744,7 +1744,10 @@ def import_schichtenverzeichnis_xx(parent, project, xlsx_path):
 
     return True
 
-def import_schichtenverzeichnis(parent, project, xlsx_path):
+def import_schichtenverzeichnis(parent, project, xlsx_path, bee_path="./BEE_Chrono.xlsx"):
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
+        return False
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1787,8 +1790,11 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
 
     sel = dlg.result_selection()
 
+    if sel["bee_path"]:
+        bee_path = sel["bee_path"]
+
     # --- Parse selected sheet ---
-    tops, td, strat_updates = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
+    tops, td, strat_updates = bgr_sv_load_tree(bee_path, xlsx_path)
 
 
     if not tops:

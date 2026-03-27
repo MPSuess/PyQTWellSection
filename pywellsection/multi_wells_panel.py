@@ -248,20 +248,6 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             col_is_spacer.append(True)
             gap_i += 1
 
-    # total_cols = n_wells * (n_tracks+1) + (n_wells - 1)
-    # width_ratios = []
-    # col_is_spacer = []
-    #
-    # for w in range(n_wells):
-    #     width_ratios.append(track_width/2)
-    #     col_is_spacer.append(False)
-    #     for _ in range(n_tracks):
-    #         width_ratios.append(track_width)
-    #         col_is_spacer.append(False)
-    #     if w != n_wells - 1:
-    #         width_ratios.append(well_gap_factor)
-    #         col_is_spacer.append(True)
-
     gs = fig.add_gridspec(
         1,
         total_cols,
@@ -269,10 +255,8 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         wspace=0.05,
         left=0.1,
         right=0.90,
-        #bottom=0.10,
         top= 0.8*vertical_scale,
         bottom=0.10/vertical_scale,
-        #top=0.8/vertical_scale,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -363,9 +347,11 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
-            mid_track = (n_tracks) // 2
-            if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
+            # mid_track = (n_tracks) // 2
+            # if ti == mid_track:
+            #     #base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
+            #     base_ax.set_title(well.get("name", f"Well {wi + 1}"), fontsize=10)
+
 
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
@@ -381,6 +367,7 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 
 
     add_depth_range_labels(fig, axes, selected_wells, n_tracks)
+    add_well_names(fig, axes, selected_wells, n_tracks)
 
     if corr_artists is None:
         corr_artists = []
@@ -427,17 +414,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         depth = log_def["depth"]
         data = log_def["data"]
-
-
-
         mask = [x > 0 for x in depth]
-
-
-
-
         # plotting depth: flattened if offset != 0
         depth_plot = [x - offset for x in depth]
-
         twin_ax = base_ax.twiny()
         label = log_cfg.get("label", log_name)
         # --- extract settings ---
@@ -449,7 +428,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         markersize = float(log_cfg.get("markersize", 2.0))
         decimate = int(log_cfg.get("decimate", 1))
         clip = bool(log_cfg.get("clip", True))
-        mask_nan = bool(log_cfg.get("mask_nan", True))
+        mask_nan = bool(log_cfg.get("mask_nan", False))
         zorder = int(log_cfg.get("zorder", 2))
 
         # --- prepare data ---
@@ -468,6 +447,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         if clip and "xlim" in log_cfg:
             xmin, xmax = log_cfg["xlim"]
             m = (x >= xmin) & (x <= xmax)
+            n = np.isnan(x) & np.isnan(y)
+            m = np.logical_or(np.logical_not(n),m)
+
             x = x[m]
             y = y[m]
 
@@ -858,7 +840,7 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0, visible_bitmaps = Non
                             base_plot = base_phys - offset
 
                             # Optional flip (sometimes needed depending on how image is stored)
-                            if track_cfg.get("flip_vertical", False):
+                            if bmp_cfg.get("flip_vertical", True):
                                 img = np.flipud(img)
 
                             # IMPORTANT:
@@ -894,6 +876,21 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
 
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
+
+def add_well_names(fig, axes, wells, n_tracks):
+
+    for wi, well in enumerate(wells):
+
+
+        first_track_idx = wi * (n_tracks + 2)
+        last_track_idx = first_track_idx + n_tracks
+        left = axes[first_track_idx].get_position().x0
+        right = axes[last_track_idx].get_position().x1
+        mid_x = (left + right) / 2
+
+        label = well.get("name", f"Well {wi + 1}")
+        fig.text(mid_x, 0.9, label, ha="center", va="center", fontsize=9)
+
 
 def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlations_only=False,corr_artists=None,
     highlight_top=None,flatten_depths=None,visible_tops=None,visible_tracks = None, stratigraphy = None):
