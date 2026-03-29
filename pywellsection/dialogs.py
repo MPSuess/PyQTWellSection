@@ -4438,7 +4438,6 @@ class ColorButton(QPushButton):
         self._color = color or "#cccccc"
         self._update_style()
 
-
 class EditStratigraphyDialog(QDialog):
     """
     Table editor for self.stratigraphy dict:
@@ -4792,8 +4791,6 @@ class EditStratigraphyDialog(QDialog):
         """Return OrderedDict or None."""
         return self._accepted_strat
 
-
-
 class StratigraphyEditorDialog(QDialog):
     """
     Table dialog to edit/add stratigraphy for the project.
@@ -4972,3 +4969,181 @@ class StratigraphyEditorDialog(QDialog):
     def result_stratigraphy(self):
         """Return OrderedDict or None."""
         return self._accepted_strat
+
+class ImportCoreExcelDialog(QDialog):
+    """
+    Extended dialog for importing core/RCA spreadsheet data as regular logs.
+
+    Features:
+      - choose sheet
+      - choose file well
+      - assign to existing well or create new well
+      - overwrite option
+      - choose which columns to import
+      - rename output logs before import
+    """
+
+    COL_IMPORT = 0
+    COL_SOURCE = 1
+    COL_TARGET = 2
+
+    def __init__(self, parent, workbook_path, existing_well_names):
+        super().__init__(parent)
+        self.setWindowTitle("Import Core Data")
+        self.resize(760, 520)
+
+        self.workbook_path = workbook_path
+        self.existing_well_names = existing_well_names or []
+        self._preview_df = None
+
+        self.xl = pd.ExcelFile(workbook_path)
+        self.sheet_names = self.xl.sheet_names
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_sheet = QComboBox(self)
+        self.cmb_sheet.addItems(self.sheet_names)
+        form.addRow("Worksheet:", self.cmb_sheet)
+
+        self.cmb_file_well = QComboBox(self)
+        form.addRow("Well in file:", self.cmb_file_well)
+
+        self.chk_new = QCheckBox("Create new well", self)
+        self.chk_new.setChecked(False)
+        form.addRow(self.chk_new)
+
+        self.cmb_existing = QComboBox(self)
+        self.cmb_existing.addItems(self.existing_well_names)
+        form.addRow("Assign to existing well:", self.cmb_existing)
+
+        self.ed_new_name = QLineEdit(self)
+        form.addRow("New well name:", self.ed_new_name)
+
+        self.chk_overwrite = QCheckBox("Overwrite logs if they already exist", self)
+        self.chk_overwrite.setChecked(False)
+        form.addRow(self.chk_overwrite)
+
+        layout.addWidget(QLabel("Columns to import:", self))
+
+        self.tbl_cols = QTableWidget(self)
+        self.tbl_cols.setColumnCount(3)
+        self.tbl_cols.setHorizontalHeaderLabels(["Import", "Source column", "Target log name"])
+        self.tbl_cols.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.tbl_cols, 1)
+
+        self.lbl_info = QLabel(
+            "Only numeric columns except 'Well' and 'Depth' are imported.\n"
+            "Empty cells are stored as NaN.",
+            self
+        )
+        layout.addWidget(self.lbl_info)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_new.toggled.connect(self._update_enabled)
+        self.cmb_sheet.currentTextChanged.connect(self._refresh_preview)
+        self.cmb_file_well.currentTextChanged.connect(self._update_new_name_from_file_well)
+
+        self._update_enabled(self.chk_new.isChecked())
+        self._refresh_preview()
+
+    def _update_enabled(self, is_new: bool):
+        self.cmb_existing.setEnabled(not is_new)
+        self.ed_new_name.setEnabled(is_new)
+
+    def _update_new_name_from_file_well(self, txt: str):
+        if self.chk_new.isChecked() and not self.ed_new_name.text().strip():
+            self.ed_new_name.setText(txt.strip())
+
+    def _sanitize_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df.columns = [str(c).strip() for c in df.columns]
+        df = df.dropna(how="all")
+        return df
+
+    def _refresh_preview(self):
+        try:
+            df = pd.read_excel(self.workbook_path, sheet_name=self.cmb_sheet.currentText())
+            df = self._sanitize_df(df)
+            self._preview_df = df
+
+            self.cmb_file_well.blockSignals(True)
+            self.cmb_file_well.clear()
+            if "Well" in df.columns:
+                wells = [str(x).strip() for x in df["Well"].dropna().unique().tolist() if str(x).strip()]
+                self.cmb_file_well.addItems(sorted(wells))
+            self.cmb_file_well.blockSignals(False)
+
+            if self.cmb_file_well.count() and self.chk_new.isChecked():
+                self.ed_new_name.setText(self.cmb_file_well.currentText().strip())
+
+            self._populate_column_table()
+
+        except Exception as e:
+            self._preview_df = None
+            self.cmb_file_well.clear()
+            self.tbl_cols.setRowCount(0)
+            self.lbl_info.setText(f"Preview error: {e}")
+
+    def _populate_column_table(self):
+        self.tbl_cols.setRowCount(0)
+        df = self._preview_df
+        if df is None or df.empty:
+            return
+
+        cols = [c for c in df.columns if c not in ("Well", "Depth")]
+
+        self.tbl_cols.setRowCount(len(cols))
+        for row, col in enumerate(cols):
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Checked)
+            self.tbl_cols.setItem(row, self.COL_IMPORT, chk)
+
+            src = QTableWidgetItem(col)
+            src.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.tbl_cols.setItem(row, self.COL_SOURCE, src)
+
+            tgt = QTableWidgetItem(col)
+            self.tbl_cols.setItem(row, self.COL_TARGET, tgt)
+
+    def selected_columns(self):
+        """
+        Returns list of tuples:
+          [(source_col, target_log_name), ...]
+        """
+        out = []
+        for row in range(self.tbl_cols.rowCount()):
+            chk_item = self.tbl_cols.item(row, self.COL_IMPORT)
+            src_item = self.tbl_cols.item(row, self.COL_SOURCE)
+            tgt_item = self.tbl_cols.item(row, self.COL_TARGET)
+
+            if chk_item is None or src_item is None or tgt_item is None:
+                continue
+            if chk_item.checkState() != Qt.Checked:
+                continue
+
+            src = src_item.text().strip()
+            tgt = tgt_item.text().strip()
+            if not src or not tgt:
+                continue
+
+            out.append((src, tgt))
+        return out
+
+    def result_config(self):
+        return {
+            "sheet": self.cmb_sheet.currentText().strip(),
+            "file_well": self.cmb_file_well.currentText().strip(),
+            "create_new": self.chk_new.isChecked(),
+            "existing_well": self.cmb_existing.currentText().strip(),
+            "new_well_name": self.ed_new_name.text().strip(),
+            "overwrite": self.chk_overwrite.isChecked(),
+            "selected_columns": self.selected_columns(),
+        }
+

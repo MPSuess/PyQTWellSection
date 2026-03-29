@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.ticker import FuncFormatter
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.ticker import FormatStrFormatter
@@ -6,6 +7,7 @@ from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 from matplotlib.image import BboxImage
 from matplotlib.transforms import Bbox, TransformedBbox
+from matplotlib.patches import Polygon
 from matplotlib.collections import LineCollection
 from pywellsection.tools import _well_distance_m
 
@@ -31,6 +33,27 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel("DEBUG")
 
 
+shale_path = Polygon(
+    [[-0.3, -0.025], [0.3, -0.025], [0.3, 0.025], [-0.3, 0.025]],
+    closed=True, fill=False).get_path()
+
+class CustomHatch(matplotlib.hatch.Shapes):
+    """
+    Custom hatches defined by a path drawn inside [-0.5, 0.5] square.
+    Identifier 'c'.
+    """
+    filled = True
+    size = 1.0
+    path = shale_path
+
+    def __init__(self, hatch, density):
+        self.num_rows = (hatch.count('__')) * density
+        self.shape_vertices = self.path.vertices
+        self.shape_codes = self.path.codes
+        matplotlib.hatch.Shapes.__init__(self, hatch, density)
+
+
+matplotlib.hatch._hatch_types.append(CustomHatch)
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                             min_size=6, max_size=11):
@@ -1295,10 +1318,6 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
     if not fills:
         return
 
-
-
-
-
     for f in fills:
         ftype = (f.get("type") or "").strip().lower()
         alpha = float(f.get("alpha", 0.3))
@@ -1375,7 +1394,12 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             twin_ax = curve_cache[log_name]["twin_ax"]
             x0, x1 = twin_ax.get_xlim()
             xmin, xmax = (min(x0, x1), max(x0, x1))
-            bound = xmin if side == "min" else xmax
+
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            if log_cfg.get("direction", "normal") == "reverse":
+                bound = xmin if side == "max" else xmax
+            else:
+                bound = xmin if side == "min" else xmax
 
             logs = track.get("logs", []) or []
             for log in logs:
@@ -1385,7 +1409,11 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     color_map = log.get("colorscale", None)
                     _, track_xmax = track_xlim or (0.0, 1.0)
 
-
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            if log_cfg.get("direction", "normal") == "reverse":
+                # Reverse the curve's displayed x-limits (xmin/xmax)'
+                y = xmin + xmax - x
+                x = y
 
             # Only fill inside the axis range
             if side == "min":
@@ -1393,30 +1421,31 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             else:
                 mask = x < xmax
 
-            # base_ax.fill_betweenx(
-            #     depth_plot, x, bound,
-            #     where=mask, alpha=alpha,
-            #     facecolor=facecolor, hatch=hatch,
-            #     linewidth=0.0, zorder=zorder,
-            # )
-
             if facetype == "color":
-
-                base_ax.fill_betweenx(
-                    depth_plot, x, bound,
-                    where=mask, alpha=alpha,
-                    facecolor=facecolor, hatch=hatch,
-                    linewidth=0.0, zorder=zorder,
-                )
+                if log_cfg.get("direction", "normal") == "reverse":
+                    base_ax.fill_betweenx(
+                        depth_plot, x, bound,
+                        where=mask, alpha=alpha,
+                        facecolor=facecolor, hatch=hatch,
+                        linewidth=0.0, zorder=zorder,
+                    )
+                else:
+                    base_ax.fill_betweenx(
+                        depth_plot, x, bound,
+                        where=mask, alpha=alpha,
+                        facecolor=facecolor, hatch=hatch,
+                        linewidth=0.0, zorder=zorder,
+                    )
             else:
+
                 single_curve_log_color_fill(base_ax, depth_plot, mask, x, track_xlim, color_map)
 
-                base_ax.fill_betweenx(
-                    depth_plot, x, bound,
-                    where=mask, alpha=1,
-                    facecolor="white",
-                    linewidth=0.0, zorder=0.01,
-                )
+                # base_ax.fill_betweenx(
+                #     depth_plot, x, bound,
+                #     where=mask, alpha=1,
+                #     facecolor="white",
+                #     linewidth=0.0, zorder=0.01,
+                # )
 
 
             log_cfg = curve_cache[log_name].get("cfg", None)
@@ -1424,9 +1453,9 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             base_ax.set_xscale("log" if xscale == "log" else "linear")
             if "xlim" in log_cfg:
                 base_ax.set_xlim(log_cfg["xlim"])
-            if log_cfg.get("direction", "normal") == "reverse":
-                x_min, x_max = base_ax.get_xlim()
-                base_ax.set_xlim(x_max, x_min)
+            #if log_cfg.get("direction", "normal") == "reverse":
+            #    x_min, x_max = base_ax.get_xlim()
+            #    base_ax.set_xlim(x_max, x_min)
 
 
         ### finaly the between logs case ....

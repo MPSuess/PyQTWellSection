@@ -45,7 +45,8 @@ from pywellsection.Qt_Map_Widget import MapDockWindow, MapPanelWidget
 from pywellsection.sample_data import create_dummy_data
 from pywellsection.io_utils import export_project_to_json, load_project_from_json, load_petrel_wellheads
 from pywellsection.io_utils import load_las_as_logs, export_discrete_logs_to_csv, import_discrete_logs_from_csv
-from pywellsection.io_utils import import_schichtenverzeichnis#, import_sv_tops_using_beee
+from pywellsection.io_utils import import_schichtenverzeichnis
+from pywellsection.io_utils import load_core_data_from_excel
 
 from pywellsection.widgets import QTextEditLogger, QTextEditCommands
 from pywellsection.console import QIPythonWidget
@@ -326,9 +327,9 @@ class MainWindow(QMainWindow):
         act_import_bitmap.triggered.connect(self._action_load_core_bitmap_to_well)
         import_menu.addAction(act_import_bitmap)
 
-        act_import_test = QAction("Import test...", self)
-        act_import_test.triggered.connect(self._file_load_test)
-        import_menu.addAction(act_import_test)
+        act_import_core_data = QAction("Import Core Data from Excel...", self)
+        act_import_core_data.triggered.connect(self._file_import_core_data)
+        import_menu.addAction(act_import_core_data)
 
         export_menu = file_menu.addMenu("&Export")
         act_export_discrete_logs = QAction("Export discrete logs as csv...", self)
@@ -427,10 +428,6 @@ class MainWindow(QMainWindow):
             )
         )
 
-    # ------------------------------------------------
-    # FILE HANDLERS (placeholders for now)
-    # ------------------------------------------------
-
     def _new_pws_project(self, confirm=False):
         if confirm:
             reply = QMessageBox.question(self, 'Message',
@@ -447,7 +444,6 @@ class MainWindow(QMainWindow):
     def _save_pws_project(self, path):
             # save
             data = self.project.to_dict()
-
 
     def _load_pws_project(self, path):
             self.project = PWSProject.from_dict(json_data)
@@ -948,6 +944,23 @@ class MainWindow(QMainWindow):
         self.panel.draw_well_panel()
 
         QMessageBox.information(self, "LAS import", "LAS logs imported successfully.")
+
+    def _file_import_core_data(self):
+        """Import Core Data file and assign logs to an existing or new well."""
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Core Data file",
+            "",
+            "Core Data files (*.xlsx);;All files (*.*)"
+        )
+
+        if not path:
+            return
+
+        load_core_data_from_excel(self, path)
+
+
 
     def _file_import_facies_intervals_csv(self):
         """
@@ -1521,8 +1534,6 @@ class MainWindow(QMainWindow):
         bmp_folder = self.input_tree.add_noncheckable_folder(logs_folder, "bitmap")
         comp_folder = self.input_tree.add_noncheckable_folder(well_folder, "Completions")
 
-#        self.panel.draw_well_panel()
-
     def _add_continuous_log_to_logs_in_input_tree(self, log_name):
         root = self.cont_folder
         existing_logs = self.input_tree.get_items_in_folder(root)
@@ -1553,7 +1564,6 @@ class MainWindow(QMainWindow):
                                 self.input_tree.lock_leaf_movement(item)
                                 item.setData(0, Qt.UserRole, ("Continuous_Log", well_name, log_name))
                             break
-
 
     def _add_core_bitmap_to_input_tree(self, key, well_name, track_name, label = "test"):
         """Add a core bitmap to the input tree."""
@@ -1601,21 +1611,21 @@ class MainWindow(QMainWindow):
             name = log.get("name")
             it = self.input_tree.add_checkable_leaf(root, name)
             it.setData(0, Qt.UserRole, ("Logs", "Continuous_Log", name))
-            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+            state = Qt.Unchecked
             it.setCheckState(0, state)
         elif log.get("type") == "discrete":
             root = self.disc_folder
             name = log.get("name")
             it = self.input_tree.add_checkable_leaf(root, name)
             it.setData(0, Qt.UserRole, ("Logs", "DiscreteLog", name))
-            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+            state = Qt.Unchecked
             it.setCheckState(0, state)
         elif log.get("type") == "bitmap":
             root = self.bmp_folder
             name = log.get("name")
             it = self.input_tree.add_checkable_leaf(root, name)
             it.setData(0, Qt.UserRole, ("Logs", "Bitmap", name))
-            state = Qt.Checked if (not prev_selected or name in prev_selected) else Qt.Unchecked
+            state = Qt.Unchecked
             it.setCheckState(0, state)
 
     def _add_new_well_to_tree(self, well_name: str):
@@ -4085,8 +4095,6 @@ class MainWindow(QMainWindow):
                 # redraw
             self.panel.draw_well_panel()
 
-
-
     def _move_well(self, well_name: str, direction: int):
         """
         Move a well left/right in well_panel order.
@@ -4221,7 +4229,6 @@ class MainWindow(QMainWindow):
         #     print(well.text(0))
         #     if well.text(0) == well_name:
         #         print(f"well found: {well.text(0)}")
-
     def _delete_bitmap_from_input_tree (self, bitmap_name: str, item: QTreeWidgetItem,
                                       confirm: bool = True):
         if confirm:
@@ -4254,7 +4261,6 @@ class MainWindow(QMainWindow):
                 break
 
         self.input_tree.remove_item(item)
-
     def _iter_all_well_panels(self):
         """
         Yield central well_panel + dock well_panels (if available).
@@ -4771,8 +4777,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_populate_well_tree"):
             self._populate_well_tree()
 
-
-
     def _delete_bitmap_key_from_all_wells(self, bitmap_key: str, confirm: bool = True):
         """
         Delete a bitmap key from ALL wells (useful for 'delete track images').
@@ -5129,6 +5133,8 @@ class MainWindow(QMainWindow):
     def _deactivate_all_windows(self):
         for w in self.WindowList:
             w.window_deactivated()
+
+    """ In this section follow the callbacks for the input tree. """
 
 
     @QtCore.Slot(str, bool, object)
