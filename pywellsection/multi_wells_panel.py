@@ -21,6 +21,8 @@ import logging
 import pandas as pd
 from pathlib import Path
 
+import pywellsection.custom_hatches
+
 logging.getLogger("ipykernel").setLevel("CRITICAL")
 logging.getLogger("traitlets").setLevel("CRITICAL")
 logging.getLogger("root").setLevel("CRITICAL")
@@ -33,27 +35,27 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel("DEBUG")
 
 
-shale_path = Polygon(
-    [[-0.3, -0.025], [0.3, -0.025], [0.3, 0.025], [-0.3, 0.025]],
-    closed=True, fill=False).get_path()
-
-class CustomHatch(matplotlib.hatch.Shapes):
-    """
-    Custom hatches defined by a path drawn inside [-0.5, 0.5] square.
-    Identifier 'c'.
-    """
-    filled = True
-    size = 1.0
-    path = shale_path
-
-    def __init__(self, hatch, density):
-        self.num_rows = (hatch.count('__')) * density
-        self.shape_vertices = self.path.vertices
-        self.shape_codes = self.path.codes
-        matplotlib.hatch.Shapes.__init__(self, hatch, density)
-
-
-matplotlib.hatch._hatch_types.append(CustomHatch)
+# shale_path = Polygon(
+#     [[-0.3, -0.025], [0.3, -0.025], [0.3, 0.025], [-0.3, 0.025]],
+#     closed=True, fill=False).get_path()
+#
+# class CustomHatch(matplotlib.hatch.Shapes):
+#     """
+#     Custom hatches defined by a path drawn inside [-0.5, 0.5] square.
+#     Identifier 'c'.
+#     """
+#     filled = True
+#     size = 1.0
+#     path = shale_path
+#
+#     def __init__(self, hatch, density):
+#         self.num_rows = (hatch.count('__')) * density
+#         self.shape_vertices = self.path.vertices
+#         self.shape_codes = self.path.codes
+#         matplotlib.hatch.Shapes.__init__(self, hatch, density)
+#
+#
+# matplotlib.hatch._hatch_types.append(CustomHatch)
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                             min_size=6, max_size=11):
@@ -423,8 +425,10 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
     curve_cache = {}
+    j=0
 
-    for j, log_cfg in enumerate(track.get("logs", [])):
+    for _,log_cfg in enumerate(track.get("logs", [])):
+
         log_name = log_cfg["log"]
 
         if visible_logs is not None:
@@ -433,6 +437,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         log_def = well.get("logs", {}).get(log_name)
         if log_def is None:
+
             continue
 
         depth = log_def["depth"]
@@ -503,7 +508,6 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             width = bbox.width
 
             colored_line(y_const, depth_plot, x_norm, twin_ax, linewidth=2*width, cmap="viridis")
-
         else:
             twin_ax.plot(
                 x, y,
@@ -520,7 +524,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             spine.set_visible(spine_name == "top")
 
         # Stack multiple logs upwards
-        offset_spine = 1.0 + j * 0.08
+        offset_spine = 1.0 + j * 0.05
         twin_ax.spines["top"].set_position(("axes", offset_spine))
 
         xscale = log_cfg.get("xscale", "linear")
@@ -546,8 +550,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             bottom=False,
             labeltop=True,
             labelbottom=False,
-            pad=2,
+            pad=1,
             labelsize=5,
+            length=2,
         )
 
         twin_ax.grid(False)
@@ -559,12 +564,14 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             "twin_ax": twin_ax,
             "cfg": log_cfg,
         }
+        j=j+1
 
     _apply_track_fills(
         base_ax=base_ax,
         curve_cache=curve_cache,
         track=track
     )
+
 
 def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs = None):
     """
