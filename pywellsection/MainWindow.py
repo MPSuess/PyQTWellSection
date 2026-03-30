@@ -5269,8 +5269,6 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(msg)
 
-
-
     @QtCore.Slot(str, bool, object)
     def on_parent_toggled(self, path, checked, item):
 
@@ -5623,6 +5621,11 @@ class MainWindow(QMainWindow):
             print(f"CONTEXT action: {action} on {path}")
         else:
             print(f"CONTEXT action: {action}")
+
+    @QtCore.Slot(str,object)
+    def on_double_click(self, path,item):
+        print("double clicked!", path)
+        return
 
 
 import secrets

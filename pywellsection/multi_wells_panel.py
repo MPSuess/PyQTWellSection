@@ -1435,6 +1435,7 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                         where=mask, alpha=alpha,
                         facecolor=facecolor, hatch=hatch,
                         linewidth=0.0, zorder=zorder,
+                        interpolate = True,
                     )
                 else:
                     base_ax.fill_betweenx(
@@ -1442,6 +1443,7 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                         where=mask, alpha=alpha,
                         facecolor=facecolor, hatch=hatch,
                         linewidth=0.0, zorder=zorder,
+                        interpolate = True,
                     )
             else:
 
@@ -1544,6 +1546,7 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     where=mask, alpha=alpha,
                     facecolor=facecolor, hatch=hatch,
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
 
             else:
@@ -1554,12 +1557,14 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     where=mask, alpha=1,
                     facecolor="white",
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
                 base_ax.fill_betweenx(
                     dl, xr_i,xmax,
                     where=mask, alpha=1,
                     facecolor="white",
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
 
 

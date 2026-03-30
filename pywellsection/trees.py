@@ -315,6 +315,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
     contextMenuEvent = QtCore.Signal(QtCore.QPoint, object)
 
+    #itemDoubleClicked = QtCore.Signal(str,object)
+
     # ---------- Checkability Policies (stored per item) ----------
     LEAF_ALWAYS_CHECKABLE = 1
     LEAF_NEVER_CHECKABLE = 2
@@ -1455,6 +1457,7 @@ def connect_input_tree(self):
     self.input_tree.contextAction.connect(self.on_context_action)
     # self.input_tree.structureChanged.connect(self.on_structure_changed)
     self.input_tree.contextMenuEvent.connect(self.on_input_tree_context_menu)
+    self.input_tree.itemDoubleClicked.connect(self.on_double_click)
 
     self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
     self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
