@@ -1973,6 +1973,7 @@ class NewDiscreteTrackDialog(QDialog):
 
         self._result = {
             "name": track_name,
+            "type":"discrete",
             "logs": [],  # no continuous logs in this track by default
             "discrete": {
                 "log": log_name,
@@ -4208,7 +4209,6 @@ class ImportTopsAssignWellDialog(QDialog):
             "bee_path": self.ed_bee_path.text().strip(),
         }
 
-
 class MapLimitsDialog(QDialog):
     """
     Dialog to set map axis limits (xmin/xmax/ymin/ymax) for a MapPanelWidget.
@@ -4409,7 +4409,6 @@ def random_strat_color() -> str:
     g = random.randint(80, 220)
     b = random.randint(80, 220)
     return f"#{r:02x}{g:02x}{b:02x}"
-
 
 class ColorButton(QPushButton):
     def __init__(self, color="#cccccc", parent=None):
@@ -5147,3 +5146,107 @@ class ImportCoreExcelDialog(QDialog):
             "selected_columns": self.selected_columns(),
         }
 
+
+class ImportSVLithologyDialog(QDialog):
+    def __init__(self, parent, xlsx_path: str, existing_well_names):
+        super().__init__(parent)
+        self.setWindowTitle("Import Lithology from Worksheet")
+        self.resize(560, 260)
+
+        self.xlsx_path = xlsx_path
+        self.existing_well_names = existing_well_names or []
+
+        self.xl = pd.ExcelFile(xlsx_path)
+        self.sheet_names = self.xl.sheet_names
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_sheet = QComboBox(self)
+        self.cmb_sheet.addItems(self.sheet_names)
+        form.addRow("Worksheet:", self.cmb_sheet)
+
+        self.lbl_preview_well = QLabel("-", self)
+        form.addRow("Well in sheet:", self.lbl_preview_well)
+
+        self.lbl_preview_kb = QLabel("-", self)
+        form.addRow("KB [mNN]:", self.lbl_preview_kb)
+
+        self.chk_create_new = QCheckBox("Create new well", self)
+        self.chk_create_new.setChecked(False)
+        form.addRow(self.chk_create_new)
+
+        self.cmb_existing_well = QComboBox(self)
+        self.cmb_existing_well.addItems(self.existing_well_names)
+        form.addRow("Assign to existing well:", self.cmb_existing_well)
+
+        self.ed_new_well_name = QLineEdit(self)
+        form.addRow("New well name:", self.ed_new_well_name)
+
+        self.ed_log_name = QLineEdit(self)
+        self.ed_log_name.setText("Hauptlithologie")
+        form.addRow("Discrete log name:", self.ed_log_name)
+
+        self.chk_overwrite = QCheckBox("Overwrite existing discrete log", self)
+        self.chk_overwrite.setChecked(False)
+        form.addRow(self.chk_overwrite)
+
+        self.chk_store_kb = QCheckBox("Store KB as well elevation if creating well", self)
+        self.chk_store_kb.setChecked(True)
+        form.addRow(self.chk_store_kb)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_create_new.toggled.connect(self._update_enabled)
+        self.cmb_sheet.currentTextChanged.connect(self._update_preview)
+
+        self._update_enabled(self.chk_create_new.isChecked())
+        self._update_preview()
+
+    def _update_enabled(self, is_new: bool):
+        self.cmb_existing_well.setEnabled(not is_new)
+        self.ed_new_well_name.setEnabled(is_new)
+
+    def _read_sheet_preview(self, sheet_name: str):
+        df = pd.read_excel(self.xlsx_path, sheet_name=sheet_name, header=None)
+        well_name = ""
+        kb = None
+
+        try:
+            well_name = str(df.iloc[0, 1]).strip() if pd.notna(df.iloc[0, 1]) else ""
+        except Exception:
+            pass
+
+        try:
+            kb_val = df.iloc[1, 1]
+            kb = float(kb_val) if pd.notna(kb_val) else None
+        except Exception:
+            kb = None
+
+        return well_name, kb
+
+    def _update_preview(self):
+        try:
+            well_name, kb = self._read_sheet_preview(self.cmb_sheet.currentText())
+            self.lbl_preview_well.setText(well_name or "-")
+            self.lbl_preview_kb.setText("" if kb is None else f"{kb:.3f}")
+            if self.chk_create_new.isChecked():
+                self.ed_new_well_name.setText(well_name)
+        except Exception as e:
+            self.lbl_preview_well.setText(f"Error: {e}")
+            self.lbl_preview_kb.setText("-")
+
+    def result_config(self):
+        return {
+            "sheet": self.cmb_sheet.currentText().strip(),
+            "create_new": self.chk_create_new.isChecked(),
+            "existing_well": self.cmb_existing_well.currentText().strip(),
+            "new_well_name": self.ed_new_well_name.text().strip(),
+            "log_name": self.ed_log_name.text().strip() or "Hauptlithologie",
+            "overwrite": self.chk_overwrite.isChecked(),
+            "store_kb": self.chk_store_kb.isChecked(),
+        }

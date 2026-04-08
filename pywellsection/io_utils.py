@@ -19,9 +19,38 @@ from typing import Dict, Any, List, Tuple, Optional
 
 import openpyxl
 
-from pywellsection.dialogs import ImportTopsAssignWellDialog, ImportCoreExcelDialog
+from pywellsection.dialogs import ImportTopsAssignWellDialog, ImportCoreExcelDialog, ImportSVLithologyDialog
 #from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 from pywellsection.Bee_SV_load import bgr_sv_load_tree
+
+# ------------------------------------------------------------
+# Common lithology colors
+# ------------------------------------------------------------
+
+DEFAULT_LITHO_COLOR_MAP = {
+    "Tonstein": "#8B5A2B",          # brown mudstone/claystone
+    "Tonmergelstein": "#9C6B3B",
+    "Mergelstein": "#A67C52",
+    "Schluff": "#C2B280",
+    "Schluffstein": "#BFA77A",
+    "Sand": "#F4D03F",              # yellow sandstone/sand
+    "Feinsand": "#F7DC6F",
+    "Mittelsand": "#F1C40F",
+    "Grobsand": "#D4AC0D",
+    "Sandstein": "#E1C542",
+    "Kies": "#BEBEBE",
+    "Mittelkies": "#A9A9A9",
+    "Kalkstein": "#85C1E9",         # blue limestone
+    "Kalkmergelstein": "#7FB3D5",
+    "Dolomit": "#A569BD",           # purple dolomite
+    "Dolomitstein": "#8E44AD",
+    "Anhydrit": "#D7DBDD",
+    "Steinsalz": "#F5EEF8",
+    "Mutterboden": "#5D4037",
+    "keine Angaben": "#DDDDDD",
+    "-999": "#DDDDDD",
+}
+
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -1215,8 +1244,7 @@ def _find_well_by_name(project, well_name: str):
             return w
     return None
 
-
-def _ensure_well_exists(project, well_name: str):
+def _ensure_well_exists(project, well_name: str, kb=None):
     well = _find_well_by_name(project, well_name)
     if well is not None:
         return well
@@ -1230,6 +1258,7 @@ def _ensure_well_exists(project, well_name: str):
         "reference_type": "KB",
         "reference_depth": 0.0,
         "total_depth": 0.0,
+        "kb": kb,
         "logs": {},
         "discrete_logs": {},
         "tops": {},
@@ -1237,19 +1266,17 @@ def _ensure_well_exists(project, well_name: str):
         "bitmaps": {},
     }
     project.all_wells.append(well)
+#    self.all_wells.append(well)
     return well
-
 
 def _to_numeric_nan(series: pd.Series) -> np.ndarray:
     return pd.to_numeric(series, errors="coerce").to_numpy(dtype=float)
-
 
 def _sanitize_core_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
     df = df.dropna(how="all")
     return df
-
 
 def load_core_data_from_excel(parent, xlsx_path: str) -> bool:
 
@@ -1355,3 +1382,240 @@ def load_core_data_from_excel(parent, xlsx_path: str) -> bool:
     except Exception as e:
         QMessageBox.critical(parent, "Import Core Data", f"Import failed:\n{e}")
         return False
+
+def import_sv_lithology_as_discrete_log(parent, project, xlsx_path: str) -> bool:
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import Lithology", f"File not found:\n{xlsx_path}")
+        return False
+
+    try:
+        existing_well_names = [w.get("name", "") for w in (project.all_wells or []) if w.get("name")]
+
+        dlg = ImportSVLithologyDialog(parent, xlsx_path, existing_well_names)
+        if dlg.exec() != QDialog.Accepted:
+            return False
+
+        cfg = dlg.result_config()
+
+        file_well_name, kb, total_depth, disc_def, imported_tops = parse_sv_lithology_sheet(
+            xlsx_path, cfg["sheet"]
+        )
+
+        target_well_name = cfg["new_well_name"] if cfg["create_new"] else cfg["existing_well"]
+        target_well_name = (target_well_name or "").strip()
+
+        if not target_well_name:
+            QMessageBox.warning(parent, "Import Lithology", "No target well selected.")
+            return False
+
+        target_well = _ensure_well_exists(
+            project,
+            target_well_name,
+            kb=kb if cfg["create_new"] and cfg["store_kb"] else None,
+        )
+
+        target_well.setdefault("discrete_logs", {})
+
+        log_name = cfg["log_name"]
+        if log_name in target_well["discrete_logs"] and not cfg["overwrite"]:
+            QMessageBox.warning(
+                parent,
+                "Import Lithology",
+                f"Discrete log '{log_name}' already exists in well '{target_well_name}'.\n"
+                "Enable overwrite to replace it."
+            )
+            return False
+
+        target_well["discrete_logs"][log_name] = disc_def
+
+        # import Haupt-Stratigraphie as tops, role=other
+        all_strat = getattr(project, "all_stratigraphy", None)
+        if all_strat is None:
+            all_strat = {}
+            project.all_stratigraphy = all_strat
+
+        added_tops = 0
+        updated_tops = 0
+
+        for t in imported_tops:
+            nm = t["name"]
+
+            # ensure stratigraphy dictionary entry exists with role=other
+            if nm not in all_strat:
+                all_strat[nm] = {
+                    "uid": new_uid64() if "new_uid64" in globals() else None,
+                    "level": "other",
+                    "role": "other",
+                    "color": random_strat_color(),
+                    "hatch": "-",
+                }
+                parent.add_top_to_tree(nm, "other")
+            else:
+                all_strat[nm].setdefault("role", "other")
+                all_strat[nm].setdefault("level", "other")
+
+            if nm in target_well["tops"]:
+                if isinstance(target_well["tops"][nm], dict):
+                    target_well["tops"][nm]["depth"] = float(t["depth"])
+                    target_well["tops"][nm]["role"] = "other"
+                    target_well["tops"][nm]["level"] = "other"
+                else:
+                    target_well["tops"][nm] = {
+                        "uid": new_uid64() if "new_uid64" in globals() else None,
+                        "depth": float(t["depth"]),
+                        "role": "other",
+                        "level": "other",
+                    }
+                updated_tops += 1
+            else:
+                target_well["tops"][nm] = {
+                    "uid": new_uid64() if "new_uid64" in globals() else None,
+                    "depth": float(t["depth"]),
+                    "role": "other",
+                    "level": "other",
+                }
+                added_tops += 1
+
+        parent.all_stratigraphy = all_strat
+        for window in parent.WindowList:
+            if window.type == "WellSection":
+                window.well_panel.stratigraphy = all_strat
+
+
+
+        target_well["total_depth"] = max(
+            float(target_well.get("total_depth", 0.0) or 0.0),
+            float(total_depth),
+        )
+
+        # make visible in active panel if possible
+        active_panel = getattr(parent, "_active_panel", None)
+        if active_panel is not None and hasattr(active_panel, "add_visible_discrete_log_by_name"):
+            active_panel.add_visible_discrete_log_by_name(log_name, redraw=False)
+
+        if hasattr(project, "rebuild_uid_index"):
+            project.rebuild_uid_index()
+
+        if cfg["create_new"]:
+            parent.all_wells.append(target_well)
+            parent._add_new_well_to_input_tree(target_well_name)
+            parent._add_discrete_log_to_well_in_input_tree(target_well_name, log_name)
+            parent._add_discrete_log_to_logs_in_input_tree(log_name)
+
+
+        QMessageBox.information(
+            parent,
+            "Import Lithology",
+            f"Imported '{log_name}' into well '{target_well_name}'.\n"
+            f"Worksheet: {cfg['sheet']}\n"
+            f"File well: {file_well_name}"
+        )
+        return True
+
+    except Exception as e:
+        QMessageBox.critical(parent, "Import Lithology", f"Import failed:\n{e}")
+        return False
+
+def parse_sv_lithology_sheet(xlsx_path: str, sheet_name: str):
+    """
+    Parse one worksheet into:
+      - well_name
+      - kb
+      - discrete log definition for Hauptlithologie:
+          {depth: [...], values: [...], missing: "-999", color_map: {...}}
+    """
+    # metadata block
+    raw = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=None)
+
+    well_name = str(raw.iloc[0, 1]).strip() if pd.notna(raw.iloc[0, 1]) else sheet_name
+
+    kb = None
+    try:
+        kb = float(raw.iloc[1, 1]) if pd.notna(raw.iloc[1, 1]) else None
+    except Exception:
+        kb = None
+
+    # table starts at row index 3
+    df = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=3)
+    df.columns = [str(c).strip() for c in df.columns]
+
+    required = {"Teufe Basis (m)", "Hauptlithologie"}
+    if not required.issubset(df.columns):
+        raise ValueError(
+            f"Sheet '{sheet_name}' must contain columns: {sorted(required)}"
+        )
+
+    df = df.dropna(how="all").copy()
+
+    # keep only rows with a base depth
+    depth_base = pd.to_numeric(df["Teufe Basis (m)"], errors="coerce")
+    lith = df["Hauptlithologie"].astype(object)
+    strat = df["Haupt-Stratigraphie"].astype(object)
+
+
+    valid = depth_base.notna()
+    depth_base = depth_base[valid].reset_index(drop=True)
+    lith = lith[valid].reset_index(drop=True)
+    strat = strat[valid].reset_index(drop=True)
+
+    if depth_base.empty:
+        raise ValueError(f"No valid depth rows found in sheet '{sheet_name}'")
+
+    # convert base-depth table into top-depth discrete log:
+    # first top = 0.0, then previous base
+    top_depths = [0.0]
+    for i in range(1, len(depth_base)):
+        top_depths.append(float(depth_base.iloc[i - 1]))
+
+    values = []
+    for v in lith.tolist():
+        if pd.isna(v) or str(v).strip() == "":
+            values.append("-999")
+        else:
+            values.append(str(v).strip())
+
+    # build color map only for categories present
+    categories = sorted(set(values))
+    color_map = {}
+    for cat in categories:
+        color_map[cat] = DEFAULT_LITHO_COLOR_MAP.get(cat, "#DDDDDD")
+
+    disc_def = {
+        "uid": new_uid64() if "new_uid64" in globals() else None,
+        "depth": [float(x) for x in top_depths],
+        "values": values,
+        "missing": "-999",
+        "color_map": color_map,
+        "source": "SV worksheet Hauptlithologie",
+    }
+
+    total_depth = float(depth_base.max())
+
+    # ----- Haupt-Stratigraphie -> tops -----
+    imported_tops = []
+    prev_name = None
+
+    for top_d, strat_name in zip(top_depths, strat.tolist()):
+        if pd.isna(strat_name):
+            continue
+
+        name = str(strat_name).strip()
+        if not name:
+            continue
+
+        # ignore consecutive repeats, keep first row only
+        if name == prev_name:
+            continue
+
+        imported_tops.append({
+            "name": name,
+            "depth": float(top_d),
+            "role": "other",
+            "level": "other",
+        })
+        prev_name = name
+
+    total_depth = float(depth_base.max())
+
+    return well_name, kb, total_depth, disc_def, imported_tops
+
