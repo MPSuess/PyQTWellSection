@@ -82,8 +82,8 @@ from collections import OrderedDict
 
 from pywellsection.log_calculator import LogCalculatorDialog
 
-from Import_LBEG_xlsx import load_LBEG_SV
-from BEEE_load_stratigraphy import _load_BEEE_stratigraphy
+from pywellsection.Import_LBEG_xlsx import load_LBEG_SV
+from pywellsection.BEEE_load_stratigraphy import _load_BEEE_stratigraphy
 
 import logging
 import os
