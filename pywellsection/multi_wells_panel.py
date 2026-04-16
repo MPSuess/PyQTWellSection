@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.ticker import FuncFormatter
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.ticker import FormatStrFormatter
@@ -6,6 +7,7 @@ from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 from matplotlib.image import BboxImage
 from matplotlib.transforms import Bbox, TransformedBbox
+from matplotlib.patches import Polygon
 from matplotlib.collections import LineCollection
 from pywellsection.tools import _well_distance_m
 
@@ -19,6 +21,8 @@ import logging
 import pandas as pd
 from pathlib import Path
 
+import pywellsection.custom_hatches
+
 logging.getLogger("ipykernel").setLevel("CRITICAL")
 logging.getLogger("traitlets").setLevel("CRITICAL")
 logging.getLogger("root").setLevel("CRITICAL")
@@ -31,6 +35,27 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel("DEBUG")
 
 
+# shale_path = Polygon(
+#     [[-0.3, -0.025], [0.3, -0.025], [0.3, 0.025], [-0.3, 0.025]],
+#     closed=True, fill=False).get_path()
+#
+# class CustomHatch(matplotlib.hatch.Shapes):
+#     """
+#     Custom hatches defined by a path drawn inside [-0.5, 0.5] square.
+#     Identifier 'c'.
+#     """
+#     filled = True
+#     size = 1.0
+#     path = shale_path
+#
+#     def __init__(self, hatch, density):
+#         self.num_rows = (hatch.count('__')) * density
+#         self.shape_vertices = self.path.vertices
+#         self.shape_codes = self.path.codes
+#         matplotlib.hatch.Shapes.__init__(self, hatch, density)
+#
+#
+# matplotlib.hatch._hatch_types.append(CustomHatch)
 
 def scale_track_xaxis_fonts(fig, axes, wells, n_tracks, track_xaxes,
                             min_size=6, max_size=11):
@@ -189,16 +214,17 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         global_mid_plot = (global_top_plot + global_bottom_plot) / 2
 
 
-    if offsets[0] != 0.0:
-        w = selected_wells[0]
-        top_ref_depth = w["reference_depth"] - offsets[0]
-        bottom_ref_depth = top_ref_depth + w["total_depth"]
-        print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
-        global_top_plot = min(top_ref_depth, global_top_plot)
-        global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
+    # if offsets[0] != 0.0:
+    #     w = selected_wells[0]
+    #     top_ref_depth = w["reference_depth"] - offsets[0]
+    #     bottom_ref_depth = top_ref_depth + w["total_depth"]
+    #     print (f"top_ref_depth={top_ref_depth:.2f} bottom_ref_depth={bottom_ref_depth:.2f}")
+    #     global_top_plot = min(top_ref_depth, global_top_plot)
+    #     global_bottom_plot = min(bottom_ref_depth, global_bottom_plot)
 
+    global_top_plot, global_bottom_plot = depth_window
 
-    print(f"global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
+    print(f"DRAWING         global_top_plot={global_top_plot:.2f} global_bottom_plot={global_bottom_plot:.2f}")
 
 
 
@@ -247,20 +273,6 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             col_is_spacer.append(True)
             gap_i += 1
 
-    # total_cols = n_wells * (n_tracks+1) + (n_wells - 1)
-    # width_ratios = []
-    # col_is_spacer = []
-    #
-    # for w in range(n_wells):
-    #     width_ratios.append(track_width/2)
-    #     col_is_spacer.append(False)
-    #     for _ in range(n_tracks):
-    #         width_ratios.append(track_width)
-    #         col_is_spacer.append(False)
-    #     if w != n_wells - 1:
-    #         width_ratios.append(well_gap_factor)
-    #         col_is_spacer.append(True)
-
     gs = fig.add_gridspec(
         1,
         total_cols,
@@ -268,10 +280,8 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         wspace=0.05,
         left=0.1,
         right=0.90,
-        #bottom=0.10,
         top= 0.8*vertical_scale,
         bottom=0.10/vertical_scale,
-        #top=0.8/vertical_scale,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -362,9 +372,11 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             base_ax.tick_params(axis="y", labelleft=False)
             base_ax.xaxis.set_visible(False)
 
-            mid_track = (n_tracks) // 2
-            if ti == mid_track:
-                base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
+            # mid_track = (n_tracks) // 2
+            # if ti == mid_track:
+            #     #base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=5, y= 1.15,fontsize=10)
+            #     base_ax.set_title(well.get("name", f"Well {wi + 1}"), fontsize=10)
+
 
             Add_logs_to_track(base_ax, offset, track, visible_logs, well)
 
@@ -380,6 +392,7 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 
 
     add_depth_range_labels(fig, axes, selected_wells, n_tracks)
+    add_well_names(fig, axes, selected_wells, n_tracks)
 
     if corr_artists is None:
         corr_artists = []
@@ -402,6 +415,8 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
     if suptitle:
         fig.suptitle(suptitle, fontsize=14, y=0.97)
 
+    #
+
     print("now axes limits are:",axes[0].get_ylim())
 
     return axes, well_main_axes
@@ -410,8 +425,10 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
 def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
     curve_cache = {}
+    j=0
 
-    for j, log_cfg in enumerate(track.get("logs", [])):
+    for _,log_cfg in enumerate(track.get("logs", [])):
+
         log_name = log_cfg["log"]
 
         if visible_logs is not None:
@@ -420,21 +437,14 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         log_def = well.get("logs", {}).get(log_name)
         if log_def is None:
+
             continue
 
         depth = log_def["depth"]
         data = log_def["data"]
-
-
-
         mask = [x > 0 for x in depth]
-
-
-
-
         # plotting depth: flattened if offset != 0
         depth_plot = [x - offset for x in depth]
-
         twin_ax = base_ax.twiny()
         label = log_cfg.get("label", log_name)
         # --- extract settings ---
@@ -446,7 +456,7 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
         markersize = float(log_cfg.get("markersize", 2.0))
         decimate = int(log_cfg.get("decimate", 1))
         clip = bool(log_cfg.get("clip", True))
-        mask_nan = bool(log_cfg.get("mask_nan", True))
+        mask_nan = bool(log_cfg.get("mask_nan", False))
         zorder = int(log_cfg.get("zorder", 2))
 
         # --- prepare data ---
@@ -458,14 +468,16 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             x = x[m]
             y = y[m]
 
-
         if decimate > 1:
             x = x[::decimate]
             y = y[::decimate]
 
         if clip and "xlim" in log_cfg:
             xmin, xmax = log_cfg["xlim"]
-            m = (x >= xmin) & (x <= xmax) | np.isnan(x)
+            m = (x >= xmin) & (x <= xmax)
+            n = np.isnan(x) & np.isnan(y)
+            m = np.logical_or(np.logical_not(n),m)
+
             x = x[m]
             y = y[m]
 
@@ -496,7 +508,6 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             width = bbox.width
 
             colored_line(y_const, depth_plot, x_norm, twin_ax, linewidth=2*width, cmap="viridis")
-
         else:
             twin_ax.plot(
                 x, y,
@@ -513,13 +524,17 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             spine.set_visible(spine_name == "top")
 
         # Stack multiple logs upwards
-        offset_spine = 1.0 + j * 0.08
+        offset_spine = 1.0 + j * 0.05
         twin_ax.spines["top"].set_position(("axes", offset_spine))
 
         xscale = log_cfg.get("xscale", "linear")
         twin_ax.set_xscale("log" if xscale == "log" else "linear")
         if "xlim" in log_cfg:
-            twin_ax.set_xlim(log_cfg["xlim"])
+            xlim = log_cfg["xlim"]
+            if xscale == "log":
+                if xlim[0] <= 0:
+                    xlim = (1e-10, xlim[1])
+            twin_ax.set_xlim(xlim)
 
         if log_cfg.get("direction", "normal") == "reverse":
             x_min, x_max = twin_ax.get_xlim()
@@ -535,8 +550,9 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             bottom=False,
             labeltop=True,
             labelbottom=False,
-            pad=2,
+            pad=1,
             labelsize=5,
+            length=2,
         )
 
         twin_ax.grid(False)
@@ -548,12 +564,14 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
             "twin_ax": twin_ax,
             "cfg": log_cfg,
         }
+        j=j+1
 
     _apply_track_fills(
         base_ax=base_ax,
         curve_cache=curve_cache,
         track=track
     )
+
 
 def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs = None):
     """
@@ -852,7 +870,7 @@ def _draw_bitmap_track(base_ax, well, track, offset = 0.0, visible_bitmaps = Non
                             base_plot = base_phys - offset
 
                             # Optional flip (sometimes needed depending on how image is stored)
-                            if track_cfg.get("flip_vertical", False):
+                            if bmp_cfg.get("flip_vertical", True):
                                 img = np.flipud(img)
 
                             # IMPORTANT:
@@ -889,6 +907,21 @@ def add_depth_range_labels(fig, axes, wells, n_tracks):
         label = f"{ref_depth:.0f}–{well_td:.0f} m"
         fig.text(mid_x, 0.04, label, ha="center", va="center", fontsize=9)
 
+def add_well_names(fig, axes, wells, n_tracks):
+
+    for wi, well in enumerate(wells):
+
+
+        first_track_idx = wi * (n_tracks + 2)
+        last_track_idx = first_track_idx + n_tracks
+        left = axes[first_track_idx].get_position().x0
+        right = axes[last_track_idx].get_position().x1
+        mid_x = (left + right) / 2
+
+        label = well.get("name", f"Well {wi + 1}")
+        fig.text(mid_x, 0.9, label, ha="center", va="center", fontsize=9)
+
+
 def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlations_only=False,corr_artists=None,
     highlight_top=None,flatten_depths=None,visible_tops=None,visible_tracks = None, stratigraphy = None):
     """
@@ -906,7 +939,7 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
       - list that will collect Line2D and Polygon artists for correlations
         so they can be removed/redrawn when zooming.
     """
-    if visible_tops is None or len(visible_tops)==0:
+    if visible_tops is None:
         # do nothing if not visible_tops is provided
         return 0
 
@@ -1292,10 +1325,6 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
     if not fills:
         return
 
-
-
-
-
     for f in fills:
         ftype = (f.get("type") or "").strip().lower()
         alpha = float(f.get("alpha", 0.3))
@@ -1372,7 +1401,12 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             twin_ax = curve_cache[log_name]["twin_ax"]
             x0, x1 = twin_ax.get_xlim()
             xmin, xmax = (min(x0, x1), max(x0, x1))
-            bound = xmin if side == "min" else xmax
+
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            if log_cfg.get("direction", "normal") == "reverse":
+                bound = xmin if side == "max" else xmax
+            else:
+                bound = xmin if side == "min" else xmax
 
             logs = track.get("logs", []) or []
             for log in logs:
@@ -1382,7 +1416,11 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     color_map = log.get("colorscale", None)
                     _, track_xmax = track_xlim or (0.0, 1.0)
 
-
+            log_cfg = curve_cache[log_name].get("cfg", None)
+            if log_cfg.get("direction", "normal") == "reverse":
+                # Reverse the curve's displayed x-limits (xmin/xmax)'
+                y = xmin + xmax - x
+                x = y
 
             # Only fill inside the axis range
             if side == "min":
@@ -1390,30 +1428,33 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             else:
                 mask = x < xmax
 
-            # base_ax.fill_betweenx(
-            #     depth_plot, x, bound,
-            #     where=mask, alpha=alpha,
-            #     facecolor=facecolor, hatch=hatch,
-            #     linewidth=0.0, zorder=zorder,
-            # )
-
             if facetype == "color":
-
-                base_ax.fill_betweenx(
-                    depth_plot, x, bound,
-                    where=mask, alpha=alpha,
-                    facecolor=facecolor, hatch=hatch,
-                    linewidth=0.0, zorder=zorder,
-                )
+                if log_cfg.get("direction", "normal") == "reverse":
+                    base_ax.fill_betweenx(
+                        depth_plot, x, bound,
+                        where=mask, alpha=alpha,
+                        facecolor=facecolor, hatch=hatch,
+                        linewidth=0.0, zorder=zorder,
+                        interpolate = True,
+                    )
+                else:
+                    base_ax.fill_betweenx(
+                        depth_plot, x, bound,
+                        where=mask, alpha=alpha,
+                        facecolor=facecolor, hatch=hatch,
+                        linewidth=0.0, zorder=zorder,
+                        interpolate = True,
+                    )
             else:
+
                 single_curve_log_color_fill(base_ax, depth_plot, mask, x, track_xlim, color_map)
 
-                base_ax.fill_betweenx(
-                    depth_plot, x, bound,
-                    where=mask, alpha=1,
-                    facecolor="white",
-                    linewidth=0.0, zorder=0.01,
-                )
+                # base_ax.fill_betweenx(
+                #     depth_plot, x, bound,
+                #     where=mask, alpha=1,
+                #     facecolor="white",
+                #     linewidth=0.0, zorder=0.01,
+                # )
 
 
             log_cfg = curve_cache[log_name].get("cfg", None)
@@ -1421,9 +1462,9 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
             base_ax.set_xscale("log" if xscale == "log" else "linear")
             if "xlim" in log_cfg:
                 base_ax.set_xlim(log_cfg["xlim"])
-            if log_cfg.get("direction", "normal") == "reverse":
-                x_min, x_max = base_ax.get_xlim()
-                base_ax.set_xlim(x_max, x_min)
+            #if log_cfg.get("direction", "normal") == "reverse":
+            #    x_min, x_max = base_ax.get_xlim()
+            #    base_ax.set_xlim(x_max, x_min)
 
 
         ### finaly the between logs case ....
@@ -1505,6 +1546,7 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     where=mask, alpha=alpha,
                     facecolor=facecolor, hatch=hatch,
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
 
             else:
@@ -1515,12 +1557,14 @@ def _apply_track_fills(base_ax, curve_cache: dict, track: dict):
                     where=mask, alpha=1,
                     facecolor="white",
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
                 base_ax.fill_betweenx(
                     dl, xr_i,xmax,
                     where=mask, alpha=1,
                     facecolor="white",
                     linewidth=0.0, zorder=zorder,
+                    interpolate = True,
                 )
 
 

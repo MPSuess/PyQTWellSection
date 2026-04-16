@@ -254,6 +254,9 @@ class LogCalculatorDialog(QDialog):
         self.panel = panel
         self.all_wells = all_wells
 
+        self.out_name = None
+        self.out_kind = None
+
         layout = QHBoxLayout(self)
 
         # ---- Left: Log list ----
@@ -405,7 +408,6 @@ class LogCalculatorDialog(QDialog):
                 return True
 
         return super().eventFilter(obj, event)
-
 
     def _populate_logs(self):
         self.lst_logs.clear()
@@ -590,5 +592,15 @@ class LogCalculatorDialog(QDialog):
             "Log Calculator",
             f"Generated '{out_name}' ({kind}) for {n_done} well(s).\nSkipped: {n_skipped}"
         )
+
+        self.out_name = out_name
+        self.out_kind = kind
         self.accept()
 
+    def result(self):
+
+        #print("returning:",self.out_name, self.out_kind)
+
+        tuedel = [self.out_name, self.out_kind]
+
+        return( tuedel)

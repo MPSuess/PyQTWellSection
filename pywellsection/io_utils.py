@@ -5,6 +5,7 @@ import re
 import lasio
 import numpy as np
 import csv
+import pandas as pd
 
 from collections import defaultdict
 
@@ -18,8 +19,9 @@ from typing import Dict, Any, List, Tuple, Optional
 
 import openpyxl
 
-from pywellsection.dialogs import ImportTopsAssignWellDialog
-from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
+from pywellsection.dialogs import ImportTopsAssignWellDialog, ImportCoreExcelDialog
+#from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
+from pywellsection.Bee_SV_load import bgr_sv_load_tree
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -185,7 +187,6 @@ def _file_load_tops_from_csv(self, path: str):
 
     QMessageBox.information(self, "Load tops CSV", "\n".join(msg))
 
-
 def _file_export_discrete_logs_csv(self):
     path, _ = QFileDialog.getSaveFileName(
         self,
@@ -201,7 +202,6 @@ def _file_export_discrete_logs_csv(self):
 
     self._file_load_tops_from_csv(path)
 
-
 def _file_import_discrete_logs_csv(self):
     path, _ = QFileDialog.getOpenFileName(
         self,
@@ -213,7 +213,6 @@ def _file_import_discrete_logs_csv(self):
         return
 
     import_discrete_logs_from_csv(self, path)
-
 
 def load_project_from_json(path):
     path = Path(path)
@@ -244,8 +243,9 @@ def load_project_from_json(path):
     window_dict = data.get("window_dict", {})
     metadata = data.get("metadata", {})
     ui_layout = data.get("ui_layout", {})
+    tree_dict = data.get("tree_dict", {})
 
-    return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
+    return window_dict, wells, tracks, stratigraphy, ui_layout, tree_dict, metadata
 
 def load_project_from_json_old(path):
     """Load a project from JSON file and return (wells, tracks, stratigraphy, metadata)."""
@@ -263,7 +263,8 @@ def load_project_from_json_old(path):
 
     return window_dict, wells, tracks, stratigraphy, ui_layout, metadata
 
-def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None, extra_metadata=None):
+def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=None, ui_layout = None,
+                           tree_dict = None, extra_metadata=None):
     """
     Export the current project to a JSON file (NumPy-safe).
 
@@ -294,12 +295,12 @@ def export_project_to_json(path, wells, tracks, stratigraphy=None, window_dict=N
         project["window_dict"] = window_dict
     if ui_layout is not None:
         project["ui_layout"] = ui_layout
-
+    if tree_dict is not None:
+        project["tree_dict"] = tree_dict
     with path.open("w", encoding="utf-8") as f:
         json.dump(project, f, indent=2, default=_json_serializer)
 
     return project
-
 
 def _json_serializer(obj):
     """Handle non-JSON-serializable objects (e.g. NumPy types)."""
@@ -829,159 +830,6 @@ def import_discrete_logs_from_csv(self, path: str):
         "\n".join(msg_lines)
     )
 
-class LoadCoreBitmapDialog(QDialog):
-    """
-    Load an image (BMP/PNG/JPG) and assign it as a core bitmap to a well.
-
-    Returns dict:
-      {
-        "well_name": str,
-        "key": str,
-        "path": str,
-        "top_depth": float,
-        "base_depth": float,
-        "label": str,
-        "flip_vertical": bool,
-        "alpha": float,
-        "interpolation": str,
-        "cmap": str|None,
-      }
-    """
-
-    def __init__(self, parent, well_names, default_well=None):
-        super().__init__(parent)
-        self.setWindowTitle("Load core bitmap")
-        self.resize(520, 260)
-
-        self._result = None
-
-        layout = QVBoxLayout(self)
-        form = QFormLayout()
-        layout.addLayout(form)
-
-        # well selection
-        self.cmb_well = QComboBox(self)
-        self.cmb_well.addItems(list(well_names))
-        if default_well and default_well in well_names:
-            self.cmb_well.setCurrentText(default_well)
-        form.addRow("Well:", self.cmb_well)
-
-        # key/name
-        self.ed_key = QLineEdit(self)
-        self.ed_key.setText("core")
-        form.addRow("Bitmap key:", self.ed_key)
-
-        # file path + browse
-        self.ed_path = QLineEdit(self)
-        btn_browse = QPushButton("Browse…", self)
-        row_path = QHBoxLayout()
-        row_path.addWidget(self.ed_path)
-        row_path.addWidget(btn_browse)
-        form.addRow("Image file:", row_path)
-        btn_browse.clicked.connect(self._browse)
-
-        # depth interval
-        self.spin_top = QDoubleSpinBox(self)
-        self.spin_top.setRange(-1e9, 1e9)
-        self.spin_top.setDecimals(3)
-        self.spin_top.setSingleStep(1.0)
-        form.addRow("Top depth:", self.spin_top)
-
-        self.spin_base = QDoubleSpinBox(self)
-        self.spin_base.setRange(-1e9, 1e9)
-        self.spin_base.setDecimals(3)
-        self.spin_base.setSingleStep(1.0)
-        self.spin_base.setValue(1.0)
-        form.addRow("Base depth:", self.spin_base)
-
-        # label
-        self.ed_label = QLineEdit(self)
-        self.ed_label.setText("Core")
-        form.addRow("Track label:", self.ed_label)
-
-        # alpha
-        self.spin_alpha = QDoubleSpinBox(self)
-        self.spin_alpha.setRange(0.0, 1.0)
-        self.spin_alpha.setDecimals(2)
-        self.spin_alpha.setSingleStep(0.05)
-        self.spin_alpha.setValue(1.0)
-        form.addRow("Alpha:", self.spin_alpha)
-
-        # interpolation
-        self.cmb_interp = QComboBox(self)
-        self.cmb_interp.addItems(["nearest", "bilinear", "bicubic"])
-        self.cmb_interp.setCurrentText("nearest")
-        form.addRow("Interpolation:", self.cmb_interp)
-
-        # colormap (optional)
-        self.cmb_cmap = QComboBox(self)
-        self.cmb_cmap.addItems(["(none)", "gray"])
-        self.cmb_cmap.setCurrentText("(none)")
-        form.addRow("Colormap:", self.cmb_cmap)
-
-        # flip
-        self.chk_flip = QCheckBox("Flip vertically", self)
-        self.chk_flip.setChecked(False)
-        form.addRow("Orientation:", self.chk_flip)
-
-        # OK/Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-    def _browse(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select image",
-            "",
-            "Images (*.bmp *.png *.jpg *.jpeg *.tif *.tiff);;All files (*.*)"
-        )
-        if path:
-            self.ed_path.setText(path)
-
-    def _on_accept(self):
-        well_name = self.cmb_well.currentText().strip()
-        key = self.ed_key.text().strip() or "core"
-        path = self.ed_path.text().strip()
-
-        if not well_name:
-            QMessageBox.warning(self, "Load core bitmap", "Please choose a well.")
-            return
-        if not path:
-            QMessageBox.warning(self, "Load core bitmap", "Please choose an image file.")
-            return
-
-        top_d = float(self.spin_top.value())
-        base_d = float(self.spin_base.value())
-        if abs(base_d - top_d) < 1e-9:
-            QMessageBox.warning(self, "Load core bitmap", "Top and Base depth must differ.")
-            return
-
-        label = self.ed_label.text().strip() or "Core"
-        alpha = float(self.spin_alpha.value())
-        interpolation = self.cmb_interp.currentText().strip()
-        cmap_txt = self.cmb_cmap.currentText().strip()
-        cmap = None if cmap_txt == "(none)" else cmap_txt
-        flip = bool(self.chk_flip.isChecked())
-
-        self._result = {
-            "well_name": well_name,
-            "key": key,
-            "path": path,
-            "top_depth": top_d,
-            "base_depth": base_d,
-            "label": label,
-            "alpha": alpha,
-            "interpolation": interpolation,
-            "cmap": cmap,
-            "flip_vertical": flip,
-        }
-        self.accept()
-
-    def result(self):
-        return self._result
-
 
 import os
 import json
@@ -1174,9 +1022,6 @@ def _normalize_loaded_project(wells: list, tracks: list, stratigraphy: dict):
     if stratigraphy is None:
         stratigraphy = {}
 
-
-
-
 # ============================================================
 # 1) Role inference from Hauptformation (full) and abbreviation
 # ============================================================
@@ -1219,157 +1064,6 @@ def default_level_for_role(role: str) -> str:
         return "other"
     return "formation"
 
-# ============================================================
-# 2) XLSX parser (UPDATED)
-#    - Reads from sheet with the header (RWE_Dea-DEA-WinDEA)
-#    - Uses Column E (2nd "Hauptformation") as top KEY
-#    - Adds stratigraphy updates with "Full Name"
-# ============================================================
-
-def parse_geolprofile_xlsx_to_tops_v2(
-    xlsx_path: str,
-    sheet_name: str,
-) -> Tuple[List[Dict[str, Any]], float, Dict[str, Dict[str, Any]]]:
-    """
-    Returns:
-      tops_list: [
-          {"key": <abbr>, "full_name": <full>, "depth": <top_depth>, "role": <role>}, ...
-      ]
-      td: float
-      strat_updates: { <abbr>: {"Full Name": <full>, "role": <role>, "level": <level>} , ... }
-
-    Notes:
-      - KEY is Column E (2nd 'Hauptformation', abbreviation).
-      - If abbreviation is blank, falls back to a generated key:
-          fault -> "*ST_<depth>"
-          other -> "*OTHER_<depth>"
-          else -> "<full>_<depth>"
-      - "Endteufe" row is treated as TD only (not a top).
-      - Top depth uses Toptiefe if present, else previous row base depth.
-    """
-    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
-
-    ws = None
-
-    if sheet_name not in wb.sheetnames:
-        raise ValueError(f"Sheet '{sheet_name}' not found in workbook")
-    if sheet_name:
-        ws = wb[sheet_name]
-    else:
-        # Pick the first non-empty sheet that contains "Profil_ID" header
-        #ws = None
-        for name in wb.sheetnames:
-            cand = wb[name]
-            first = next(cand.iter_rows(values_only=True), None)
-            if first and "Profil_ID" in list(first):
-                ws = cand
-                break
-    if ws is None:
-        raise ValueError("No sheet with 'Profil_ID' header found.")
-
-    rows = [r for r in ws.iter_rows(values_only=True)]
-    if not rows or len(rows) < 2:
-        return [], 0.0, {}
-
-    header = list(rows[0])
-
-    # indices
-    idx_top = header.index("Toptiefe") if "Toptiefe" in header else 1
-    idx_base = header.index("Basistiefe") if "Basistiefe" in header else 2
-
-    hf_idxs = [i for i, h in enumerate(header) if h == "Hauptformation"]
-    # Column D = first Hauptformation (full name)
-    # Column E = second Hauptformation (abbrev) (requested)
-    idx_full = hf_idxs[0] if len(hf_idxs) >= 1 else 3
-    idx_abbr = hf_idxs[1] if len(hf_idxs) >= 2 else 4
-
-    tops: List[Dict[str, Any]] = []
-    strat_updates: Dict[str, Dict[str, Any]] = {}
-
-    prev_base = 0.0
-    td = 0.0
-
-    for r in rows[1:]:
-        if r is None:
-            continue
-
-        base_v = r[idx_base] if idx_base < len(r) else None
-        if base_v is None or base_v == "":
-            continue
-        try:
-            base_d = float(base_v)
-        except Exception:
-            continue
-
-        td = max(td, base_d)
-
-        top_v = r[idx_top] if idx_top < len(r) else None
-        if top_v is None or top_v == "":
-            top_d = prev_base
-        else:
-            try:
-                top_d = float(top_v)
-            except Exception:
-                top_d = prev_base
-
-        full = r[idx_full] if idx_full < len(r) else ""
-        abbr = r[idx_abbr] if idx_abbr < len(r) else ""
-
-        full_name = (str(full).strip() if full not in (None, "") else "")
-        abbr_key = (str(abbr).strip() if abbr not in (None, "") else "")
-
-        # "Endteufe" row: TD only
-        if full_name.lower() == "endteufe":
-            prev_base = base_d
-            continue
-
-        role = infer_role_from_hauptformation(full_name, abbr_key)
-        level = default_level_for_role(role)
-
-        # Required: Use abbreviation as top key
-        key = abbr_key
-
-        # If abbreviation is missing: generate deterministic key
-        if not key:
-            if role == "fault":
-                key = f"*ST_{top_d:.2f}"
-            elif role == "other":
-                key = f"*OTHER_{top_d:.2f}"
-            else:
-                # keep a readable fallback
-                fn = full_name if full_name else "TOP"
-                key = f"{fn}_{top_d:.2f}"
-
-        # Track stratigraphy update:
-        # - store "Full Name" (requested exact field)
-        # - store role/level
-        if key not in strat_updates:
-            strat_updates[key] = {"Full Name": full_name, "role": role, "level": level, "color": random_strat_color(),
-                                  "hatch": "-"}
-        else:
-            # keep first full name if already set; but fill if missing
-            if not strat_updates[key].get("Full Name"):
-                strat_updates[key]["Full Name"] = full_name
-            strat_updates[key].setdefault("role", role)
-            strat_updates[key].setdefault("level", level)
-            strat_updates[key].setdefault("color", random_strat_color())
-            strat_updates[key].setdefault("hatch", "-")
-
-        tops.append({"key": key, "full_name": full_name, "depth": top_d, "role": role, "color": random_strat_color(),
-                     "hatch": "-"})
-
-        prev_base = base_d
-
-    # Deduplicate tops by key: keep shallowest occurrence
-    dedup: Dict[str, Dict[str, Any]] = {}
-    for t in tops:
-        k = t["key"]
-        if k not in dedup or float(t["depth"]) < float(dedup[k]["depth"]):
-            dedup[k] = t
-    tops = list(dedup.values())
-    tops.sort(key=lambda x: float(x["depth"]))
-
-    return tops, float(td), strat_updates
 
 import random
 
@@ -1402,244 +1096,10 @@ def random_strat_color(seed=None):
 #    - updates project.stratigraphy with "Full Name" field
 # ============================================================
 
-def import_schichtenverzeichnisv1(parent,project, xlsx_path: str,): # PWSProject or app container with .all_wells/.all_stratigraphy
+def import_schichtenverzeichnis(parent, project, xlsx_path, bee_path="./BEE_Chrono.xlsx"):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
-
-    try:
-        parsed_tops, td, strat_updates = parse_geolprofile_xlsx_to_tops_v2(xlsx_path)
-    except Exception as e:
-        QMessageBox.critical(parent, "Import", f"Failed to parse file:\n{e}")
-        return False
-
-    if not parsed_tops:
-        QMessageBox.information(parent, "Import", "No tops found in this file.")
-        return False
-
-    wells = getattr(project, "all_wells", None)
-    if wells is None:
-        wells = getattr(project, "wells", []) or []
-
-    existing_names = [w.get("name", "") for w in wells if w.get("name")]
-    default_new_name = os.path.splitext(os.path.basename(xlsx_path))[0]
-
-    dlg = ImportTopsAssignWellDialog(
-        parent,
-        existing_well_names=existing_names,
-        default_new_name=default_new_name,
-        td=td,
-        n_tops=len(parsed_tops),
-    )
-    if dlg.exec_() != QDialog.Accepted:
-        return False
-
-    sel = dlg.result_selection()
-
-    # Resolve target well
-    target_well = None
-    if sel["create_new"]:
-        new_name = sel["new_name"]
-        if not new_name:
-            QMessageBox.warning(parent, "Import", "Please provide a name for the new well.")
-            return False
-
-        target_well = {
-            "name": new_name,
-            "UWI": "",
-            "x": None,
-            "y": None,
-            "reference_type": "KB",
-            "reference_depth": 0.0,
-            "total_depth": float(sel["td"]) if sel["set_td"] else 0.0,
-            "logs": {},
-            "discrete_logs": {},
-            "tops": {},
-            "facies_intervals": [],
-            "bitmaps": {},
-        }
-        wells.append(target_well)
-    else:
-        nm = sel["existing_name"]
-        for w in wells:
-            if w.get("name") == nm:
-                target_well = w
-                break
-        if target_well is None:
-            QMessageBox.warning(parent, "Import", "Selected well not found.")
-            return False
-
-        if sel["set_td"]:
-            ref = float(target_well.get("reference_depth", 0.0) or 0.0)
-            target_well["total_depth"] = max(float(target_well.get("total_depth", 0.0) or 0.0), float(td - ref))
-
-    # Update project stratigraphy with "Full Name" and roles
-    strat = getattr(project, "all_stratigraphy", None)
-    if strat is None:
-        strat = getattr(project, "stratigraphy", None)
-        if strat is None:
-            strat = {}
-            # attach if possible
-            if hasattr(project, "all_stratigraphy"):
-                project.all_stratigraphy = strat
-            elif hasattr(project, "stratigraphy"):
-                project.stratigraphy = strat
-
-    # strat is expected to be dict
-    if not isinstance(strat, dict):
-        strat = {}
-
-    # merge updates (do not overwrite existing styling)
-    for key, upd in strat_updates.items():
-        if key not in strat:
-            strat[key] = dict(upd)
-        else:
-            # ensure Full Name exists (requested)
-            if "Full Name" not in strat[key] or not strat[key].get("Full Name"):
-                strat[key]["Full Name"] = upd.get("Full Name", "")
-            strat[key].setdefault("role", upd.get("role", "stratigraphy"))
-            strat[key].setdefault("level", upd.get("level", "formation"))
-
-    # Apply tops to the well using abbreviation keys
-    tops_dict = target_well.setdefault("tops", {})
-
-    added = 0
-    updated = 0
-    for t in parsed_tops:
-        key = t["key"]
-        depth = float(t["depth"])
-
-        meta = strat.get(key, {}) if isinstance(strat, dict) else {}
-        role = meta.get("role", t.get("role", "stratigraphy"))
-        level = meta.get("level", default_level_for_role(role))
-
-        if key in tops_dict and isinstance(tops_dict[key], dict):
-            tops_dict[key]["depth"] = depth
-            tops_dict[key].setdefault("role", role)
-            tops_dict[key].setdefault("level", level)
-            updated += 1
-        else:
-            tops_dict[key] = {"depth": depth, "role": role, "level": level}
-            # if you keep color/hatch in stratigraphy, you can copy defaults once:
-            if isinstance(meta, dict):
-                if "color" in meta:
-                    tops_dict[key].setdefault("color", meta["color"])
-                if "hatch" in meta:
-                    tops_dict[key].setdefault("hatch", meta["hatch"])
-            added += 1
-
-    QMessageBox.information(
-        parent,
-        "Import",
-        f"Imported tops into '{target_well.get('name','')}'.\n\nAdded: {added}\nUpdated: {updated}\n"
-        f"Stratigraphy updated/extended: {len(strat_updates)} keys\n\n"
-        "Note: Top keys use the abbreviation (2nd Hauptformation / Column E)."
-    )
-    return True
-
-def import_schichtenverzeichnisv2(parent, project, xlsx_path):
-    if not os.path.exists(xlsx_path):
-        QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
-        return False
-
-    # --- Load workbook first ---
-    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
-    sheet_names = wb.sheetnames
-
-    if not sheet_names:
-        QMessageBox.warning(parent, "Import", "No worksheets found in file.")
-        return False
-
-    wells = project.all_wells
-    existing_names = [w["name"] for w in wells if w.get("name")]
-
-    dlg = ImportTopsAssignWellDialog(
-        parent,
-        sheet_names=sheet_names,
-        existing_well_names=existing_names,
-        default_new_name=os.path.splitext(os.path.basename(xlsx_path))[0],
-    )
-
-    # --- Live preview update when sheet changes ---
-    def update_preview():
-        try:
-            tops, td, _ = parse_geolprofile_xlsx_to_tops_v2(
-                xlsx_path,
-                dlg.selected_sheet(),
-            )
-            dlg.set_preview(len(tops), td)
-        except Exception as e:
-            dlg.lbl_preview.setText(f"Preview error: {e}")
-
-    dlg.cmb_sheet.currentIndexChanged.connect(update_preview)
-    update_preview()
-
-    if dlg.exec_() != QDialog.Accepted:
-        return False
-
-    sel = dlg.result_selection()
-
-    # --- Parse selected sheet ---
-    tops, td, strat_updates = parse_geolprofile_xlsx_to_tops_v2(
-        xlsx_path,
-        sel["sheet"],
-    )
-
-    if not tops:
-        QMessageBox.information(parent, "Import", "No tops found in selected sheet.")
-        return False
-
-    # --- Resolve well (unchanged logic) ---
-    if sel["create_new"]:
-        target_well = {
-            "name": sel["new_name"],
-            "reference_type": "KB",
-            "reference_depth": 0.0,
-            "total_depth": td if sel["set_td"] else 0.0,
-            "logs": {},
-            "discrete_logs": {},
-            "tops": {},
-            "facies_intervals": [],
-            "bitmaps": {},
-        }
-        wells.append(target_well)
-    else:
-        target_well = next(
-            (w for w in wells if w.get("name") == sel["existing_name"]), None
-        )
-        if target_well is None:
-            QMessageBox.warning(parent, "Import", "Selected well not found.")
-            return False
-
-        if sel["set_td"]:
-            ref = float(target_well.get("reference_depth", 0.0))
-            target_well["total_depth"] = max(
-                float(target_well.get("total_depth", 0.0)),
-                td - ref,
-            )
-
-    # --- Apply stratigraphy + tops (unchanged) ---
-    strat = project.all_stratigraphy
-    for key, meta in strat_updates.items():
-        strat.setdefault(key, {}).update(meta)
-
-    tops_dict = target_well.setdefault("tops", {})
-    for t in tops:
-        tops_dict[t["key"]] = {
-            "depth": t["depth"],
-            "role": t["role"],
-            "level": strat.get(t["key"], {}).get("level", "formation"),
-        }
-
-    QMessageBox.information(
-        parent,
-        "Import",
-        f"Imported {len(tops)} tops from sheet '{sel['sheet']}' into '{target_well['name']}'."
-    )
-
-    return True
-
-def import_schichtenverzeichnis(parent, project, xlsx_path):
     if not os.path.exists(xlsx_path):
         QMessageBox.warning(parent, "Import", f"File not found:\n{xlsx_path}")
         return False
@@ -1682,8 +1142,11 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
 
     sel = dlg.result_selection()
 
+    if sel["bee_path"]:
+        bee_path = sel["bee_path"]
+
     # --- Parse selected sheet ---
-    tops, td, strat_updates = bgr_sv_load_tree("../Safe/BEE_Chrono.xlsx", xlsx_path)
+    tops, td, strat_updates = bgr_sv_load_tree(bee_path, xlsx_path)
 
 
     if not tops:
@@ -1725,12 +1188,18 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
         strat.setdefault(key, {}).update(meta)
 
     tops_dict = target_well.setdefault("tops", {})
+
+    parent.panel.set_draw_well_panel(False)
+
     for t in tops:
         tops_dict[t["key"]] = {
             "depth": t["depth"],
             "role": t["role"],
             "level": strat.get(t["key"], {}).get("level", "formation"),
         }
+        parent.add_top_to_tree(t["key"], t["role"])
+
+    parent.panel.set_draw_well_panel(True)
 
     QMessageBox.information(
         parent,
@@ -1739,3 +1208,150 @@ def import_schichtenverzeichnis(parent, project, xlsx_path):
     )
 
     return True
+
+def _find_well_by_name(project, well_name: str):
+    for w in (project.all_wells or []):
+        if w.get("name") == well_name:
+            return w
+    return None
+
+
+def _ensure_well_exists(project, well_name: str):
+    well = _find_well_by_name(project, well_name)
+    if well is not None:
+        return well
+
+    well = {
+        "uid": new_uid64() if "new_uid64" in globals() else None,
+        "name": well_name,
+        "UWI": "",
+        "x": None,
+        "y": None,
+        "reference_type": "KB",
+        "reference_depth": 0.0,
+        "total_depth": 0.0,
+        "logs": {},
+        "discrete_logs": {},
+        "tops": {},
+        "facies_intervals": [],
+        "bitmaps": {},
+    }
+    project.all_wells.append(well)
+    return well
+
+
+def _to_numeric_nan(series: pd.Series) -> np.ndarray:
+    return pd.to_numeric(series, errors="coerce").to_numpy(dtype=float)
+
+
+def _sanitize_core_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.dropna(how="all")
+    return df
+
+
+def load_core_data_from_excel(parent, xlsx_path: str) -> bool:
+
+    project = parent
+
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Import Core Data", f"File not found:\n{xlsx_path}")
+        return False
+
+    try:
+        existing_well_names = [w.get("name", "") for w in (project.all_wells or []) if w.get("name")]
+
+        dlg = ImportCoreExcelDialog(
+            parent,
+            workbook_path=xlsx_path,
+            existing_well_names=existing_well_names,
+        )
+        if dlg.exec() != QDialog.Accepted:
+            return False
+
+        cfg = dlg.result_config()
+
+        if not cfg["selected_columns"]:
+            QMessageBox.information(parent, "Import Core Data", "No columns selected.")
+            return False
+
+        df = pd.read_excel(xlsx_path, sheet_name=cfg["sheet"])
+        df = _sanitize_core_dataframe(df)
+
+        required = {"Well", "Depth"}
+        if not required.issubset(df.columns):
+            QMessageBox.warning(
+                parent,
+                "Import Core Data",
+                f"Selected sheet '{cfg['sheet']}' must contain at least columns: Well, Depth"
+            )
+            return False
+
+        if cfg["file_well"]:
+            df = df[df["Well"].astype(str).str.strip() == cfg["file_well"]].copy()
+
+        if df.empty:
+            QMessageBox.information(parent, "Import Core Data", "No matching rows found.")
+            return False
+
+        target_well_name = cfg["new_well_name"] if cfg["create_new"] else cfg["existing_well"]
+        target_well_name = (target_well_name or "").strip()
+        if not target_well_name:
+            QMessageBox.warning(parent, "Import Core Data", "No target well selected.")
+            return False
+
+        target_well = _ensure_well_exists(project, target_well_name)
+        target_well.setdefault("logs", {})
+
+        depth = _to_numeric_nan(df["Depth"])
+
+        imported = []
+        skipped = []
+
+        for src_col, tgt_name in cfg["selected_columns"]:
+            if src_col not in df.columns:
+                skipped.append(f"{src_col} (missing in sheet)")
+                continue
+
+            values = _to_numeric_nan(df[src_col])
+
+            if tgt_name in target_well["logs"] and not cfg["overwrite"]:
+                skipped.append(tgt_name)
+                continue
+
+            target_well["logs"][tgt_name] = {
+                "uid": new_uid64() if "new_uid64" in globals() else None,
+                "depth": depth.tolist(),
+                "data": values.tolist(),
+            }
+            imported.append(tgt_name)
+
+        finite_depth = depth[np.isfinite(depth)]
+        if finite_depth.size:
+            max_depth = float(np.nanmax(finite_depth))
+            ref_depth = float(target_well.get("reference_depth", 0.0) or 0.0)
+            target_well["total_depth"] = max(float(target_well.get("total_depth", 0.0) or 0.0), max_depth - ref_depth)
+
+        active_panel = getattr(parent, "active_window", None)
+        if active_panel is not None:
+            for log_name in imported:
+                if hasattr(active_panel, "add_visible_log_by_name"):
+                    active_panel.add_visible_log_by_name(log_name, redraw=False)
+
+        #Update Input Tree
+
+        for log_name in imported:
+            parent._add_new_log_to_tree({"name": log_name,"type": "continuous"})
+            parent._add_log_to_well_in_input_tree(target_well["name"], log_name)
+            #parent.all_wells[target_well["name"]].update()
+
+        msg = f"Imported {len(imported)} logs into '{target_well_name}'."
+        if skipped:
+            msg += f"\nSkipped: {', '.join(skipped)}"
+        QMessageBox.information(parent, "Import Core Data", msg)
+        return True
+
+    except Exception as e:
+        QMessageBox.critical(parent, "Import Core Data", f"Import failed:\n{e}")
+        return False
