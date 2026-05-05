@@ -1455,6 +1455,7 @@ class MainWindow(QMainWindow):
 
     def _populate_tops_tree(self):
         """Rebuild the new well tops tree from self.c_stratigraphy_root, preserving selections if possible."""
+        self.input_tree.blockSignals(True)
         # Remember current selection by name
         strat_prev_selected = set()
         strat_root = self.c_stratigraphy_root
