@@ -197,10 +197,8 @@ def _file_load_tops_from_csv(self, path: str):
         self.panel.draw_panel()
 
     # ---- refresh trees ----
-    if hasattr(self, "_populate_well_tree"):
-        self._populate_well_tree()
-    if hasattr(self, "_populate_top_tree"):
-        self._populate_top_tree()
+    self._populate_input_tree()
+    self._populate_tops_tree()
 
     # ---- summary message ----
     msg = [
@@ -839,8 +837,7 @@ def import_discrete_logs_from_csv(self, path: str):
     # ---- refresh trees ----
     if hasattr(self, "_populate_log_tree"):
         self._populate_log_tree()
-    if hasattr(self, "_populate_well_tree"):
-        self._populate_well_tree()
+    self._populate_input_tree()
 
     # ---- summary message ----
     msg_lines = [
@@ -924,8 +921,7 @@ def load_project_from_json_new(self, path: str | None = None):
                 pass
 
         # ---- refresh UI ----
-        if hasattr(self, "_populate_well_tree"):
-            self._populate_well_tree()
+        self._populate_input_tree()
         if hasattr(self, "_populate_track_tree"):
             self._populate_track_tree()
         if hasattr(self, "_populate_strat_tree"):
@@ -1366,12 +1362,9 @@ def load_core_data_from_excel(parent, xlsx_path: str) -> bool:
                 if hasattr(active_panel, "add_visible_log_by_name"):
                     active_panel.add_visible_log_by_name(log_name, redraw=False)
 
-        #Update Input Tree
-
-        for log_name in imported:
-            parent._add_new_log_to_tree({"name": log_name,"type": "continuous"})
-            parent._add_log_to_well_in_input_tree(target_well["name"], log_name)
-            #parent.all_wells[target_well["name"]].update()
+        # Update Input Tree
+        parent._populate_input_tree()
+        parent._populate_log_tree()
 
         msg = f"Imported {len(imported)} logs into '{target_well_name}'."
         if skipped:
@@ -1498,9 +1491,8 @@ def import_sv_lithology_as_discrete_log(parent, project, xlsx_path: str) -> bool
 
         if cfg["create_new"]:
             parent.all_wells.append(target_well)
-            parent._add_new_well_to_input_tree(target_well_name)
-            parent._add_discrete_log_to_well_in_input_tree(target_well_name, log_name)
-            parent._add_discrete_log_to_logs_in_input_tree(log_name)
+        parent._populate_input_tree()
+        parent._populate_log_tree()
 
 
         QMessageBox.information(
