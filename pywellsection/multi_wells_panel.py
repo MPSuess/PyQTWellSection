@@ -273,6 +273,10 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             col_is_spacer.append(True)
             gap_i += 1
 
+    safe_scale = max(0.1, float(vertical_scale or 1.0))
+    bottom_margin = min(max(0.10 / safe_scale, 0.04), 0.35)
+    top_margin = min(max(0.8 * safe_scale, bottom_margin + 0.20), 0.96)
+
     gs = fig.add_gridspec(
         1,
         total_cols,
@@ -280,8 +284,8 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
         wspace=0.05,
         left=0.1,
         right=0.90,
-        top= 0.8*vertical_scale,
-        bottom=0.10/vertical_scale,
+        top=top_margin,
+        bottom=bottom_margin,
     )
 
     axes = [fig.add_subplot(gs[0, i]) for i in range(total_cols)]
@@ -351,7 +355,6 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
             base_ax.set_ylabel("Depth (m)", labelpad=8)
             base_ax.tick_params(axis="y", labelleft=True, direction="in", pad=-10)
             base_ax.xaxis.set_visible(False)
-            base_ax.set_title(well.get("name", f"Well {wi + 1}"), pad=70, fontsize=10)
 
             if depth_formatter is not None:
                 base_ax.yaxis.set_major_formatter(depth_formatter)
@@ -943,6 +946,9 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
         # do nothing if not visible_tops is provided
         return 0
 
+    # Be defensive: tops should still draw even if no stratigraphy table is available.
+    strat_map = stratigraphy if isinstance(stratigraphy, dict) else {}
+
     n_wells = len(wells)
     if corr_artists is None:
         corr_artists = []
@@ -1028,11 +1034,14 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
 
         # Draw top lines and within-well fills only on full pass
         if not correlations_only:
-            # horizontal top lines in ALL tracks of this well
-            for ti in range(n_tracks+1):
-                if ti == 0: continue
-                col_idx = first_track_idx + ti
-                base_ax = axes[col_idx]
+            if n_tracks > 0:
+                plot_axes = [axes[first_track_idx + ti + 1] for ti in range(n_tracks)]
+            else:
+                # No visible tracks: draw tops on the depth axis so they are still visible.
+                plot_axes = [main_ax]
+
+            # horizontal top lines in all plotting axes for this well
+            for base_ax in plot_axes:
                 for name in top_names:
 
                     info = top_meta[name]
@@ -1044,54 +1053,35 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
                                       and highlight_top[1] == name)
 
                     linewidth = style["line_width"] * (1.0 if not is_highlighted else 1.8)
-#                    print(stratigraphy)
 
-                    if len(stratigraphy) == 0:
-                        return len(stratigraphy)
+                    meta = strat_map.get(name, {})
+                    role = meta.get('role', 'stratigraphy')
+                    line_color = meta.get('color', info["color"])
+                    line_style = meta.get('hatch', '-')
 
-#                    print(f"add_tops_and_correlations stratigraphy: {stratigraphy}")
-
-                    if name not in stratigraphy.keys():
-                        continue
-
-                    if stratigraphy[name]['role'] == 'stratigraphy':
+                    if role in ('stratigraphy', 'fault'):
                         base_ax.axhline(
                             info["depth"],
                             xmin=0.0,
                             xmax=1.0,
-                            color=stratigraphy[name]["color"],
-                            linestyle=stratigraphy[name]["hatch"],
+                            color=line_color,
+                            linestyle=line_style,
                             linewidth=linewidth,
                             zorder=1.2 if not is_highlighted else 1.8,
                         )
-                    elif stratigraphy[name]['role'] == 'fault':
-                        base_ax.axhline(
-                            info["depth"],
-                            xmin=0.0,
-                            xmax=1.0,
-                            color=stratigraphy[name]["color"],
-                            linestyle=stratigraphy[name]["hatch"],
-                            linewidth=linewidth,
-                            zorder=1.2 if not is_highlighted else 1.8,
-                        )
-
 
             # fill BETWEEN tops in this well using upper top's style
             if len(top_depths) >= 2:
+                fill_axes = plot_axes if n_tracks == 0 else [axes[first_track_idx + ti + 1] for ti in range(n_tracks)]
                 for i in range(len(top_depths) - 1):
                     name_upper = top_names[i]
                     d1 = top_depths[i]
                     d2 = top_depths[i + 1]
                     info = top_meta[name_upper]
                     color = info["color"]
-                    #color = stratigraphy[name_upper]['color']
                     style = info["style"]
-                    if name_upper not in stratigraphy.keys():
-                        continue
-                    if stratigraphy[name_upper]['role']=='stratigraphy':
-                        for ti in range(n_tracks):
-                            col_idx = first_track_idx + ti + 1
-                            base_ax = axes[col_idx]
+                    if strat_map.get(name_upper, {}).get('role', 'stratigraphy') == 'stratigraphy':
+                        for base_ax in fill_axes:
                             base_ax.axhspan(
                                 d1,
                                 d2,
@@ -1105,7 +1095,6 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
             # hatched interval just below deepest formation top
             formation_depths = [
                 depth for (name, depth, color, level) in top_items
-                #if level == "formation"
             ]
             if formation_depths:
                 deepest_formation = max(formation_depths)
@@ -1116,10 +1105,7 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
                 open_top = deepest_formation
                 open_bottom = min(deepest_formation + thickness, depth_max)
                 if open_bottom > open_top:
-
-                    for ti in range(n_tracks):
-                        col_idx = first_track_idx + ti +1
-                        base_ax = axes[col_idx]
+                    for base_ax in plot_axes:
                         base_ax.axhspan(
                             open_top,
                             open_bottom,
@@ -1132,7 +1118,10 @@ def add_tops_and_correlations(fig,axes,wells,well_main_axes,n_tracks,correlation
 
         # labels + figure-coordinate y positions
         x_min_main, x_max_main = main_ax.get_xlim()
-        x_label_pos = x_min_main - 1.5* (x_max_main - x_min_main)
+        if n_tracks > 0:
+            x_label_pos = x_min_main - 1.5 * (x_max_main - x_min_main)
+        else:
+            x_label_pos = x_min_main + 0.02 * (x_max_main - x_min_main)
         #x_label_pos = xmin_main - 0.5 * (xmax_main - xmin_main)
 
         for name in top_names:

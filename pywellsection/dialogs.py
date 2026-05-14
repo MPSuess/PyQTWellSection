@@ -379,6 +379,145 @@ class AssignLasToWellDialog(QDialog):
                 self.ed_uwi.text().strip(),
             )
 
+
+class SpliceLasLogDialog(QDialog):
+    """Choose a LAS curve and depth interval to splice into an existing log."""
+
+    def __init__(self, parent, *, well_name: str, target_log_name: str,
+                 existing_depth_range, las_well_info, las_logs):
+        super().__init__(parent)
+        self.setWindowTitle(f"Splice LAS log into {well_name} / {target_log_name}")
+        self.resize(560, 320)
+
+        self._las_logs = las_logs or {}
+        self._result = None
+        self._existing_depth_range = existing_depth_range or (None, None)
+
+        layout = QVBoxLayout(self)
+
+        las_name = (las_well_info or {}).get("name", "") or "N/A"
+        las_uwi = (las_well_info or {}).get("uwi", "") or "N/A"
+        layout.addWidget(QLabel(f"LAS well: {las_name}  (UWI: {las_uwi})", self))
+        layout.addWidget(QLabel(
+            f"Target log: {target_log_name}\n"
+            f"Target depth range: {self._fmt_range(*self._existing_depth_range)}",
+            self,
+        ))
+
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_source_log = QComboBox(self)
+        self.cmb_source_log.addItems(sorted(self._las_logs.keys()))
+        if target_log_name in self._las_logs:
+            self.cmb_source_log.setCurrentText(target_log_name)
+        form.addRow("LAS source log:", self.cmb_source_log)
+
+        self.lbl_source_range = QLabel("n/a", self)
+        form.addRow("LAS depth range:", self.lbl_source_range)
+
+        self.spin_top = QDoubleSpinBox(self)
+        self.spin_top.setDecimals(3)
+        self.spin_top.setRange(-1e9, 1e9)
+        form.addRow("Splice top depth:", self.spin_top)
+
+        self.spin_base = QDoubleSpinBox(self)
+        self.spin_base.setDecimals(3)
+        self.spin_base.setRange(-1e9, 1e9)
+        form.addRow("Splice base depth:", self.spin_base)
+
+        self.lbl_note = QLabel(
+            "Samples within the selected interval are replaced by the LAS source log.",
+            self,
+        )
+        layout.addWidget(self.lbl_note)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.cmb_source_log.currentTextChanged.connect(self._update_source_info)
+        self._update_source_info()
+
+    def _fmt_range(self, d0, d1) -> str:
+        if d0 is None or d1 is None:
+            return "n/a"
+        return f"{float(d0):.3f} – {float(d1):.3f} m"
+
+    def _depth_range_from_log(self, log_def):
+        if not log_def:
+            return None, None
+        depth = np.asarray(log_def.get("depth", []), dtype=float)
+        if depth.size == 0:
+            return None, None
+        mask = np.isfinite(depth)
+        if not np.any(mask):
+            return None, None
+        depth = depth[mask]
+        return float(np.nanmin(depth)), float(np.nanmax(depth))
+
+    def _update_source_info(self):
+        source_name = self.cmb_source_log.currentText().strip()
+        src_log = self._las_logs.get(source_name)
+        s0, s1 = self._depth_range_from_log(src_log)
+        self.lbl_source_range.setText(self._fmt_range(s0, s1))
+
+        vals = [v for v in (*self._existing_depth_range, s0, s1) if v is not None]
+        if vals:
+            lo = min(vals)
+            hi = max(vals)
+            self.spin_top.setRange(lo - 1000.0, hi + 1000.0)
+            self.spin_base.setRange(lo - 1000.0, hi + 1000.0)
+
+        e0, e1 = self._existing_depth_range
+        if None not in (e0, e1, s0, s1):
+            ov0 = max(e0, s0)
+            ov1 = min(e1, s1)
+            if ov0 < ov1:
+                self.spin_top.setValue(ov0)
+                self.spin_base.setValue(ov1)
+                return
+
+        if s0 is not None and s1 is not None:
+            self.spin_top.setValue(s0)
+            self.spin_base.setValue(s1)
+
+    def _on_accept(self):
+        source_name = self.cmb_source_log.currentText().strip()
+        if not source_name:
+            QMessageBox.warning(self, "Splice log", "Please select a LAS source log.")
+            return
+
+        top_depth = float(self.spin_top.value())
+        base_depth = float(self.spin_base.value())
+        if top_depth >= base_depth:
+            QMessageBox.warning(self, "Splice log", "Top depth must be smaller than base depth.")
+            return
+
+        s0, s1 = self._depth_range_from_log(self._las_logs.get(source_name))
+        if s0 is None or s1 is None:
+            QMessageBox.warning(self, "Splice log", "Selected LAS source log has no valid depth samples.")
+            return
+
+        if base_depth < s0 or top_depth > s1:
+            QMessageBox.warning(
+                self,
+                "Splice log",
+                "Selected splice interval does not overlap the LAS source log.",
+            )
+            return
+
+        self._result = {
+            "source_log": source_name,
+            "top_depth": top_depth,
+            "base_depth": base_depth,
+        }
+        self.accept()
+
+    def result_config(self):
+        return self._result
+
 class OldNewTrackDialog(QDialog):
     def __init__(self, parent, suggested_name="Track"):
         super().__init__(parent)
@@ -2047,9 +2186,6 @@ class DiscreteColorEditorDialog(QDialog):
         btn_row_layout.addStretch(1)
         layout.addLayout(btn_row_layout)
 
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
-
         # Default color row
         def_layout = QHBoxLayout()
         def_layout.addWidget(QLabel("Default color:", self))
@@ -2396,9 +2532,6 @@ class LithofaciesTableDialog(QDialog):
         btn_row.addWidget(self.btn_del)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
-
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
 
         # OK / Cancel
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
@@ -2748,7 +2881,7 @@ class LoadCoreBitmapDialog(QDialog):
         label = self.ed_label.text().strip() or "core"
         # alpha = float(self.spin_alpha.value())
         # interpolation = self.cmb_interp.currentText().strip()
-        # cmap_txt = self.cmb_cmap.currentText().strip()
+        # cmap_txt = self.bmp_cmap.currentText().strip()
         # cmap = None if cmap_txt == "(none)" else cmap_txt
         # flip = bool(self.chk_flip.isChecked())
 
@@ -2896,6 +3029,9 @@ class LoadBitmapForTrackDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+        # wiring to update label from well name
+        self.cmb_well.currentTextChanged.connect(self._update_label_from_well)
+
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -2905,6 +3041,10 @@ class LoadBitmapForTrackDialog(QDialog):
         )
         if path:
             self.ed_path.setText(path)
+
+    def _update_label_from_well(self, well_name: str):
+        if not self.ed_label.text().strip():
+            self.ed_label.setText(well_name)
 
     def _on_accept(self):
         well_name = self.cmb_well.currentText().strip()
@@ -3364,22 +3504,26 @@ class TrackSettingsDialog(QDialog):
         btn_row.addWidget(self.btn_add)
         btn_row.addWidget(self.btn_edit)
         btn_row.addWidget(self.btn_del)
-        btn_row.addStretch(1)
         btn_row.addWidget(self.btn_up)
         btn_row.addWidget(self.btn_down)
+        btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        layout.addWidget(btns)
+        # ---------------- dialog buttons ----------------
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self
+        )
+        layout.addWidget(self.button_box)
 
-        btns.accepted.connect(self._on_ok)
-        btns.rejected.connect(self.reject)
-
+        # signals
         self.btn_add.clicked.connect(self._add_fill)
         self.btn_edit.clicked.connect(self._edit_fill)
         self.btn_del.clicked.connect(self._delete_fill)
         self.btn_up.clicked.connect(lambda: self._move_fill(-1))
         self.btn_down.clicked.connect(lambda: self._move_fill(+1))
+
+        self.button_box.accepted.connect(self._on_ok)
+        self.button_box.rejected.connect(self.reject)
 
         self._refresh_fill_list()
 
@@ -3454,680 +3598,11 @@ class TrackSettingsDialog(QDialog):
             self.track["name"] = name
         self.accept()
 
-class EditWellLogTableDialog(QDialog):
-    """
-    Extended editor for one continuous well log (depth, value).
-
-    Added features:
-      - Basic stats (min/max/mean/count)
-      - Replace blanks/NULLs with -999 (either depth, value, or both)
-      - Replace a numeric value with another (e.g. -999 -> NaN like handling)
-      - Paste from clipboard (2-column: depth,value) with delimiter auto-detect
-      - Resample to uniform step (linear interpolation), optional depth range
-    """
-
-    COL_DEPTH = 0
-    COL_VALUE = 1
-
-    def __init__(self, parent, well_name: str, log_name: str, depth, data):
-        super().__init__(parent)
-        self.setWindowTitle(f"Edit Log: {log_name} • {well_name}")
-        self.resize(980, 680)
-
-        self._well_name = well_name
-        self._log_name = log_name
-
-        depth = [] if depth is None else list(depth)
-        data = [] if data is None else list(data)
-        n = min(len(depth), len(data))
-
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(QLabel(
-            "Edit depth/value pairs. Hidden rows (filter) are still included on OK.\n"
-            "Tips: Paste from clipboard, sort by depth, resample to step. Non-numeric rows are rejected on OK.",
-            self
-        ))
-
-        # --- filter + stats row ---
-        row_top = QHBoxLayout()
-        row_top.addWidget(QLabel("Filter:", self))
-        self.ed_filter = QLineEdit(self)
-        self.ed_filter.setPlaceholderText("type to filter rows…")
-        row_top.addWidget(self.ed_filter, 1)
-        self.btn_clear_filter = QPushButton("Clear", self)
-        row_top.addWidget(self.btn_clear_filter)
-
-        self.lbl_stats = QLabel("", self)
-        self.lbl_stats.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        row_top.addWidget(self.lbl_stats, 0)
-
-        layout.addLayout(row_top)
-
-        # --- table ---
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Depth", "Value"])
-        self.table.setRowCount(n)
-        for i in range(n):
-            self._set_cell(i, self.COL_DEPTH, depth[i])
-            self._set_cell(i, self.COL_VALUE, data[i])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table, 1)
-
-        # --- action buttons row ---
-        row_btns = QHBoxLayout()
-        self.btn_add = QPushButton("Add row", self)
-        self.btn_del = QPushButton("Delete selected", self)
-        self.btn_sort = QPushButton("Sort by depth", self)
-        self.btn_paste = QPushButton("Paste (Depth,Value)", self)
-
-        row_btns.addWidget(self.btn_add)
-        row_btns.addWidget(self.btn_del)
-        row_btns.addWidget(self.btn_sort)
-        row_btns.addWidget(self.btn_paste)
-        row_btns.addStretch(1)
-        layout.addLayout(row_btns)
-
-        # --- tools area: Replace / Resample ---
-        tools_row = QHBoxLayout()
-
-        # Replace NULL/blanks
-        grp_null = QGroupBox("NULL / blank handling", self)
-        gnl = QVBoxLayout(grp_null)
-        self.chk_blank_to_null = QCheckBox("Replace blanks/NULL with -999 (Value column)", self)
-        self.chk_blank_to_null.setChecked(False)
-        gnl.addWidget(self.chk_blank_to_null)
-
-        self.chk_depth_blank_to_null = QCheckBox("Replace blanks/NULL with -999 (Depth column)", self)
-        self.chk_depth_blank_to_null.setChecked(False)
-        gnl.addWidget(self.chk_depth_blank_to_null)
-
-        tools_row.addWidget(grp_null, 1)
-
-        # Replace numeric
-        grp_rep = QGroupBox("Replace numeric value", self)
-        grl = QFormLayout(grp_rep)
-        self.ed_rep_from = QLineEdit(self)
-        self.ed_rep_from.setPlaceholderText("from (e.g. -999)")
-        self.ed_rep_to = QLineEdit(self)
-        self.ed_rep_to.setPlaceholderText("to (e.g. 0)")
-        grl.addRow("Replace:", self.ed_rep_from)
-        grl.addRow("With:", self.ed_rep_to)
-        self.btn_apply_replace = QPushButton("Apply replace (Value)", self)
-        grl.addRow(self.btn_apply_replace)
-        tools_row.addWidget(grp_rep, 1)
-
-        # Resample
-        grp_rs = QGroupBox("Resample", self)
-        rsl = QFormLayout(grp_rs)
-        self.ed_step = QLineEdit(self)
-        self.ed_step.setPlaceholderText("step (e.g. 0.1524)")
-        self.ed_rs_top = QLineEdit(self)
-        self.ed_rs_top.setPlaceholderText("optional top depth")
-        self.ed_rs_base = QLineEdit(self)
-        self.ed_rs_base.setPlaceholderText("optional base depth")
-        rsl.addRow("Step:", self.ed_step)
-        rsl.addRow("Top:", self.ed_rs_top)
-        rsl.addRow("Base:", self.ed_rs_base)
-        self.btn_resample = QPushButton("Resample (linear)", self)
-        rsl.addRow(self.btn_resample)
-        tools_row.addWidget(grp_rs, 1)
-
-        layout.addLayout(tools_row)
-
-        # --- OK/Cancel ---
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_ok)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        # connections
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
-        self.btn_sort.clicked.connect(self._sort_by_depth)
-        self.btn_paste.clicked.connect(self._paste_from_clipboard)
-
-        self.ed_filter.textChanged.connect(self._apply_filter)
-        self.btn_clear_filter.clicked.connect(lambda: self.ed_filter.setText(""))
-
-        self.chk_blank_to_null.stateChanged.connect(self._apply_null_replacement_if_checked)
-        self.chk_depth_blank_to_null.stateChanged.connect(self._apply_null_replacement_if_checked)
-
-        self.btn_apply_replace.clicked.connect(self._apply_replace_value)
-        self.btn_resample.clicked.connect(self._resample)
-
-        self.table.itemChanged.connect(lambda *_: self._update_stats())
-
-        self._result_depth = None
-        self._result_data = None
-
-        self._apply_filter()
-        self._update_stats()
-
-    # ---------------- table utils ----------------
-    def _set_cell(self, r: int, c: int, v):
-        it = QTableWidgetItem("" if v is None else str(v))
-        it.setFlags(it.flags() | Qt.ItemIsEditable)
-        self.table.setItem(r, c, it)
-
-    def _add_row(self):
-        r = self.table.rowCount()
-        self.table.insertRow(r)
-        self._set_cell(r, self.COL_DEPTH, "")
-        self._set_cell(r, self.COL_VALUE, "")
-        self.table.setCurrentCell(r, 0)
-        self._apply_filter()
-        self._update_stats()
-
-    def _delete_selected_rows(self):
-        rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
-        if not rows:
-            return
-        for r in rows:
-            self.table.removeRow(r)
-        self._apply_filter()
-        self._update_stats()
-
-    def _apply_filter(self):
-        s = (self.ed_filter.text() or "").strip().lower()
-        for r in range(self.table.rowCount()):
-            if not s:
-                self.table.setRowHidden(r, False)
-                continue
-            d = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").lower()
-            v = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()
-            self.table.setRowHidden(r, (s not in d and s not in v))
-
-    def _read_all_rows_numeric(self, allow_blank_rows=True):
-        """
-        Read all rows and return arrays (depth, value) as float, excluding fully blank rows.
-        Raises ValueError for non-numeric content.
-        """
-        depth = []
-        value = []
-        for r in range(self.table.rowCount()):
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-
-            if allow_blank_rows and (not d_txt and not v_txt):
-                continue
-
-            d = float(d_txt.replace(",", "."))
-            v = float(v_txt.replace(",", "."))
-            depth.append(d)
-            value.append(v)
-
-        return np.asarray(depth, dtype=float), np.asarray(value, dtype=float)
-
-    def _sort_by_depth(self):
-        rows = []
-        for r in range(self.table.rowCount()):
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-            if not d_txt and not v_txt:
-                continue
-            try:
-                d = float(d_txt.replace(",", "."))
-                v = float(v_txt.replace(",", "."))
-                rows.append((d, v))
-            except Exception:
-                rows.append((np.nan, np.nan))
-
-        rows_num = [(d, v) for d, v in rows if np.isfinite(d) and np.isfinite(v)]
-        rows_nan = [(d, v) for d, v in rows if not (np.isfinite(d) and np.isfinite(v))]
-        rows_num.sort(key=lambda t: t[0])
-        rows_sorted = rows_num + rows_nan
-
-        self.table.blockSignals(True)
-        self.table.setRowCount(len(rows_sorted))
-        for i, (d, v) in enumerate(rows_sorted):
-            self._set_cell(i, 0, "" if not np.isfinite(d) else d)
-            self._set_cell(i, 1, "" if not np.isfinite(v) else v)
-        self.table.blockSignals(False)
-
-        self.table.resizeColumnsToContents()
-        self._apply_filter()
-        self._update_stats()
-
-    # ---------------- stats ----------------
-    def _update_stats(self):
-        # compute stats on numeric rows only
-        vals = []
-        depths = []
-        for r in range(self.table.rowCount()):
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-            if not d_txt or not v_txt:
-                continue
-            try:
-                d = float(d_txt.replace(",", "."))
-                v = float(v_txt.replace(",", "."))
-                depths.append(d)
-                vals.append(v)
-            except Exception:
-                pass
-
-        if not vals:
-            self.lbl_stats.setText("count=0")
-            return
-
-        arr = np.asarray(vals, dtype=float)
-        self.lbl_stats.setText(
-            f"count={len(arr)}  min={np.nanmin(arr):.3g}  max={np.nanmax(arr):.3g}  mean={np.nanmean(arr):.3g}"
-        )
-
-    # ---------------- NULL replacement ----------------
-    def _apply_null_replacement_if_checked(self):
-        # apply to existing blanks/NULL tokens immediately
-        null_tokens = {"null", "nan", "none", "nil", "na", "n/a", "-"}
-        self.table.blockSignals(True)
-
-        if self.chk_blank_to_null.isChecked():
-            for r in range(self.table.rowCount()):
-                it = self.table.item(r, self.COL_VALUE)
-                txt = (it.text() if it else "").strip()
-                if (not txt) or (txt.lower() in null_tokens):
-                    self._set_cell(r, self.COL_VALUE, "-999")
-
-        if self.chk_depth_blank_to_null.isChecked():
-            for r in range(self.table.rowCount()):
-                it = self.table.item(r, self.COL_DEPTH)
-                txt = (it.text() if it else "").strip()
-                if (not txt) or (txt.lower() in null_tokens):
-                    self._set_cell(r, self.COL_DEPTH, "-999")
-
-        self.table.blockSignals(False)
-        self._update_stats()
-
-    # ---------------- replace numeric ----------------
-    def _apply_replace_value(self):
-        frm = (self.ed_rep_from.text() or "").strip()
-        to = (self.ed_rep_to.text() or "").strip()
-        if not frm or not to:
-            QMessageBox.information(self, "Replace", "Provide both 'from' and 'to' values.")
-            return
-        try:
-            v_from = float(frm.replace(",", "."))
-            v_to = float(to.replace(",", "."))
-        except Exception:
-            QMessageBox.warning(self, "Replace", "From/To must be numeric.")
-            return
-
-        self.table.blockSignals(True)
-        for r in range(self.table.rowCount()):
-            it = self.table.item(r, self.COL_VALUE)
-            if it is None:
-                continue
-            txt = it.text().strip()
-            if not txt:
-                continue
-            try:
-                v = float(txt.replace(",", "."))
-            except Exception:
-                continue
-            if v == v_from:
-                self._set_cell(r, self.COL_VALUE, str(v_to))
-        self.table.blockSignals(False)
-        self._update_stats()
-
-    # ---------------- paste ----------------
-    def _paste_from_clipboard(self):
-        cb = self.parent().clipboard() if hasattr(self.parent(), "clipboard") else None
-        if cb is None:
-            from PySide6.QtWidgets import QApplication
-            cb = QApplication.clipboard()
-
-        text = cb.text()
-        if not text.strip():
-            QMessageBox.information(self, "Paste", "Clipboard is empty.")
-            return
-
-        # Try to parse 2 columns with pandas, delimiter auto-detect
-        try:
-            # normalize decimal comma -> dot is ambiguous; keep as is for now, we convert later
-            df = pd.read_csv(
-                pd.compat.StringIO(text),
-                sep=None,
-                engine="python",
-                header=None,
-                comment="#"
-            )
-        except Exception:
-            # fallback: whitespace split
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            rows = []
-            for ln in lines:
-                parts = ln.replace("\t", " ").split()
-                if len(parts) >= 2:
-                    rows.append(parts[:2])
-            df = pd.DataFrame(rows)
-
-        if df.shape[1] < 2:
-            QMessageBox.warning(self, "Paste", "Need at least 2 columns: Depth and Value.")
-            return
-
-        depth_col = df.iloc[:, 0].astype(str).tolist()
-        val_col = df.iloc[:, 1].astype(str).tolist()
-
-        start_row = self.table.rowCount()
-        self.table.blockSignals(True)
-        self.table.setRowCount(start_row + len(depth_col))
-        for i, (d, v) in enumerate(zip(depth_col, val_col)):
-            self._set_cell(start_row + i, self.COL_DEPTH, d)
-            self._set_cell(start_row + i, self.COL_VALUE, v)
-        self.table.blockSignals(False)
-
-        self._apply_filter()
-        self._update_stats()
-
-    # ---------------- resample ----------------
-    def _resample(self):
-        step_txt = (self.ed_step.text() or "").strip()
-        if not step_txt:
-            QMessageBox.information(self, "Resample", "Provide a step value.")
-            return
-        try:
-            step = float(step_txt.replace(",", "."))
-            if step <= 0:
-                raise ValueError()
-        except Exception:
-            QMessageBox.warning(self, "Resample", "Step must be a positive number.")
-            return
-
-        # Read numeric arrays
-        try:
-            d, v = self._read_all_rows_numeric(allow_blank_rows=True)
-        except Exception as e:
-            QMessageBox.warning(self, "Resample", f"Cannot resample: non-numeric row exists.\n{e}")
-            return
-
-        if d.size < 2:
-            QMessageBox.information(self, "Resample", "Need at least 2 samples to resample.")
-            return
-
-        # Sort by depth
-        order = np.argsort(d)
-        d = d[order]
-        v = v[order]
-
-        # Optional range
-        top_txt = (self.ed_rs_top.text() or "").strip()
-        base_txt = (self.ed_rs_base.text() or "").strip()
-        top = d[0] if not top_txt else float(top_txt.replace(",", "."))
-        base = d[-1] if not base_txt else float(base_txt.replace(",", "."))
-        if base <= top:
-            QMessageBox.warning(self, "Resample", "Base must be greater than Top.")
-            return
-
-        new_d = np.arange(top, base + 0.5 * step, step)
-        new_v = np.interp(new_d, d, v)
-
-        # Replace table content
-        self.table.blockSignals(True)
-        self.table.setRowCount(len(new_d))
-        for i in range(len(new_d)):
-            self._set_cell(i, self.COL_DEPTH, f"{new_d[i]:.6f}")
-            self._set_cell(i, self.COL_VALUE, f"{new_v[i]:.6f}")
-        self.table.blockSignals(False)
-
-        self._apply_filter()
-        self._update_stats()
-
-    # ---------------- OK ----------------
-    def _on_ok(self):
-        # Apply blank->-999 if requested
-        self._apply_null_replacement_if_checked()
-
-        depth = []
-        data = []
-
-        for r in range(self.table.rowCount()):
-            d_txt = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
-            v_txt = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").strip()
-
-            if not d_txt and not v_txt:
-                continue
-
-            try:
-                d = float(d_txt.replace(",", "."))
-                v = float(v_txt.replace(",", "."))
-            except Exception:
-                QMessageBox.warning(
-                    self, "Invalid value",
-                    f"Row {r+1} contains non-numeric Depth/Value:\n"
-                    f"Depth='{d_txt}', Value='{v_txt}'"
-                )
-                return
-
-            depth.append(d)
-            data.append(v)
-
-        if len(depth) == 0:
-            res = QMessageBox.question(
-                self, "Empty log",
-                "This will result in an empty log. Continue?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if res != QMessageBox.Yes:
-                return
-
-        self._result_depth = depth
-        self._result_data = data
-        self.accept()
-
-    def result_arrays(self):
-        return self._result_depth, self._result_data
-
-class EditWellPanelOrderDialog(QDialog):
-    """
-    Edit the wells shown in ONE well section panel:
-      - reorder by moving rows up/down
-      - remove selected wells
-      - add wells from project list via dropdown
-    Applies by setting panel.visible_wells (names list) and redrawing.
-    """
-
-    def __init__(self, parent, panel, project_wells):
-        """
-        panel: WellPanelWidget (or panel-like object) containing:
-          - wells: list[well dict] (current project wells)
-          - visible_wells: Optional[list[str]] filter; if None => "all"
-          - draw_panel()
-        project_wells: list[well dict] for add dropdown
-        """
-        super().__init__(parent)
-        self.setWindowTitle("Edit Wells in Section")
-        self.resize(600, 420)
-
-        self.panel = panel
-        self.project_wells = project_wells or []
-
-        # current displayed wells (names in order)
-        current = self._get_current_displayed_well_names()
-
-        layout = QVBoxLayout(self)
-
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(1)
-        self.table.setHorizontalHeaderLabels(["Well"])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.setDragDropMode(QAbstractItemView.NoDragDrop)  # keep simple (buttons)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table, 1)
-
-        self._set_rows(current)
-
-        # row controls
-        row_btns = QHBoxLayout()
-        self.btn_up = QPushButton("Move up", self)
-        self.btn_down = QPushButton("Move down", self)
-        self.btn_remove = QPushButton("Remove", self)
-        row_btns.addWidget(self.btn_up)
-        row_btns.addWidget(self.btn_down)
-        row_btns.addWidget(self.btn_remove)
-        row_btns.addStretch(1)
-        layout.addLayout(row_btns)
-
-        # add controls
-        add_row = QHBoxLayout()
-        add_row.addWidget(QLabel("Add well:", self))
-        self.cmb_add = QComboBox(self)
-        add_row.addWidget(self.cmb_add, 1)
-        self.btn_add = QPushButton("Add", self)
-        add_row.addWidget(self.btn_add)
-        layout.addLayout(add_row)
-
-        self._refresh_add_combo()
-
-        # OK/Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_ok)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        # connections
-        self.btn_up.clicked.connect(self._move_up)
-        self.btn_down.clicked.connect(self._move_down)
-        self.btn_remove.clicked.connect(self._remove_selected)
-        self.btn_add.clicked.connect(self._add_selected_from_combo)
-
-    # -------------------------
-    # helpers
-    # -------------------------
-    def _get_current_displayed_well_names(self):
-        # If panel has explicit ordering state, prefer it
-        order = getattr(self.panel, "well_order", None)
-        if isinstance(order, list) and order:
-            return list(order)
-
-        vw = getattr(self.panel, "visible_wells", None)
-        if vw is None:
-            # all wells in current panel order
-            wells = getattr(self.panel, "wells", []) or []
-            return [w.get("name", "") for w in wells if w.get("name")]
-        else:
-            # visible_wells already defines list/order
-            return list(vw)
-
-    def _set_rows(self, names):
-        self.table.setRowCount(0)
-        for nm in names:
-            r = self.table.rowCount()
-            self.table.insertRow(r)
-            it = QTableWidgetItem(nm)
-            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
-            self.table.setItem(r, 0, it)
-        if self.table.rowCount() > 0:
-            self.table.selectRow(0)
-
-    def _row_names(self):
-        out = []
-        for r in range(self.table.rowCount()):
-            it = self.table.item(r, 0)
-            nm = it.text().strip() if it else ""
-            if nm:
-                out.append(nm)
-        return out
-
-    def _selected_row(self):
-        idxs = self.table.selectionModel().selectedRows()
-        if not idxs:
-            return None
-        return idxs[0].row()
-
-    def _swap_rows(self, r1, r2):
-        if r1 < 0 or r2 < 0 or r1 >= self.table.rowCount() or r2 >= self.table.rowCount():
-            return
-        t1 = self.table.item(r1, 0).text()
-        t2 = self.table.item(r2, 0).text()
-        self.table.item(r1, 0).setText(t2)
-        self.table.item(r2, 0).setText(t1)
-        self.table.selectRow(r2)
-
-    def _refresh_add_combo(self):
-        existing = set(self._row_names())
-        self.cmb_add.clear()
-        for w in self.project_wells:
-            nm = w.get("name", "")
-            if nm and nm not in existing:
-                self.cmb_add.addItem(nm)
-
-        self.btn_add.setEnabled(self.cmb_add.count() > 0)
-
-    # -------------------------
-    # actions
-    # -------------------------
-    def _move_up(self):
-        r = self._selected_row()
-        if r is None or r == 0:
-            return
-        self._swap_rows(r, r - 1)
-        self._refresh_add_combo()
-
-    def _move_down(self):
-        r = self._selected_row()
-        if r is None or r >= self.table.rowCount() - 1:
-            return
-        self._swap_rows(r, r + 1)
-        self._refresh_add_combo()
-
-    def _remove_selected(self):
-        r = self._selected_row()
-        if r is None:
-            return
-        self.table.removeRow(r)
-        if self.table.rowCount() > 0:
-            self.table.selectRow(min(r, self.table.rowCount() - 1))
-        self._refresh_add_combo()
-
-    def _add_selected_from_combo(self):
-        nm = self.cmb_add.currentText().strip()
-        if not nm:
-            return
-        r = self.table.rowCount()
-        self.table.insertRow(r)
-        it = QTableWidgetItem(nm)
-        it.setFlags(it.flags() & ~Qt.ItemIsEditable)
-        self.table.setItem(r, 0, it)
-        self.table.selectRow(r)
-        self._refresh_add_combo()
-
-    def _on_ok(self):
-        names = self._row_names()
-        if not names:
-            res = QMessageBox.question(
-                self, "Empty selection",
-                "No wells selected for this panel.\n\nContinue?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if res != QMessageBox.Yes:
-                return
-
-        # Apply ordering & visibility to panel
-        # We store explicit order on panel so draw uses that order.
-        self.panel.well_order = list(names)
-        self.panel.visible_wells = list(names)
-
-        if hasattr(self.panel, "draw_panel"):
-            self.panel.draw_panel()
-
-        self.accept()
 
 class ImportTopsAssignWellDialog(QDialog):
-    def __init__(
-        self,
-        parent,
-        *,
-        sheet_names,
-        existing_well_names,
-        default_new_name,
-        td_preview=None,
-        n_tops_preview=None,
-    ):
+    """Assign imported tops to an existing well or create a new one."""
+
+    def __init__(self, parent, *, sheet_names, existing_well_names, default_new_name, td_preview=None, n_tops_preview=None):
         super().__init__(parent)
         self.setWindowTitle("Import Well Tops")
         self.resize(560, 260)
@@ -4144,22 +3619,19 @@ class ImportTopsAssignWellDialog(QDialog):
         form.addRow("BEE path:", row_path)
         btn_browse.clicked.connect(self._on_browse_bee_path)
 
-        # --- Sheet selection ---
         self.cmb_sheet = QComboBox(self)
-        self.cmb_sheet.addItems(sheet_names)
+        self.cmb_sheet.addItems(sheet_names or [])
         form.addRow("Worksheet:", self.cmb_sheet)
 
-        # --- Preview (updated later) ---
         self.lbl_preview = QLabel("Select sheet to preview", self)
         form.addRow("Preview:", self.lbl_preview)
 
-        # --- Well assignment ---
-        self.cmb_well = QComboBox(self)
-        self.cmb_well.addItems(existing_well_names or [])
-        form.addRow("Assign to existing well:", self.cmb_well)
-
         self.chk_new = QCheckBox("Create new well", self)
         form.addRow(self.chk_new)
+
+        self.cmb_existing = QComboBox(self)
+        self.cmb_existing.addItems(existing_well_names or [])
+        form.addRow("Assign to existing well:", self.cmb_existing)
 
         self.ed_new_name = QLineEdit(self)
         self.ed_new_name.setText(default_new_name or "")
@@ -4175,21 +3647,20 @@ class ImportTopsAssignWellDialog(QDialog):
         layout.addWidget(btns)
 
         self.chk_new.toggled.connect(self._update_enabled)
-        self._update_enabled(False)
+        self._update_enabled(self.chk_new.isChecked())
 
     def _on_browse_bee_path(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Bee xlsx file",
             "",
-            "Images (*.xlsx);;All files (*.*)"
+            "Excel files (*.xlsx *.xls);;All files (*.*)"
         )
         if path:
             self.ed_bee_path.setText(path)
 
-
     def _update_enabled(self, is_new: bool):
-        self.cmb_well.setEnabled(not is_new)
+        self.cmb_existing.setEnabled(not is_new)
         self.ed_new_name.setEnabled(is_new)
 
     def set_preview(self, n_tops: int, td: float):
@@ -4202,786 +3673,15 @@ class ImportTopsAssignWellDialog(QDialog):
         return {
             "sheet": self.selected_sheet(),
             "create_new": self.chk_new.isChecked(),
-            "existing_name": self.cmb_well.currentText().strip(),
+            "existing_name": self.cmb_existing.currentText().strip(),
             "new_name": self.ed_new_name.text().strip(),
             "set_td": self.chk_set_td.isChecked(),
             "bee_path": self.ed_bee_path.text().strip(),
         }
 
 
-class MapLimitsDialog(QDialog):
-    """
-    Dialog to set map axis limits (xmin/xmax/ymin/ymax) for a MapPanelWidget.
-    Supports:
-      - manual limits
-      - "auto from data" reset
-    """
-    def __init__(self, parent, map_panel):
-        super().__init__(parent)
-        self.setWindowTitle("Map View Limits")
-        self.resize(420, 220)
-
-        self.map_panel = map_panel
-        ax = getattr(map_panel, "ax", None)
-
-        # If ax not stored, infer from fig
-        if ax is None and hasattr(map_panel, "fig"):
-            try:
-                ax = map_panel.fig.axes[0] if map_panel.fig.axes else None
-            except Exception:
-                ax = None
-
-        # default limits (fallback)
-        xmin = ymin = -1000.0
-        xmax = ymax = 1000.0
-        if ax is not None:
-            try:
-                xmin, xmax = ax.get_xlim()
-                ymin, ymax = ax.get_ylim()
-            except Exception:
-                pass
-
-        layout = QVBoxLayout(self)
-        form = QFormLayout()
-        layout.addLayout(form)
-
-        self.chk_fixed = QCheckBox("Use fixed limits (disable auto-fit)", self)
-        self.chk_fixed.setChecked(bool(getattr(map_panel, "use_fixed_limits", False)))
-        form.addRow(self.chk_fixed)
-
-        # Spinboxes
-        self.sp_xmin = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmin, xmin)
-        self.sp_xmax = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmax, xmax)
-        self.sp_ymin = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymin, ymin)
-        self.sp_ymax = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymax, ymax)
-
-        form.addRow("X min:", self.sp_xmin)
-        form.addRow("X max:", self.sp_xmax)
-        form.addRow("Y min:", self.sp_ymin)
-        form.addRow("Y max:", self.sp_ymax)
-
-        # Buttons row with "Auto" helper
-        row = QHBoxLayout()
-        self.btn_auto = QLabel("Tip: click OK with fixed unchecked to auto-fit from data.", self)
-        self.btn_auto.setStyleSheet("color: gray;")
-        row.addWidget(self.btn_auto)
-        layout.addLayout(row)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_ok)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        self.chk_fixed.toggled.connect(self._update_enabled)
-        self._update_enabled(self.chk_fixed.isChecked())
-
-    def _cfg_spin(self, sp: QDoubleSpinBox, v: float):
-        sp.setDecimals(3)
-        sp.setRange(-1e12, 1e12)
-        sp.setSingleStep(10.0)
-        sp.setValue(float(v))
-
-    def _update_enabled(self, enabled: bool):
-        self.sp_xmin.setEnabled(enabled)
-        self.sp_xmax.setEnabled(enabled)
-        self.sp_ymin.setEnabled(enabled)
-        self.sp_ymax.setEnabled(enabled)
-
-    def _on_ok(self):
-        fixed = bool(self.chk_fixed.isChecked())
-
-        if fixed:
-            xmin = float(self.sp_xmin.value())
-            xmax = float(self.sp_xmax.value())
-            ymin = float(self.sp_ymin.value())
-            ymax = float(self.sp_ymax.value())
-
-            if xmax <= xmin or ymax <= ymin:
-                QMessageBox.warning(self, "Invalid limits", "Max must be greater than Min for both axes.")
-                return
-
-            # store on panel
-            self.map_panel.use_fixed_limits = True
-            self.map_panel.fixed_limits = (xmin, xmax, ymin, ymax)
-        else:
-            # auto-fit
-            self.map_panel.use_fixed_limits = False
-            self.map_panel.fixed_limits = None
-
-        # redraw
-        if hasattr(self.map_panel, "draw_panel"):
-            self.map_panel.draw_panel()
-
-        self.accept()
-
-class ResolveUnmatchedBasesDialog(QDialog):
-    """
-    For each unresolved Base name:
-      - choose a BEEE unit candidate (dropdown)
-      - OR type a custom name
-      - choose role: other/fault/stratigraphy
-    We then map Base(candidate) -> Top(underlying) if candidate chosen,
-    or use custom name directly as mapped top.
-    """
-    def __init__(self, parent, unresolved_rows, beee_idx):
-        super().__init__(parent)
-        self.setWindowTitle("Resolve Unmatched Base Tops")
-        self.resize(900, 420)
-
-        self._rows = unresolved_rows
-        self._idx = beee_idx
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Select the equivalent BEEE stratigraphic unit for each Base pick, "
-            "or enter a custom name. For custom names, set role to 'other' or 'fault'.",
-            self
-        ))
-
-        self.tbl = QTableWidget(self)
-        self.tbl.setColumnCount(6)
-        self.tbl.setHorizontalHeaderLabels([
-            "Well", "MD", "SV Base Name",
-            "Match BEEE Unit (Base)", "Custom Name", "Role"
-        ])
-        self.tbl.setRowCount(len(unresolved_rows))
-        self.tbl.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.tbl)
-
-        for i, r in enumerate(unresolved_rows):
-            self.tbl.setItem(i, 0, QTableWidgetItem(str(r.get("well",""))))
-            self.tbl.setItem(i, 1, QTableWidgetItem("" if r.get("md") is None else f"{r['md']:.2f}"))
-            self.tbl.setItem(i, 2, QTableWidgetItem(str(r.get("sv_name",""))))
-
-            cmb = QComboBox(self.tbl)
-            cmb.addItem("")  # none
-            for k in (r.get("candidates") or []):
-                fn = self._idx["key_to_fullname"].get(k, "")
-                cmb.addItem(f"{k}  —  {fn}", userData=k)
-            self.tbl.setCellWidget(i, 3, cmb)
-
-            edit = QLineEdit(self.tbl)
-            edit.setPlaceholderText("Enter custom mapped TOP name (optional)")
-            self.tbl.setCellWidget(i, 4, edit)
-
-            role = QComboBox(self.tbl)
-            role.addItems(["other", "fault", "stratigraphy"])
-            role.setCurrentText("other")
-            self.tbl.setCellWidget(i, 5, role)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-    def results(self):
-        """
-        Returns list of dicts with:
-          well, md, sv_name, mapped_top (string), role
-        """
-        out = []
-        for i in range(self.tbl.rowCount()):
-            well = self.tbl.item(i, 0).text()
-            md_txt = self.tbl.item(i, 1).text().strip()
-            md = float(md_txt) if md_txt else None
-            sv_name = self.tbl.item(i, 2).text().strip()
-
-            cmb: QComboBox = self.tbl.cellWidget(i, 3)
-            chosen_key = cmb.currentData()
-            edit: QLineEdit = self.tbl.cellWidget(i, 4)
-            custom = edit.text().strip()
-            role: QComboBox = self.tbl.cellWidget(i, 5)
-            role_val = role.currentText().strip() or "other"
-
-            out.append({
-                "well": well,
-                "md": md,
-                "sv_name": sv_name,
-                "chosen_beee_base_key": chosen_key,
-                "custom_top": custom,
-                "role": role_val,
-            })
-        return out
-
-def random_strat_color() -> str:
-    """Return a readable random hex color."""
-    r = random.randint(80, 220)
-    g = random.randint(80, 220)
-    b = random.randint(80, 220)
-    return f"#{r:02x}{g:02x}{b:02x}"
-
-
-class ColorButton(QPushButton):
-    def __init__(self, color="#cccccc", parent=None):
-        super().__init__(parent)
-        self._color = color or "#cccccc"
-        self.setText("")
-        self.setFixedWidth(42)
-        self.clicked.connect(self.choose_color)
-        self._update_style()
-
-    def _update_style(self):
-        self.setStyleSheet(
-            f"QPushButton {{ background-color: {self._color}; border: 1px solid #666; }}"
-        )
-
-    def choose_color(self):
-        col = QColorDialog.getColor(QColor(self._color), self, "Select color")
-        if col.isValid():
-            self._color = col.name()
-            self._update_style()
-
-    def color(self) -> str:
-        return self._color
-
-    def set_color(self, color: str):
-        self._color = color or "#cccccc"
-        self._update_style()
-
-class EditStratigraphyDialog(QDialog):
-    """
-    Table editor for self.stratigraphy dict:
-        {
-            "Formation A": {"level":"formation","color":"#ffcc00","hatch":"-","role":"stratigraphy", ...},
-            ...
-        }
-    """
-
-    COL_NAME = 0
-    COL_LEVEL = 1
-    COL_ROLE = 2
-    COL_COLOR = 3
-    COL_HATCH = 4
-
-    LEVEL_OPTIONS = [
-        "group", "supergroup", "system", "series", "formation", "member", "bed", "fault", "other"
-    ]
-    ROLE_OPTIONS = ["stratigraphy", "other", "fault"]
-    HATCH_OPTIONS = [
-        "", "-", "|", "/", "\\", "+", "x", "o", "O", ".", "*"
-    ]
-
-    def __init__(self, parent=None, stratigraphy=None):
-        super().__init__(parent)
-        self.setWindowTitle("Edit Stratigraphy")
-        self.resize(920, 560)
-
-        # work on a copy
-        self._stratigraphy = dict(stratigraphy or {})
-
-        main_layout = QVBoxLayout(self)
-
-        # ---------------- filters ----------------
-        filter_layout = QHBoxLayout()
-
-        filter_layout.addWidget(QLabel("Name filter:"))
-        self.ed_name_filter = QLineEdit(self)
-        self.ed_name_filter.setPlaceholderText("Filter by unit name...")
-        filter_layout.addWidget(self.ed_name_filter)
-
-        filter_layout.addWidget(QLabel("Role filter:"))
-        self.cmb_role_filter = QComboBox(self)
-        self.cmb_role_filter.addItems(["all", "stratigraphy", "other", "fault"])
-        filter_layout.addWidget(self.cmb_role_filter)
-
-        main_layout.addLayout(filter_layout)
-
-        # ---------------- table ----------------
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Name", "Level", "Role", "Color", "Hatch"])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
-        main_layout.addWidget(self.table)
-
-        # ---------------- row buttons ----------------
-        btn_layout = QHBoxLayout()
-
-        self.btn_add = QPushButton("Add row", self)
-        self.btn_delete = QPushButton("Delete row", self)
-        self.btn_up = QPushButton("Move up", self)
-        self.btn_down = QPushButton("Move down", self)
-
-        btn_layout.addWidget(self.btn_add)
-        btn_layout.addWidget(self.btn_delete)
-        btn_layout.addSpacing(16)
-        btn_layout.addWidget(self.btn_up)
-        btn_layout.addWidget(self.btn_down)
-        btn_layout.addStretch()
-
-        main_layout.addLayout(btn_layout)
-
-        # ---------------- dialog buttons ----------------
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self
-        )
-        main_layout.addWidget(self.button_box)
-
-        # signals
-        self.btn_add.clicked.connect(self.add_row)
-        self.btn_delete.clicked.connect(self.delete_selected_row)
-        self.btn_up.clicked.connect(self.move_selected_row_up)
-        self.btn_down.clicked.connect(self.move_selected_row_down)
-
-        self.ed_name_filter.textChanged.connect(self.apply_filters)
-        self.cmb_role_filter.currentTextChanged.connect(self.apply_filters)
-
-        self.button_box.accepted.connect(self._on_accept)
-        self.button_box.rejected.connect(self.reject)
-
-        self.populate_table()
-
-    # ------------------------------------------------------------------
-    # table helpers
-    # ------------------------------------------------------------------
-    def populate_table(self):
-        self.table.setRowCount(0)
-
-        for name, props in self._stratigraphy.items():
-            self._append_table_row(
-                name=name,
-                level=props.get("level", "formation"),
-                role=props.get("role", "stratigraphy"),
-                color=props.get("color", random_strat_color()),
-                hatch=props.get("hatch", "-"),
-            )
-
-        self.apply_filters()
-
-    def _append_table_row(self, name, level, role, color, hatch):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-
-        # name
-        name_item = QTableWidgetItem(str(name))
-        self.table.setItem(row, self.COL_NAME, name_item)
-
-        # level
-        cmb_level = QComboBox(self.table)
-        cmb_level.addItems(self.LEVEL_OPTIONS)
-        if level in self.LEVEL_OPTIONS:
-            cmb_level.setCurrentText(level)
-        else:
-            cmb_level.setCurrentText("formation")
-        self.table.setCellWidget(row, self.COL_LEVEL, cmb_level)
-
-        # role
-        cmb_role = QComboBox(self.table)
-        cmb_role.addItems(self.ROLE_OPTIONS)
-        if role in self.ROLE_OPTIONS:
-            cmb_role.setCurrentText(role)
-        else:
-            cmb_role.setCurrentText("stratigraphy")
-        self.table.setCellWidget(row, self.COL_ROLE, cmb_role)
-
-        # color
-        color_btn = ColorButton(color=color, parent=self.table)
-        self.table.setCellWidget(row, self.COL_COLOR, color_btn)
-
-        # hatch
-        cmb_hatch = QComboBox(self.table)
-        cmb_hatch.addItems(self.HATCH_OPTIONS)
-        if hatch in self.HATCH_OPTIONS:
-            cmb_hatch.setCurrentText(hatch)
-        else:
-            cmb_hatch.setCurrentText("-")
-        self.table.setCellWidget(row, self.COL_HATCH, cmb_hatch)
-
-    def add_row(self):
-        self._append_table_row(
-            name="NewUnit",
-            level="formation",
-            role="stratigraphy",
-            color=random_strat_color(),
-            hatch="-",
-        )
-        row = self.table.rowCount() - 1
-        self.table.selectRow(row)
-        self.apply_filters()
-
-    def delete_selected_row(self):
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        self.table.removeRow(row)
-
-    def move_selected_row_up(self):
-        row = self.table.currentRow()
-        if row <= 0:
-            return
-        self._swap_rows(row, row - 1)
-        self.table.selectRow(row - 1)
-
-    def move_selected_row_down(self):
-        row = self.table.currentRow()
-        if row < 0 or row >= self.table.rowCount() - 1:
-            return
-        self._swap_rows(row, row + 1)
-        self.table.selectRow(row + 1)
-
-    def _swap_rows(self, r1, r2):
-        """Swap row contents including widgets."""
-        # extract row 1
-        name1 = self.table.item(r1, self.COL_NAME).text() if self.table.item(r1, self.COL_NAME) else ""
-        level1 = self.table.cellWidget(r1, self.COL_LEVEL).currentText()
-        role1 = self.table.cellWidget(r1, self.COL_ROLE).currentText()
-        color1 = self.table.cellWidget(r1, self.COL_COLOR).color()
-        hatch1 = self.table.cellWidget(r1, self.COL_HATCH).currentText()
-
-        # extract row 2
-        name2 = self.table.item(r2, self.COL_NAME).text() if self.table.item(r2, self.COL_NAME) else ""
-        level2 = self.table.cellWidget(r2, self.COL_LEVEL).currentText()
-        role2 = self.table.cellWidget(r2, self.COL_ROLE).currentText()
-        color2 = self.table.cellWidget(r2, self.COL_COLOR).color()
-        hatch2 = self.table.cellWidget(r2, self.COL_HATCH).currentText()
-
-        # rewrite row 1
-        self.table.item(r1, self.COL_NAME).setText(name2)
-        self.table.cellWidget(r1, self.COL_LEVEL).setCurrentText(level2)
-        self.table.cellWidget(r1, self.COL_ROLE).setCurrentText(role2)
-        self.table.cellWidget(r1, self.COL_COLOR).set_color(color2)
-        self.table.cellWidget(r1, self.COL_HATCH).setCurrentText(hatch2)
-
-        # rewrite row 2
-        self.table.item(r2, self.COL_NAME).setText(name1)
-        self.table.cellWidget(r2, self.COL_LEVEL).setCurrentText(level1)
-        self.table.cellWidget(r2, self.COL_ROLE).setCurrentText(role1)
-        self.table.cellWidget(r2, self.COL_COLOR).set_color(color1)
-        self.table.cellWidget(r2, self.COL_HATCH).setCurrentText(hatch1)
-
-    # ------------------------------------------------------------------
-    # filtering
-    # ------------------------------------------------------------------
-    def apply_filters(self):
-        name_filter = self.ed_name_filter.text().strip().lower()
-        role_filter = self.cmb_role_filter.currentText().strip().lower()
-
-        for row in range(self.table.rowCount()):
-            name_item = self.table.item(row, self.COL_NAME)
-            name_val = name_item.text().strip().lower() if name_item else ""
-            role_val = self.table.cellWidget(row, self.COL_ROLE).currentText().strip().lower()
-
-            visible = True
-
-            if name_filter and name_filter not in name_val:
-                visible = False
-
-            if role_filter != "all" and role_val != role_filter:
-                visible = False
-
-            self.table.setRowHidden(row, not visible)
-
-    # ------------------------------------------------------------------
-    # output
-    # ------------------------------------------------------------------
-    def get_stratigraphy(self):
-        """
-        Return updated stratigraphy dict, preserving table order.
-        """
-        out = {}
-
-        for row in range(self.table.rowCount()):
-            name_item = self.table.item(row, self.COL_NAME)
-            if not name_item:
-                continue
-
-            name = name_item.text().strip()
-            if not name:
-                continue
-
-            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
-            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
-            color = self.table.cellWidget(row, self.COL_COLOR).color()
-            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
-
-            out[name] = {
-                "level": level,
-                "role": role,
-                "color": color,
-                "hatch": hatch,
-            }
-
-        return out
-
-    def acceptxs(self):
-        # validate duplicate names
-        names = []
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, self.COL_NAME)
-            if item:
-                nm = item.text().strip()
-                if nm:
-                    names.append(nm)
-
-        if len(names) != len(set(names)):
-            QMessageBox.warning(self, "Duplicate names", "Stratigraphic unit names must be unique.")
-            return
-
-        super().accept()
-
-    def _on_accept(self):
-        """
-        Validate and build new stratigraphy OrderedDict.
-        Enforces:
-          - Name not empty
-          - Name unique
-        """
-        new_strat = OrderedDict()
-        n_rows = self.table.rowCount()
-
-        for row in range(n_rows):
-            name_item = self.table.item(row, self.COL_NAME)
-            print(name_item)
-            if name_item is None:
-                continue
-
-            name = name_item.text().strip()
-            if not name:
-                # Check if the rest of row is empty; if not, complain
-                row_items = [
-                    self.table.item(row, c)
-                    for c in (self.COL_LEVEL, self.COL_ROLE,
-                              self.COL_COLOR, self.COL_HATCH)
-                ]
-                if not any(it and it.text().strip() for it in row_items):
-                    # fully empty row => skip
-                    continue
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Stratigraphy",
-                        f"Row {row+1} has metadata but no Name. "
-                        "Please fill Name or clear the row."
-                    )
-                    return
-
-            if name in new_strat:
-                QMessageBox.warning(
-                    self,
-                    "Stratigraphy",
-                    f"Duplicate unit name '{name}' in row {row+1}. "
-                    "Names must be unique."
-                )
-                return
-
-            def _get(col):
-                it = self.table.item(row, col)
-
-                return it.text().strip() if it is not None else ""
-
-
-            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
-            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
-            color = self.table.cellWidget(row, self.COL_COLOR).color()
-            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
-
-            new_strat[name] = {
-                "level": level,
-                "role":  role,
-                "color": color,
-                "hatch": hatch,
-            }
-
-        self._accepted_strat = new_strat
-        self.accept()
-
-    def result_stratigraphy(self):
-        """Return OrderedDict or None."""
-        return self._accepted_strat
-
-class StratigraphyEditorDialog(QDialog):
-    """
-    Table dialog to edit/add stratigraphy for the project.
-
-    Stratigraphy dict structure:
-        {
-          "Unit_A": {
-              "level": "formation",
-              "role":  "stratigraphy",   # NEW
-              "color": "#ff0000",
-              "hatch": "",
-          },
-          "Fault_1": {
-              "level": "fault",
-              "role":  "fault",
-              "color": "#0000ff",
-              "hatch": "//",
-          },
-          ...
-        }
-    """
-
-    COL_NAME  = 0
-    COL_LEVEL = 1
-    COL_ROLE  = 2
-    COL_COLOR = 3
-    COL_HATCH = 4
-
-    def __init__(self, parent, stratigraphy: dict | None):
-        super().__init__(parent)
-        self.setWindowTitle("Edit Stratigraphy")
-        self.resize(700, 400)
-
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(QLabel(
-            "Edit stratigraphic units (top = shallowest, bottom = deepest).\n"
-            "Columns:\n"
-            "  • Level – e.g. formation/member/fault/etc.\n"
-            "  • Role  – e.g. stratigraphy/fault/other, used to distinguish surfaces.",
-            self
-        ))
-
-        # Table
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Name", "Level", "Role", "Color", "Hatch"]
-        )
-        self.table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.table)
-
-        # Buttons: Add / Delete row
-        btn_row_layout = QHBoxLayout()
-        self.btn_add = QPushButton("Add row", self)
-        self.btn_del = QPushButton("Delete selected row(s)", self)
-        btn_row_layout.addWidget(self.btn_add)
-        btn_row_layout.addWidget(self.btn_del)
-        btn_row_layout.addStretch(1)
-        layout.addLayout(btn_row_layout)
-
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_del.clicked.connect(self._delete_selected_rows)
-
-        # OK/Cancel
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        self._accepted_strat = None
-        self._load_from_stratigraphy(stratigraphy or {})
-
-    # ---------- populate / helpers ----------
-
-    def _load_from_stratigraphy(self, stratigraphy: dict):
-        """
-        Fill table from existing stratigraphy dict, preserving order.
-        """
-        keys = list(stratigraphy.keys())
-        self.table.setRowCount(len(keys))
-
-        for row, name in enumerate(keys):
-            meta  = stratigraphy.get(name, {}) or {}
-            level = meta.get("level", "")
-            role  = meta.get("role", "stratigraphy")  # default role
-            color = meta.get("color", "")
-            hatch = meta.get("hatch", "")
-
-            self.table.setItem(row, self.COL_NAME,
-                               QTableWidgetItem(str(name)))
-            self.table.setItem(row, self.COL_LEVEL,
-                               QTableWidgetItem(str(level)))
-            self.table.setItem(row, self.COL_ROLE,
-                               QTableWidgetItem(str(role)))
-            self.table.setItem(row, self.COL_COLOR,
-                               QTableWidgetItem(str(color)))
-            self.table.setItem(row, self.COL_HATCH,
-                               QTableWidgetItem(str(hatch)))
-
-    def _add_row(self):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-        # Everything starts blank; user fills Name, Level, Role, Color, Hatch
-
-    def _delete_selected_rows(self):
-        rows = sorted({idx.row() for idx in self.table.selectedIndexes()},
-                      reverse=True)
-        for r in rows:
-            self.table.removeRow(r)
-
-    def _on_accept(self):
-        """
-        Validate and build new stratigraphy OrderedDict.
-        Enforces:
-          - Name not empty
-          - Name unique
-        """
-        new_strat = OrderedDict()
-        n_rows = self.table.rowCount()
-
-        for row in range(n_rows):
-            name_item = self.table.item(row, self.COL_NAME)
-            if name_item is None:
-                continue
-
-            name = name_item.text().strip()
-            if not name:
-                # Check if the rest of row is empty; if not, complain
-                row_items = [
-                    self.table.item(row, c)
-                    for c in (self.COL_LEVEL, self.COL_ROLE,
-                              self.COL_COLOR, self.COL_HATCH)
-                ]
-                if not any(it and it.text().strip() for it in row_items):
-                    # fully empty row => skip
-                    continue
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Stratigraphy",
-                        f"Row {row+1} has metadata but no Name. "
-                        "Please fill Name or clear the row."
-                    )
-                    return
-
-            if name in new_strat:
-                QMessageBox.warning(
-                    self,
-                    "Stratigraphy",
-                    f"Duplicate unit name '{name}' in row {row+1}. "
-                    "Names must be unique."
-                )
-                return
-
-            def _get(col):
-                it = self.table.item(row, col)
-                return it.text().strip() if it is not None else ""
-
-            level = self.table.cellWidget(row, self.COL_LEVEL).currentText()
-            role = self.table.cellWidget(row, self.COL_ROLE).currentText()
-            color = self.table.cellWidget(row, self.COL_COLOR).color()
-            hatch = self.table.cellWidget(row, self.COL_HATCH).currentText()
-
-
-            new_strat[name] = {
-                "level": level,
-                "role":  role,
-                "color": color,
-                "hatch": hatch,
-            }
-
-        self._accepted_strat = new_strat
-        self.accept()
-
-    def result_stratigraphy(self):
-        """Return OrderedDict or None."""
-        return self._accepted_strat
-
 class ImportCoreExcelDialog(QDialog):
-    """
-    Extended dialog for importing core/RCA spreadsheet data as regular logs.
-
-    Features:
-      - choose sheet
-      - choose file well
-      - assign to existing well or create new well
-      - overwrite option
-      - choose which columns to import
-      - rename output logs before import
-    """
+    """Dialog for importing core/RCA sheet columns as regular logs."""
 
     COL_IMPORT = 0
     COL_SOURCE = 1
@@ -5058,7 +3758,7 @@ class ImportCoreExcelDialog(QDialog):
 
     def _update_new_name_from_file_well(self, txt: str):
         if self.chk_new.isChecked() and not self.ed_new_name.text().strip():
-            self.ed_new_name.setText(txt.strip())
+            self.ed_new_name.setText((txt or "").strip())
 
     def _sanitize_df(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
@@ -5113,10 +3813,6 @@ class ImportCoreExcelDialog(QDialog):
             self.tbl_cols.setItem(row, self.COL_TARGET, tgt)
 
     def selected_columns(self):
-        """
-        Returns list of tuples:
-          [(source_col, target_log_name), ...]
-        """
         out = []
         for row in range(self.tbl_cols.rowCount()):
             chk_item = self.tbl_cols.item(row, self.COL_IMPORT)
@@ -5146,4 +3842,739 @@ class ImportCoreExcelDialog(QDialog):
             "overwrite": self.chk_overwrite.isChecked(),
             "selected_columns": self.selected_columns(),
         }
+
+
+class LoadWellTopsDialog(QDialog):
+    """Dialog to select worksheet/columns and target well for tops import."""
+
+    def __init__(self, parent, workbook_path, existing_well_names, suggested_well_name=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load Well Tops from Excel")
+        self.resize(760, 520)
+
+        self.workbook_path = workbook_path
+        self.existing_well_names = existing_well_names or []
+        self._result = None
+        self._preview_df = None
+
+        self.xl = pd.ExcelFile(workbook_path)
+        self.sheet_names = self.xl.sheet_names
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_sheet = QComboBox(self)
+        self.cmb_sheet.addItems(self.sheet_names)
+        form.addRow("Worksheet:", self.cmb_sheet)
+
+        self.cmb_depth_col = QComboBox(self)
+        form.addRow("Depth column:", self.cmb_depth_col)
+
+        self.cmb_abbrev_col = QComboBox(self)
+        form.addRow("Abbreviation column:", self.cmb_abbrev_col)
+
+        self.chk_new = QCheckBox("Create new well", self)
+        self.chk_new.setChecked(not bool(self.existing_well_names))
+        form.addRow(self.chk_new)
+
+        self.cmb_existing = QComboBox(self)
+        self.cmb_existing.addItems(self.existing_well_names)
+        form.addRow("Assign to existing well:", self.cmb_existing)
+
+        self.ed_new_name = QLineEdit(self)
+        self.ed_new_name.setText((suggested_well_name or "").strip())
+        form.addRow("New well name:", self.ed_new_name)
+
+        self.chk_overwrite = QCheckBox("Overwrite logs if they already exist", self)
+        self.chk_overwrite.setChecked(False)
+        form.addRow(self.chk_overwrite)
+
+        layout.addWidget(QLabel("Preview (first 12 rows):", self))
+        self.tbl_preview = QTableWidget(self)
+        self.tbl_preview.setColumnCount(0)
+        self.tbl_preview.setRowCount(0)
+        self.tbl_preview.setMinimumHeight(220)
+        layout.addWidget(self.tbl_preview, 1)
+
+        self.lbl_info = QLabel("", self)
+        layout.addWidget(self.lbl_info)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_new.toggled.connect(self._update_enabled)
+        self.cmb_sheet.currentTextChanged.connect(self._refresh_preview)
+
+        self._update_enabled(self.chk_new.isChecked())
+        self._refresh_preview()
+
+    def _update_enabled(self, is_new: bool):
+        self.cmb_existing.setEnabled(not is_new)
+        self.ed_new_name.setEnabled(is_new)
+
+    def _refresh_preview(self):
+        try:
+            sheet = self.cmb_sheet.currentText().strip()
+            if not sheet:
+                self.lbl_info.setText("No worksheet selected")
+                return
+
+            df = pd.read_excel(self.workbook_path, sheet_name=sheet)
+            df.columns = [str(c).strip() for c in df.columns]
+            df = df.dropna(how="all")
+            self._preview_df = df
+
+            self.cmb_depth_col.blockSignals(True)
+            self.cmb_abbrev_col.blockSignals(True)
+
+            old_depth = self.cmb_depth_col.currentText().strip()
+            old_abbrev = self.cmb_abbrev_col.currentText().strip()
+
+            self.cmb_depth_col.clear()
+            self.cmb_abbrev_col.clear()
+            self.cmb_depth_col.addItems(df.columns.tolist())
+            self.cmb_abbrev_col.addItems(df.columns.tolist())
+
+            if old_depth in df.columns:
+                self.cmb_depth_col.setCurrentText(old_depth)
+            elif len(df.columns) > 0:
+                self.cmb_depth_col.setCurrentText(df.columns[0])
+
+            if old_abbrev in df.columns:
+                self.cmb_abbrev_col.setCurrentText(old_abbrev)
+            elif len(df.columns) > 3:
+                self.cmb_abbrev_col.setCurrentText(df.columns[3])
+            elif len(df.columns) > 0:
+                self.cmb_abbrev_col.setCurrentText(df.columns[-1])
+
+            self.cmb_depth_col.blockSignals(False)
+            self.cmb_abbrev_col.blockSignals(False)
+
+            show_cols = []
+            dcol = self.cmb_depth_col.currentText().strip()
+            acol = self.cmb_abbrev_col.currentText().strip()
+            if dcol and dcol in df.columns:
+                show_cols.append(dcol)
+            if acol and acol in df.columns and acol != dcol:
+                show_cols.append(acol)
+            if not show_cols:
+                show_cols = df.columns[: min(6, len(df.columns))].tolist()
+
+            p = df[show_cols].head(12)
+            self.tbl_preview.setColumnCount(len(show_cols))
+            self.tbl_preview.setHorizontalHeaderLabels(show_cols)
+            self.tbl_preview.setRowCount(len(p))
+
+            for r, (_, row_data) in enumerate(p.iterrows()):
+                for c, val in enumerate(row_data):
+                    txt = "" if pd.isna(val) else str(val)
+                    it = QTableWidgetItem(txt)
+                    it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                    self.tbl_preview.setItem(r, c, it)
+
+            self.tbl_preview.resizeColumnsToContents()
+            self.lbl_info.setText(f"Rows in sheet: {len(df)}")
+
+        except Exception as e:
+            self._preview_df = None
+            self.tbl_preview.setRowCount(0)
+            self.tbl_preview.setColumnCount(0)
+            self.lbl_info.setText(f"Preview error: {e}")
+
+    def _on_accept(self):
+        sheet = self.cmb_sheet.currentText().strip()
+        depth_column = self.cmb_depth_col.currentText().strip()
+        abbrev_column = self.cmb_abbrev_col.currentText().strip()
+
+        if not sheet:
+            QMessageBox.warning(self, "Load Well Tops", "Please select a worksheet.")
+            return
+        if not depth_column or not abbrev_column:
+            QMessageBox.warning(self, "Load Well Tops", "Please select depth and abbreviation columns.")
+            return
+
+        if self.chk_new.isChecked():
+            well_name = self.ed_new_name.text().strip()
+            if not well_name:
+                QMessageBox.warning(self, "Load Well Tops", "Please enter a new well name.")
+                return
+        else:
+            well_name = self.cmb_existing.currentText().strip()
+            if not well_name:
+                QMessageBox.warning(self, "Load Well Tops", "Please select an existing well.")
+                return
+
+        self._result = {
+            "sheet": sheet,
+            "depth_column": depth_column,
+            "abbrev_column": abbrev_column,
+            "well_name": well_name,
+            "create_new": self.chk_new.isChecked(),
+        }
+        self.accept()
+
+    def result_config(self):
+        return self._result
+
+
+class LoadWellHeadsDialog(QDialog):
+    """Dialog to map XLS columns for well-head import with live preview."""
+
+    COL_IMPORT = 0
+    COL_SOURCE = 1
+
+    def __init__(self, parent, workbook_path):
+        super().__init__(parent)
+        self.setWindowTitle("Load Well Heads from Excel")
+        self.resize(800, 620)
+
+        self.workbook_path = workbook_path
+        self._preview_df = None
+        self._result = None
+
+        self.xl = pd.ExcelFile(workbook_path)
+        self.sheet_names = self.xl.sheet_names
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.cmb_sheet = QComboBox(self)
+        self.cmb_sheet.addItems(self.sheet_names)
+        form.addRow("Worksheet:", self.cmb_sheet)
+
+        self.cmb_wellname_col = QComboBox(self)
+        form.addRow("Wellname column*:", self.cmb_wellname_col)
+
+        self.cmb_x_col = QComboBox(self)
+        form.addRow("X column*:", self.cmb_x_col)
+
+        self.cmb_y_col = QComboBox(self)
+        form.addRow("Y column*:", self.cmb_y_col)
+
+        self.cmb_kb_col = QComboBox(self)
+        form.addRow("KB column*:", self.cmb_kb_col)
+
+        self.chk_update_existing = QCheckBox("Update existing wells if Wellname already exists", self)
+        self.chk_update_existing.setChecked(True)
+        form.addRow(self.chk_update_existing)
+
+        layout.addWidget(QLabel("Optional header columns:", self))
+        self.tbl_optional = QTableWidget(self)
+        self.tbl_optional.setColumnCount(2)
+        self.tbl_optional.setHorizontalHeaderLabels(["Import", "Source column"])
+        self.tbl_optional.horizontalHeader().setStretchLastSection(True)
+        self.tbl_optional.setMaximumHeight(180)
+        layout.addWidget(self.tbl_optional)
+
+        layout.addWidget(QLabel("Preview (first 12 rows):", self))
+        self.tbl_preview = QTableWidget(self)
+        self.tbl_preview.setColumnCount(0)
+        self.tbl_preview.setRowCount(0)
+        self.tbl_preview.setMinimumHeight(240)
+        layout.addWidget(self.tbl_preview, 1)
+
+        self.lbl_info = QLabel("* mandatory fields", self)
+        layout.addWidget(self.lbl_info)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.cmb_sheet.currentTextChanged.connect(self._refresh_preview)
+        self.cmb_wellname_col.currentTextChanged.connect(self._refresh_preview_table_only)
+        self.cmb_x_col.currentTextChanged.connect(self._refresh_preview_table_only)
+        self.cmb_y_col.currentTextChanged.connect(self._refresh_preview_table_only)
+        self.cmb_kb_col.currentTextChanged.connect(self._refresh_preview_table_only)
+
+        self._refresh_preview()
+
+    def _normalize_col_name(self, name: str) -> str:
+        return "".join(ch for ch in (name or "").lower().strip() if ch.isalnum())
+
+    def _guess_column(self, columns, aliases):
+        norm_to_real = {self._normalize_col_name(c): c for c in columns}
+        for a in aliases:
+            hit = norm_to_real.get(self._normalize_col_name(a))
+            if hit:
+                return hit
+        return ""
+
+    def _refresh_preview(self):
+        try:
+            sheet = self.cmb_sheet.currentText().strip()
+            if not sheet:
+                self.lbl_info.setText("No worksheet selected")
+                return
+
+            df = pd.read_excel(self.workbook_path, sheet_name=sheet)
+            df.columns = [str(c).strip() for c in df.columns]
+            df = df.dropna(how="all")
+            self._preview_df = df
+
+            old_values = {
+                "wellname": self.cmb_wellname_col.currentText().strip(),
+                "x": self.cmb_x_col.currentText().strip(),
+                "y": self.cmb_y_col.currentText().strip(),
+                "kb": self.cmb_kb_col.currentText().strip(),
+            }
+
+            for cmb in (self.cmb_wellname_col, self.cmb_x_col, self.cmb_y_col, self.cmb_kb_col):
+                cmb.blockSignals(True)
+                cmb.clear()
+                cmb.addItems(df.columns.tolist())
+
+            self._set_combo_default(
+                self.cmb_wellname_col,
+                old_values["wellname"],
+                self._guess_column(df.columns, ["Wellname", "Well", "Name", "Well Name"]),
+            )
+            self._set_combo_default(
+                self.cmb_x_col,
+                old_values["x"],
+                self._guess_column(df.columns, ["X", "Surface X", "Easting"]),
+            )
+            self._set_combo_default(
+                self.cmb_y_col,
+                old_values["y"],
+                self._guess_column(df.columns, ["Y", "Surface Y", "Northing"]),
+            )
+            self._set_combo_default(
+                self.cmb_kb_col,
+                old_values["kb"],
+                self._guess_column(df.columns, ["KB", "Reference depth", "Well datum value"]),
+            )
+
+            for cmb in (self.cmb_wellname_col, self.cmb_x_col, self.cmb_y_col, self.cmb_kb_col):
+                cmb.blockSignals(False)
+
+            self._populate_optional_table()
+            self._refresh_preview_table_only()
+
+        except Exception as e:
+            self._preview_df = None
+            self.tbl_optional.setRowCount(0)
+            self.tbl_preview.setRowCount(0)
+            self.tbl_preview.setColumnCount(0)
+            self.lbl_info.setText(f"Preview error: {e}")
+
+    def _set_combo_default(self, combo: QComboBox, old_value: str, guessed: str):
+        if old_value and combo.findText(old_value) >= 0:
+            combo.setCurrentText(old_value)
+            return
+        if guessed and combo.findText(guessed) >= 0:
+            combo.setCurrentText(guessed)
+            return
+        if combo.count() > 0:
+            combo.setCurrentIndex(0)
+
+    def _mandatory_columns(self):
+        return {
+            self.cmb_wellname_col.currentText().strip(),
+            self.cmb_x_col.currentText().strip(),
+            self.cmb_y_col.currentText().strip(),
+            self.cmb_kb_col.currentText().strip(),
+        }
+
+    def _populate_optional_table(self):
+        self.tbl_optional.setRowCount(0)
+        df = self._preview_df
+        if df is None or df.empty:
+            return
+
+        mandatory = self._mandatory_columns()
+        cols = [c for c in df.columns if c not in mandatory]
+        self.tbl_optional.setRowCount(len(cols))
+
+        for row, col in enumerate(cols):
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Unchecked)
+            self.tbl_optional.setItem(row, self.COL_IMPORT, chk)
+
+            src = QTableWidgetItem(col)
+            src.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.tbl_optional.setItem(row, self.COL_SOURCE, src)
+
+    def _refresh_preview_table_only(self):
+        df = self._preview_df
+        if df is None:
+            return
+
+        show_cols = []
+        for c in [
+            self.cmb_wellname_col.currentText().strip(),
+            self.cmb_x_col.currentText().strip(),
+            self.cmb_y_col.currentText().strip(),
+            self.cmb_kb_col.currentText().strip(),
+        ]:
+            if c and c in df.columns and c not in show_cols:
+                show_cols.append(c)
+
+        if not show_cols:
+            show_cols = df.columns[: min(6, len(df.columns))].tolist()
+
+        p = df[show_cols].head(12)
+        self.tbl_preview.setColumnCount(len(show_cols))
+        self.tbl_preview.setHorizontalHeaderLabels(show_cols)
+        self.tbl_preview.setRowCount(len(p))
+
+        for r, (_, row_data) in enumerate(p.iterrows()):
+            for c, val in enumerate(row_data):
+                txt = "" if pd.isna(val) else str(val)
+                it = QTableWidgetItem(txt)
+                it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                self.tbl_preview.setItem(r, c, it)
+
+        self.tbl_preview.resizeColumnsToContents()
+        self.lbl_info.setText(f"Rows in sheet: {len(df)}")
+
+    def selected_optional_columns(self):
+        out = []
+        for row in range(self.tbl_optional.rowCount()):
+            chk_item = self.tbl_optional.item(row, self.COL_IMPORT)
+            src_item = self.tbl_optional.item(row, self.COL_SOURCE)
+            if chk_item is None or src_item is None:
+                continue
+            if chk_item.checkState() != Qt.Checked:
+                continue
+            src = src_item.text().strip()
+            if src:
+                out.append(src)
+        return out
+
+    def _on_accept(self):
+        sheet = self.cmb_sheet.currentText().strip()
+        wellname_col = self.cmb_wellname_col.currentText().strip()
+        x_col = self.cmb_x_col.currentText().strip()
+        y_col = self.cmb_y_col.currentText().strip()
+        kb_col = self.cmb_kb_col.currentText().strip()
+
+        if not sheet:
+            QMessageBox.warning(self, "Load Well Heads", "Please select a worksheet.")
+            return
+
+        if not all([wellname_col, x_col, y_col, kb_col]):
+            QMessageBox.warning(
+                self,
+                "Load Well Heads",
+                "Please select columns for Wellname, X, Y and KB.",
+            )
+            return
+
+        if len({wellname_col, x_col, y_col, kb_col}) < 4:
+            QMessageBox.warning(
+                self,
+                "Load Well Heads",
+                "Mandatory fields must use four different columns.",
+            )
+            return
+
+        self._result = {
+            "sheet": sheet,
+            "wellname_column": wellname_col,
+            "x_column": x_col,
+            "y_column": y_col,
+            "kb_column": kb_col,
+            "optional_columns": self.selected_optional_columns(),
+            "update_existing": self.chk_update_existing.isChecked(),
+        }
+        self.accept()
+
+    def result_config(self):
+        return self._result
+
+
+class EditStratigraphyDialog(QDialog):
+    """Simple table editor for project stratigraphy metadata."""
+
+    def __init__(self, parent=None, stratigraphy=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Stratigraphy")
+        self.resize(820, 460)
+
+        self._input = OrderedDict(stratigraphy or {})
+        self._result = None
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Edit unit name, level, role, color and hatch.", self))
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Name", "Level", "Role", "Color", "Hatch"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        layout.addWidget(self.table)
+
+        row_btn = QHBoxLayout()
+        btn_add = QPushButton("Add row", self)
+        btn_del = QPushButton("Delete selected", self)
+        row_btn.addWidget(btn_add)
+        row_btn.addWidget(btn_del)
+        row_btn.addStretch(1)
+        layout.addLayout(row_btn)
+
+        btn_add.clicked.connect(self._add_row)
+        btn_del.clicked.connect(self._delete_selected)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self._populate()
+
+    def _populate(self):
+        self.table.setRowCount(0)
+        for name, meta in self._input.items():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(str(name)))
+            self.table.setItem(row, 1, QTableWidgetItem(str(meta.get("level", "formation"))))
+            self.table.setItem(row, 2, QTableWidgetItem(str(meta.get("role", "stratigraphy"))))
+            self.table.setItem(row, 3, QTableWidgetItem(str(meta.get("color", "#cccccc"))))
+            self.table.setItem(row, 4, QTableWidgetItem(str(meta.get("hatch", "-"))))
+
+    def _add_row(self):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self.table.setItem(row, 0, QTableWidgetItem("NewUnit"))
+        self.table.setItem(row, 1, QTableWidgetItem("formation"))
+        self.table.setItem(row, 2, QTableWidgetItem("stratigraphy"))
+        self.table.setItem(row, 3, QTableWidgetItem("#cccccc"))
+        self.table.setItem(row, 4, QTableWidgetItem("-"))
+
+    def _delete_selected(self):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
+        for r in rows:
+            self.table.removeRow(r)
+
+    def _on_accept(self):
+        out = OrderedDict()
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, 0)
+            if name_item is None:
+                continue
+            name = name_item.text().strip()
+            if not name:
+                continue
+            if name in out:
+                QMessageBox.warning(self, "Stratigraphy", f"Duplicate unit name '{name}'.")
+                return
+            out[name] = {
+                "level": (self.table.item(row, 1).text().strip() if self.table.item(row, 1) else "formation"),
+                "role": (self.table.item(row, 2).text().strip() if self.table.item(row, 2) else "stratigraphy"),
+                "color": (self.table.item(row, 3).text().strip() if self.table.item(row, 3) else "#cccccc"),
+                "hatch": (self.table.item(row, 4).text().strip() if self.table.item(row, 4) else "-"),
+            }
+        self._result = out
+        self.accept()
+
+    def result_stratigraphy(self):
+        return self._result
+
+
+class StratigraphyEditorDialog(EditStratigraphyDialog):
+    """Backward-compatible alias for older call sites."""
+
+
+class EditWellLogTableDialog(QDialog):
+    """Edit one continuous log as depth/data rows."""
+
+    def __init__(self, parent, well_name: str, log_name: str, depth, data):
+        super().__init__(parent)
+        self.setWindowTitle(f"Edit Log Table: {well_name} / {log_name}")
+        self.resize(620, 520)
+
+        self._result_depth = None
+        self._result_data = None
+
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Depth", "Data"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        d = list(depth or [])
+        v = list(data or [])
+        n = max(len(d), len(v))
+        self.table.setRowCount(n)
+        for i in range(n):
+            dv = "" if i >= len(d) else str(d[i])
+            vv = "" if i >= len(v) else str(v[i])
+            self.table.setItem(i, 0, QTableWidgetItem(dv))
+            self.table.setItem(i, 1, QTableWidgetItem(vv))
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        out_depth = []
+        out_data = []
+        for row in range(self.table.rowCount()):
+            it_d = self.table.item(row, 0)
+            it_v = self.table.item(row, 1)
+            d_txt = it_d.text().strip() if it_d else ""
+            v_txt = it_v.text().strip() if it_v else ""
+            if not d_txt and not v_txt:
+                continue
+            try:
+                d_val = float(d_txt.replace(",", "."))
+                v_val = float(v_txt.replace(",", "."))
+            except ValueError:
+                QMessageBox.warning(self, "Edit Log", f"Invalid number in row {row + 1}.")
+                return
+            out_depth.append(d_val)
+            out_data.append(v_val)
+
+        self._result_depth = out_depth
+        self._result_data = out_data
+        self.accept()
+
+    def result_arrays(self):
+        return self._result_depth, self._result_data
+
+
+class EditWellPanelOrderDialog(QDialog):
+    """Reorder wells shown in a panel."""
+
+    def __init__(self, parent, panel, project_wells):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Well Order")
+        self.resize(360, 420)
+        self._panel = panel
+        self._project_wells = project_wells or []
+
+        panel_wells = getattr(panel, "wells", None) or self._project_wells
+        self._wells = list(panel_wells)
+
+        layout = QVBoxLayout(self)
+        self.list_wells = QListWidget(self)
+        for w in self._wells:
+            self.list_wells.addItem(str(w.get("name", "Unnamed")))
+        layout.addWidget(self.list_wells)
+
+        row = QHBoxLayout()
+        btn_up = QPushButton("Up", self)
+        btn_down = QPushButton("Down", self)
+        row.addWidget(btn_up)
+        row.addWidget(btn_down)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        btn_up.clicked.connect(lambda: self._move(-1))
+        btn_down.clicked.connect(lambda: self._move(+1))
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _move(self, delta: int):
+        row = self.list_wells.currentRow()
+        if row < 0:
+            return
+        new_row = row + delta
+        if new_row < 0 or new_row >= self.list_wells.count():
+            return
+        self._wells[row], self._wells[new_row] = self._wells[new_row], self._wells[row]
+        item = self.list_wells.takeItem(row)
+        self.list_wells.insertItem(new_row, item)
+        self.list_wells.setCurrentRow(new_row)
+
+    def _on_accept(self):
+        if self._panel is not None:
+            self._panel.wells = self._wells
+            if hasattr(self._panel, "draw_well_panel"):
+                self._panel.draw_well_panel()
+            elif hasattr(self._panel, "draw_panel"):
+                self._panel.draw_panel()
+        self.accept()
+
+
+class MapLimitsDialog(QDialog):
+    """Set fixed/auto limits for the map panel axes."""
+
+    def __init__(self, parent, map_panel):
+        super().__init__(parent)
+        self.setWindowTitle("Map View Limits")
+        self.resize(420, 220)
+        self.map_panel = map_panel
+
+        ax = getattr(map_panel, "ax", None)
+        if ax is None and hasattr(map_panel, "fig"):
+            ax = map_panel.fig.axes[0] if getattr(map_panel.fig, "axes", []) else None
+
+        xmin = ymin = -1000.0
+        xmax = ymax = 1000.0
+        if ax is not None:
+            try:
+                xmin, xmax = ax.get_xlim()
+                ymin, ymax = ax.get_ylim()
+            except Exception:
+                pass
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self.chk_fixed = QCheckBox("Use fixed limits (disable auto-fit)", self)
+        self.chk_fixed.setChecked(bool(getattr(map_panel, "use_fixed_limits", False)))
+        form.addRow(self.chk_fixed)
+
+        self.sp_xmin = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmin, xmin)
+        self.sp_xmax = QDoubleSpinBox(self); self._cfg_spin(self.sp_xmax, xmax)
+        self.sp_ymin = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymin, ymin)
+        self.sp_ymax = QDoubleSpinBox(self); self._cfg_spin(self.sp_ymax, ymax)
+
+        form.addRow("X min:", self.sp_xmin)
+        form.addRow("X max:", self.sp_xmax)
+        form.addRow("Y min:", self.sp_ymin)
+        form.addRow("Y max:", self.sp_ymax)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_ok)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+        self.chk_fixed.toggled.connect(self._update_enabled)
+        self._update_enabled(self.chk_fixed.isChecked())
+
+    def _cfg_spin(self, sp: QDoubleSpinBox, v: float):
+        sp.setDecimals(3)
+        sp.setRange(-1e12, 1e12)
+        sp.setSingleStep(10.0)
+        sp.setValue(float(v))
+
+    def _update_enabled(self, enabled: bool):
+        self.sp_xmin.setEnabled(enabled)
+        self.sp_xmax.setEnabled(enabled)
+        self.sp_ymin.setEnabled(enabled)
+        self.sp_ymax.setEnabled(enabled)
+
+    def _on_ok(self):
+        if self.chk_fixed.isChecked():
+            xmin = float(self.sp_xmin.value())
+            xmax = float(self.sp_xmax.value())
+            ymin = float(self.sp_ymin.value())
+            ymax = float(self.sp_ymax.value())
+            if xmax <= xmin or ymax <= ymin:
+                QMessageBox.warning(self, "Invalid limits", "Max must be greater than Min for both axes.")
+                return
+            self.map_panel.use_fixed_limits = True
+            self.map_panel.fixed_limits = (xmin, xmax, ymin, ymax)
+        else:
+            self.map_panel.use_fixed_limits = False
+            self.map_panel.fixed_limits = None
+
+        if hasattr(self.map_panel, "draw_panel"):
+            self.map_panel.draw_panel()
+        self.accept()
 

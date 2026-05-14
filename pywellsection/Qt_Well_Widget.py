@@ -28,7 +28,9 @@ from .dialogs import AddFormationTopDialog
 from .dialogs import AddLogToTrackDialog
 
 import logging
+import traceback
 from pathlib import Path
+import math
 
 logging.getLogger("ipykernel").setLevel("CRITICAL")
 logging.getLogger("traitlets").setLevel("CRITICAL")
@@ -177,39 +179,31 @@ class  WellPanelWidget(QWidget):
 
 
         if len(self.visible_wells) == 0:
-            self.fig.clear()
-            self.canvas.draw()
-            return
+            # On first draw, default to all wells if no explicit visibility was set yet.
+            if self.axes is None and self.wells:
+                self.visible_wells = [w.get("name") for w in self.wells if w.get("name")]
+            else:
+                self.fig.clear()
+                self.canvas.draw()
+                return
 
         if len(self.visible_wells)!= 0:
 
-            top_true = bottom_true = None
-            if hasattr(self, "axes") and self.axes:
-                # Take the first main axis as reference (row 0, track 0)
-                ref_ax = self.axes[0]
-                y0, y1 = ref_ax.get_ylim()
-
-                offset0 = 0.0
-                if getattr(self, "_flatten_depths", None):
-                    # first well offset
-                    if len(self._flatten_depths) > 0:
-                        offset0 = float(self._flatten_depths[0])
-
-
-                top_true = min(y0, y1)
-                bottom_true = max(y0, y1)
-                self.offset0 = offset0
-
-#                if self.current_depth_window is None:
-                    #self.current_depth_window = (top_true, bottom_true)
-                vtop, vbottom = self.get_visible_depth_range()
-                self.current_depth_window = (vtop, vbottom)
+            # Keep current_depth_window deterministic during import/rebuild redraws.
+            # Explicit layout settings can still override via set_current_depth_window().
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
             self._corr_artists = []
             flatten_depths = self._flatten_depths
             visible_tops = self.visible_tops
+            if visible_tops is None:
+                visible_tops = set()
+                if isinstance(self.stratigraphy, dict):
+                    visible_tops.update(self.stratigraphy.keys())
+                for w in (self.wells or []):
+                    tops = w.get("tops") or {}
+                    visible_tops.update(tops.keys())
             visible_logs = self.visible_logs
             visible_discrete_logs = self.visible_discrete_logs
             visible_tracks = self.visible_tracks
@@ -232,44 +226,86 @@ class  WellPanelWidget(QWidget):
             depth_window = self.get_current_depth_window()
 
 
-            self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
-                self.fig,
-                self.wells,
-                self.tracks,
-                well_gap_factor=self.well_gap_factor,
-                track_gap_factor=self.track_gap_factor,
-                track_width=self.track_width,
-                suptitle=self.well_panel_title,
-                corr_artists=self._corr_artists,
-                highlight_top=self.highlight_top,
-                flatten_depths=flatten_depths,
-                visible_wells=self.visible_wells,
-                visible_tops = visible_tops,
-                visible_logs = visible_logs,
-                visible_discrete_logs=visible_discrete_logs,
-                visible_bitmaps=visible_bitmaps,
-                visible_tracks = visible_tracks,
-                depth_window=depth_window,
-                stratigraphy=self.stratigraphy,
-                vertical_scale=self.vertical_scale,
-                gap_proportional_to_distance = self.gap_proportional_to_distance,
-                gap_distance_ref_m = self.gap_distance_ref_m,
-                gap_min_factor = self.gap_min_factor,
-                gap_max_factor = self.gap_max_factor,
-            )
+            try:
+                self.axes, self.well_main_axes = draw_multi_wells_panel_on_figure(
+                    self.fig,
+                    self.wells,
+                    self.tracks,
+                    well_gap_factor=self.well_gap_factor,
+                    track_gap_factor=self.track_gap_factor,
+                    track_width=self.track_width,
+                    suptitle=self.well_panel_title,
+                    corr_artists=self._corr_artists,
+                    highlight_top=self.highlight_top,
+                    flatten_depths=flatten_depths,
+                    visible_wells=self.visible_wells,
+                    visible_tops = visible_tops,
+                    visible_logs = visible_logs,
+                    visible_discrete_logs=visible_discrete_logs,
+                    visible_bitmaps=visible_bitmaps,
+                    visible_tracks = visible_tracks,
+                    depth_window=depth_window,
+                    stratigraphy=self.stratigraphy,
+                    vertical_scale=self.vertical_scale,
+                    gap_proportional_to_distance = self.gap_proportional_to_distance,
+                    gap_distance_ref_m = self.gap_distance_ref_m,
+                    gap_min_factor = self.gap_min_factor,
+                    gap_max_factor = self.gap_max_factor,
+                )
+            except Exception:
+                LOG.error("draw_multi_wells_panel_on_figure failed")
+                traceback.print_exc()
+                self.fig.clear()
+                ax = self.fig.add_subplot(111)
+                ax.text(0.5, 0.5, "Plot error - see console traceback", ha="center", va="center")
+                ax.set_axis_off()
+                self.canvas.draw()
+                return
             self._connect_ylim_sync()
             self._build_axis_index()
 
             self.canvas.draw()
 
     def update_well_panel(self,tracks, wells, stratigraphy, panel_settings):
+        old_names = {w.get("name") for w in (self.wells or []) if isinstance(w, dict) and w.get("name")}
+        new_names = {w.get("name") for w in (wells or []) if isinstance(w, dict) and w.get("name")}
+
         self.tracks = tracks
         self.n_tracks = len(tracks)
         self.wells = wells
         self.stratigraphy = stratigraphy
         self.panel_settings = panel_settings
         LOG.debug(f"stratigraphy: {stratigraphy}")
+
+        # If the visible well set changed, reset cached depth window so redraw recomputes bounds.
+        if old_names != new_names:
+            self.current_depth_window = None
+
+        # Initialize visible_tops to all known tops if not already set
+        if self.visible_tops is None:
+            self._initialize_visible_tops()
+
         self.draw_well_panel()
+
+    def _initialize_visible_tops(self):
+        """Initialize visible_tops to include all known tops from stratigraphy and wells."""
+        known_tops = set()
+
+        # Gather tops from stratigraphy
+        if isinstance(self.stratigraphy, dict):
+            known_tops.update(self.stratigraphy.keys())
+
+        # Gather tops from wells
+        for w in (self.wells or []):
+            tops = w.get("tops") or {}
+            known_tops.update(tops.keys())
+
+        # Set visible_tops to all known tops if any exist
+        if known_tops:
+            self.visible_tops = known_tops
+            LOG.debug(f"Initialized visible_tops to {known_tops}")
+        else:
+            self.visible_tops = set()
 
     def enable_top_picking(self):
         """
@@ -911,16 +947,19 @@ class  WellPanelWidget(QWidget):
             or None if no axes available
         """
 
-        # axes should be stored from last draw
-        if not hasattr(self, "axes") or not self.axes:
-            return None
-
-        # use first non-spacer axis
+        # Prefer the dedicated depth axis for stable limits on redraw.
         ax = None
-        for a in self.axes:
-            if a and a.get_visible():
-                ax = a
-                break
+        if hasattr(self, "well_main_axes") and self.well_main_axes:
+            ax = self.well_main_axes[0]
+
+        # fallback: first visible axis
+        if ax is None:
+            if not hasattr(self, "axes") or not self.axes:
+                return None
+            for a in self.axes:
+                if a and a.get_visible():
+                    ax = a
+                    break
 
         if ax is None:
             return None
@@ -932,9 +971,12 @@ class  WellPanelWidget(QWidget):
         top_plot = min(y0, y1)
         bottom_plot = max(y0, y1)
 
-        # convert to TRUE depth using offset
-        # (flattening shifts depth by offset)
-        offsets = getattr(self, "flatten_depths", None)
+        # Guard against default matplotlib limits from non-initialized axes.
+        if (not math.isfinite(y0)) or (not math.isfinite(y1)) or abs(y1 - y0) < 1e-9:
+            return None
+
+        # convert to TRUE depth using offset (flattening shifts depth by offset)
+        offsets = getattr(self, "_flatten_depths", None)
 
         if offsets:
             # use first well offset as reference (all axes aligned)
@@ -1215,12 +1257,19 @@ class  WellPanelWidget(QWidget):
 
     def set_visible_wells(self, visible_wells):
         self.visible_wells = visible_wells
+        # Visibility changes should recompute panel depth extent on next draw.
+        self.current_depth_window = None
 
     def get_visible_wells(self):
         return self.visible_wells
 
     def set_visible_tops(self, visible_tops):
-        self.visible_tops = visible_tops
+        """Set visible_tops, converting dict keys to set if needed."""
+        if isinstance(visible_tops, dict):
+            # If a dict is passed, use its keys
+            self.visible_tops = set(visible_tops.keys()) if visible_tops else set()
+        else:
+            self.visible_tops = visible_tops
 
     def get_visible_tops(self):
         return self.visible_tops
@@ -1366,12 +1415,51 @@ class  WellPanelWidget(QWidget):
     def get_current_depth_window(self):
 
         if self.current_depth_window is not None:
-            return self.current_depth_window
+            top, bottom = self.current_depth_window
+            # Reject invalid/degenerated cached windows (e.g., matplotlib default 0..1).
+            if top is not None and bottom is not None and abs(float(bottom) - float(top)) > 1.0:
+                return self.current_depth_window
+            self.current_depth_window = None
         else:
-            ref_depths = [w["reference_depth"] for w in self.wells]
-            bottoms = [w["reference_depth"] + w["total_depth"] for w in self.wells]
+            wells = self.wells or []
+            if not wells:
+                return None
 
-            return ((min(ref_depths), max(bottoms)))
+            ref_depths = []
+            bottoms = []
+            for w in wells:
+                if "reference_depth" not in w or "total_depth" not in w:
+                    continue
+                ref = float(w["reference_depth"])
+                td = float(w["total_depth"])
+                ref_depths.append(ref)
+                bottoms.append(ref + td)
+
+            if not ref_depths or not bottoms:
+                return None
+
+            return (min(ref_depths), max(bottoms))
+
+        wells = self.wells or []
+        if not wells:
+            return None
+
+        ref_depths = []
+        bottoms = []
+        for w in wells:
+            if "reference_depth" not in w or "total_depth" not in w:
+                continue
+            ref = float(w["reference_depth"])
+            td = float(w["total_depth"])
+            ref_depths.append(ref)
+            bottoms.append(ref + td)
+
+        if not ref_depths or not bottoms:
+            return None
+
+        window = (min(ref_depths), max(bottoms))
+        self.current_depth_window = window
+        return window
 
     def set_current_depth_window(self, min_depth, max_depth):
         self.current_depth_window = (min_depth, max_depth)
@@ -1549,6 +1637,7 @@ class  WellPanelWidget(QWidget):
                 vw.append(well_name)
 
         self.visible_wells = vw
+        self.current_depth_window = None
 
         # Keep optional explicit ordering consistent
         if hasattr(self, "well_order"):
@@ -1595,6 +1684,8 @@ class  WellPanelWidget(QWidget):
                 return False
             self.visible_wells = [n for n in vw if n != well_name]
 
+        self.current_depth_window = None
+
         # Keep well_order consistent
         if hasattr(self, "well_order"):
             wo = getattr(self, "well_order", None)
@@ -1638,10 +1729,10 @@ class  WellPanelWidget(QWidget):
         vt = getattr(self, "visible_tops", None)
 
         if vt is None:
-            # all visible already
-            if redraw:
-                self.draw_well_panel()
-            return True
+            # Materialize the implicit "all visible" state so the renderer
+            # receives an explicit collection instead of None.
+            vt = set(known) if known else set()
+            self.visible_tops = vt
 
         if vt == set():
             vt = list()
@@ -1651,6 +1742,8 @@ class  WellPanelWidget(QWidget):
                 vt.append(top_name)
             else:
                 vt.add(top_name)
+
+        self.visible_tops = vt
 
         if redraw:
             self.draw_well_panel()

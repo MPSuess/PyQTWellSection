@@ -1457,10 +1457,11 @@ def connect_input_tree(self):
     self.input_tree.contextAction.connect(self.on_context_action)
     # self.input_tree.structureChanged.connect(self.on_structure_changed)
     self.input_tree.contextMenuEvent.connect(self.on_input_tree_context_menu)
+    
     self.input_tree.itemDoubleClicked.connect(self.on_double_click)
 
-    self.input_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-    self.input_tree.customContextMenuRequested.connect(self._on_window_tree_context_menu)
+    # CheckableTree handles CustomContextMenu internally and emits contextMenuEvent.
+    # Keep input-tree context routing on that signal path.
     on_tree_loaded(self)
 
 def on_tree_loaded(self):

@@ -1,19 +1,20 @@
-
 import json
 from pathlib import Path
 import re
+import os
 import lasio
 import numpy as np
 import csv
 import pandas as pd
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QComboBox, QLineEdit, QPushButton, QFileDialog,
     QDoubleSpinBox, QCheckBox, QDialogButtonBox, QMessageBox, QLabel
 )
+from PySide6.QtCore import Qt
 
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -1355,3 +1356,427 @@ def load_core_data_from_excel(parent, xlsx_path: str) -> bool:
     except Exception as e:
         QMessageBox.critical(parent, "Import Core Data", f"Import failed:\n{e}")
         return False
+
+
+def _parse_excel_number(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        try:
+            return float(value)
+        except Exception:
+            return None
+    txt = str(value).strip().replace(",", ".")
+    if not txt:
+        return None
+    try:
+        return float(txt)
+    except ValueError:
+        return None
+
+
+def load_well_heads_from_excel(parent, xlsx_path: str) -> bool:
+    """Load/update well headers from Excel with preview and column mapping dialog."""
+
+    project = parent
+
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Load Well Heads", f"File not found:\n{xlsx_path}")
+        return False
+
+    try:
+        from pywellsection.dialogs import LoadWellHeadsDialog
+
+        dlg = LoadWellHeadsDialog(parent, workbook_path=xlsx_path)
+        if dlg.exec() != QDialog.Accepted:
+            return False
+
+        cfg = dlg.result_config()
+        if not cfg:
+            return False
+
+        df = pd.read_excel(xlsx_path, sheet_name=cfg["sheet"])
+        df.columns = [str(c).strip() for c in df.columns]
+        df = df.dropna(how="all")
+
+        required_map = {
+            "Wellname": cfg["wellname_column"],
+            "X": cfg["x_column"],
+            "Y": cfg["y_column"],
+            "KB": cfg["kb_column"],
+        }
+        missing_cols = [src for _, src in required_map.items() if src not in df.columns]
+        if missing_cols:
+            QMessageBox.warning(
+                parent,
+                "Load Well Heads",
+                "Selected columns not found in worksheet:\n" + ", ".join(missing_cols),
+            )
+            return False
+
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+
+        known_optional = {
+            "uwi": "uwi",
+            "api": "api",
+            "operator": "operator",
+            "field": "field",
+            "country": "country",
+            "latitude": "latitude",
+            "lat": "latitude",
+            "longitude": "longitude",
+            "lon": "longitude",
+            "totaldepth": "total_depth",
+            "td": "total_depth",
+            "referencetype": "reference_type",
+        }
+
+        def _norm_col(name: str) -> str:
+            return "".join(ch for ch in (name or "").strip().lower() if ch.isalnum())
+
+        for _, row in df.iterrows():
+            well_name = str(row.get(required_map["Wellname"], "") or "").strip()
+            x_val = _parse_excel_number(row.get(required_map["X"]))
+            y_val = _parse_excel_number(row.get(required_map["Y"]))
+            kb_val = _parse_excel_number(row.get(required_map["KB"]))
+
+            if not well_name or x_val is None or y_val is None or kb_val is None:
+                skipped_count += 1
+                continue
+
+            target_well = _find_well_by_name(project, well_name)
+            if target_well is None:
+                target_well = _ensure_well_exists(project, well_name)
+                created_count += 1
+            else:
+                if not cfg.get("update_existing", True):
+                    skipped_count += 1
+                    continue
+                updated_count += 1
+
+            target_well["name"] = well_name
+            target_well["x"] = x_val
+            target_well["y"] = y_val
+            target_well["reference_type"] = "KB"
+            target_well["reference_depth"] = kb_val
+
+            for src_col in cfg.get("optional_columns", []):
+                if src_col not in df.columns:
+                    continue
+                raw_val = row.get(src_col)
+                if pd.isna(raw_val):
+                    continue
+                text_val = str(raw_val).strip()
+                if text_val == "":
+                    continue
+
+                mapped_key = known_optional.get(_norm_col(src_col))
+                if mapped_key == "total_depth":
+                    num = _parse_excel_number(raw_val)
+                    target_well[mapped_key] = num if num is not None else text_val
+                elif mapped_key == "latitude" or mapped_key == "longitude":
+                    num = _parse_excel_number(raw_val)
+                    target_well[mapped_key] = num if num is not None else text_val
+                elif mapped_key == "uwi":
+                    target_well["uwi"] = text_val
+                    target_well["UWI"] = text_val
+                elif mapped_key:
+                    target_well[mapped_key] = text_val
+                else:
+                    extra = target_well.setdefault("header_extra", {})
+                    extra[src_col] = text_val
+
+        if hasattr(parent, "_populate_well_tree"):
+            parent._populate_well_tree()
+        if hasattr(parent, "_populate_well_tops_tree"):
+            parent._populate_well_tops_tree()
+        if hasattr(parent, "_populate_well_log_tree"):
+            parent._populate_well_log_tree()
+        if hasattr(parent, "_populate_well_track_tree"):
+            parent._populate_well_track_tree()
+
+        if hasattr(parent, "panel"):
+            parent.panel.set_draw_well_panel(True)
+            parent.panel.current_depth_window = None
+
+        if hasattr(parent, "_rebuild_well_panel_from_tree"):
+            parent._rebuild_well_panel_from_tree()
+
+        if hasattr(parent, "panel") and hasattr(parent.panel, "draw_well_panel"):
+            parent.panel.draw_well_panel()
+
+        QMessageBox.information(
+            parent,
+            "Load Well Heads",
+            "\n".join([
+                f"Created wells: {created_count}",
+                f"Updated wells: {updated_count}",
+                f"Skipped rows: {skipped_count}",
+            ]),
+        )
+        return True
+
+    except Exception as e:
+        QMessageBox.critical(parent, "Load Well Heads", f"Load failed:\n{e}")
+        return False
+
+def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
+    """
+    Load well tops from an Excel file with user-friendly dialog.
+    
+    Features:
+      - User selects worksheet and columns for depths and abbreviations
+      - Can create new well (with optional name suggestion from filename)
+      - Can assign to existing well
+      - Creates/updates stratigraphy metadata
+      
+    Parameters
+    ----------
+    parent : QMainWindow-like
+        Parent window (typically MainWindow) with attributes:
+        - all_wells: list of well dicts
+        - stratigraphy: dict of top names to metadata
+        - active_window: current panel
+        - _populate_well_tree, _populate_top_tree: refresh methods
+    xlsx_path : str
+        Path to Excel file
+        
+    Returns
+    -------
+    bool
+        True if load succeeded, False otherwise
+    """
+    
+    project = parent
+    
+    if not os.path.exists(xlsx_path):
+        QMessageBox.warning(parent, "Load Well Tops", f"File not found:\n{xlsx_path}")
+        return False
+    
+    try:
+        # Extract suggested well name from filename (without extension)
+        filename = os.path.splitext(os.path.basename(xlsx_path))[0]
+        suggested_well_name = filename.replace("_", " ").replace("-", " ").strip()
+        
+        # Get existing well names
+        existing_well_names = [w.get("name", "") for w in (project.all_wells or []) if w.get("name")]
+        
+        # Show dialog
+        from pywellsection.dialogs import LoadWellTopsDialog
+        
+        dlg = LoadWellTopsDialog(
+            parent,
+            workbook_path=xlsx_path,
+            existing_well_names=existing_well_names,
+            suggested_well_name=suggested_well_name,
+        )
+        
+        if dlg.exec() != QDialog.Accepted:
+            return False
+        
+        cfg = dlg.result_config()
+        if not cfg:
+            return False
+        
+        # Read the Excel sheet
+        df = pd.read_excel(xlsx_path, sheet_name=cfg["sheet"])
+        df.columns = [str(c).strip() for c in df.columns]
+        df = df.dropna(how="all")
+        
+        depth_col = cfg["depth_column"]
+        abbrev_col = cfg["abbrev_column"]
+        
+        if depth_col not in df.columns or abbrev_col not in df.columns:
+            QMessageBox.warning(
+                parent,
+                "Load Well Tops",
+                f"Selected columns not found in sheet '{cfg['sheet']}'."
+            )
+            return False
+        
+        # Get or create target well
+        target_well_name = cfg["well_name"]
+        target_well = _find_well_by_name(project, target_well_name)
+        
+        if target_well is None:
+            target_well = _ensure_well_exists(project, target_well_name)
+        
+        if target_well is None:
+            QMessageBox.warning(parent, "Load Well Tops", "Could not create/find target well.")
+            return False
+        
+        # Initialize or get stratigraphy
+        strat = getattr(project, "all_stratigraphy", None)
+        if strat is None or not isinstance(strat, dict):
+            strat = OrderedDict()
+        else:
+            strat = OrderedDict(strat)
+        
+        # Import tops into well
+        tops = target_well.setdefault("tops", {})
+        added_count = 0
+        updated_count = 0
+        skipped_count = 0
+        imported_top_names = set()
+        
+        for idx, row in df.iterrows():
+            try:
+                depth_val = row[depth_col]
+                abbrev_val = row[abbrev_col]
+                
+                # Skip empty rows
+                if pd.isna(depth_val) or pd.isna(abbrev_val):
+                    skipped_count += 1
+                    continue
+                
+                # Parse depth as float
+                try:
+                    depth = float(str(depth_val).replace(",", ".").strip())
+                except (ValueError, TypeError):
+                    skipped_count += 1
+                    continue
+                
+                # Parse abbreviation/code as string
+                top_name = str(abbrev_val).strip()
+                if not top_name:
+                    skipped_count += 1
+                    continue
+                
+                # Add/update stratigraphy metadata
+                if top_name not in strat:
+                    strat[top_name] = {
+                        "level": "",
+                        "color": "#000000",
+                        "hatch": "-",
+                        "role": "stratigraphy",
+                    }
+                
+                # Add/update top in well
+                if top_name in tops:
+                    # Update existing
+                    old_val = tops[top_name]
+                    if isinstance(old_val, dict):
+                        old_val["depth"] = depth
+                    else:
+                        tops[top_name] = {"depth": depth}
+                    updated_count += 1
+                else:
+                    # Add new
+                    tops[top_name] = {"depth": depth}
+                    added_count += 1
+                imported_top_names.add(top_name)
+                    
+            except Exception as e:
+                print(f"Warning: Error processing row {idx}: {e}")
+                skipped_count += 1
+                continue
+        
+        # Update project stratigraphy
+        project.all_stratigraphy = strat
+        
+        # Update total depth if needed
+        try:
+            depths = df[depth_col].apply(lambda x: float(str(x).replace(",", ".")) if pd.notna(x) else np.nan)
+            finite_depths = depths[np.isfinite(depths)]
+            if finite_depths.size > 0:
+                max_depth = float(np.nanmax(finite_depths))
+                ref_depth = float(target_well.get("reference_depth", 0.0) or 0.0)
+                current_td = float(target_well.get("total_depth", 0.0) or 0.0)
+                new_td = max(current_td, max_depth - ref_depth)
+                target_well["total_depth"] = new_td
+        except Exception:
+            pass
+        
+        # Snapshot currently checked wells/tops to preserve user-visible state.
+        prev_checked_wells = set()
+        prev_checked_tops = set()
+        if hasattr(parent, "input_tree"):
+            try:
+                if hasattr(parent, "c_well_folder"):
+                    for it in parent.input_tree.get_items_in_folder(parent.c_well_folder, recursive=True):
+                        info = it.data(0, Qt.UserRole)
+                        if isinstance(info, (tuple, list)) and len(info) > 1 and info[1] == "Well":
+                            if it.checkState(0) == Qt.Checked and info[0]:
+                                prev_checked_wells.add(str(info[0]).strip())
+                if hasattr(parent, "c_well_tops_folder"):
+                    for it in parent.input_tree.get_items_in_folder(parent.c_well_tops_folder, recursive=True):
+                        info = it.data(0, Qt.UserRole)
+                        if isinstance(info, (tuple, list)) and len(info) > 2 and info[0] == "Tops":
+                            if it.checkState(0) == Qt.Checked and info[2]:
+                                prev_checked_tops.add(str(info[2]).strip())
+            except Exception:
+                pass
+
+        # Refresh UI
+        if hasattr(parent, "_populate_well_tree"):
+            parent._populate_well_tree()
+        if hasattr(parent, "all_stratigraphy"):
+            parent.all_stratigraphy = strat
+        if hasattr(parent, "_populate_tops_tree"):
+            parent._populate_tops_tree()
+
+        # Ensure imported well/tops are visible while preserving previously checked state.
+        if hasattr(parent, "input_tree"):
+            try:
+                parent.input_tree.blockSignals(True)
+                desired_wells = set(prev_checked_wells)
+                desired_wells.add(str(target_well_name).strip())
+
+                desired_tops = set(prev_checked_tops)
+                desired_tops.update({str(t).strip() for t in imported_top_names})
+
+                if hasattr(parent, "c_well_folder"):
+                    for it in parent.input_tree.get_items_in_folder(parent.c_well_folder, recursive=True):
+                        info = it.data(0, Qt.UserRole)
+                        if isinstance(info, (tuple, list)) and len(info) > 1 and info[1] == "Well":
+                            nm = str(info[0]).strip()
+                            it.setCheckState(0, Qt.Checked if nm in desired_wells else Qt.Unchecked)
+
+                if hasattr(parent, "c_well_tops_folder"):
+                    for it in parent.input_tree.get_items_in_folder(parent.c_well_tops_folder, recursive=True):
+                        info = it.data(0, Qt.UserRole)
+                        if isinstance(info, (tuple, list)) and len(info) > 2 and info[0] == "Tops":
+                            nm = str(info[2]).strip()
+                            it.setCheckState(0, Qt.Checked if nm in desired_tops else Qt.Unchecked)
+
+                # Keep roots visibly checked if anything is selected.
+                if hasattr(parent, "c_well_folder") and desired_wells:
+                    parent.c_well_folder.setCheckState(0, Qt.Checked)
+                if hasattr(parent, "c_well_tops_folder") and desired_tops:
+                    parent.c_well_tops_folder.setCheckState(0, Qt.Checked)
+            except Exception:
+                pass
+            finally:
+                parent.input_tree.blockSignals(False)
+
+        if hasattr(parent, "_rebuild_well_panel_from_tree"):
+            parent._rebuild_well_panel_from_tree()
+        
+        # Redraw active panel if it exists
+        active_panel = getattr(parent, "active_window", None)
+        if active_panel is not None and hasattr(active_panel, "well_panel"):
+            active_panel.well_panel.stratigraphy = strat
+            active_panel.well_panel.wells = project.all_wells
+            # Recompute depth limits after data import to avoid stale 0..1 ranges.
+            active_panel.well_panel.current_depth_window = None
+            active_panel.well_panel.draw_well_panel()
+        
+        # Show summary
+        msg = [
+            f"Added tops:    {added_count}",
+            f"Updated tops:  {updated_count}",
+            f"Skipped rows:  {skipped_count}",
+            f"\nWell: {target_well_name}",
+        ]
+        
+        QMessageBox.information(parent, "Load Well Tops", "\n".join(msg))
+        return True
+        
+    except Exception as e:
+        QMessageBox.critical(parent, "Load Well Tops", f"Load failed:\n{str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
