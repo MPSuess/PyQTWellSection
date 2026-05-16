@@ -606,10 +606,11 @@ def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs 
     if visible_discrete_logs is not None and disc_name not in visible_discrete_logs:
         return
 
+    from matplotlib.patches import Rectangle
+
     disc_label = disc_cfg.get("label", disc_name)
     color_map = disc_cfg.get("color_map", {})
     default_color = disc_cfg.get("default_color", "#dddddd")
-    missing_code = disc_cfg.get("missing", -999)  # optional, default -999
 
     disc_logs = well.get("discrete_logs", {})
     disc_def = disc_logs.get(disc_name)
@@ -617,7 +618,8 @@ def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs 
         return
 
     depths = np.array(disc_def.get("depth", []), dtype=float)
-    values = np.array(disc_def.get("values", []), dtype=object)
+    values = np.array(disc_def.get("values", []), dtype=int)
+    dictionary = disc_def.get("dictionary", {}) or {}
 
     if depths.size == 0 or values.size == 0:
         return
@@ -644,46 +646,53 @@ def _draw_discrete_track(base_ax, well, offset, disc_cfg, visible_discrete_logs 
     for i in range(len(depths) - 1):
         top_phys = depths[i]
         bot_phys = depths[i + 1]
-        val = values[i]
-
-        if val == missing_code:
+        val = int(values[i])
+        if val <= 0:
             continue
 
         top_plot = top_phys - offset
         bot_plot = bot_phys - offset
 
-        col = color_map.get(val, default_color)
-
-        base_ax.axhspan(
-            top_plot,
-            bot_plot,
-            xmin=0.0,
-            xmax=1.0,
-            facecolor=col,
-            edgecolor="k",
-            linewidth=0.3,
-            alpha=0.9,
-            zorder=0.8,
+        entry = dictionary.get(str(val), dictionary.get(val, {}))
+        col = entry.get("color") or color_map.get(val) or color_map.get(str(val), default_color)
+        hatch = entry.get("hatch", "")
+        base_ax.add_patch(
+            Rectangle(
+                (0.0, min(top_plot, bot_plot)),
+                1.0,
+                abs(bot_plot - top_plot),
+                facecolor=col,
+                edgecolor="k",
+                linewidth=0.3,
+                alpha=0.9,
+                hatch=hatch,
+                zorder=0.8,
+            )
         )
 
     # last sample → extend to TD if not missing
     last_val = values[-1]
-    if last_val != missing_code:
+    last_val = int(last_val)
+    if last_val > 0:
         top_phys = depths[-1]
         top_plot = top_phys - offset
         bot_plot = last_bottom_plot
 
-        col = color_map.get(last_val, default_color)
-        base_ax.axhspan(
-            top_plot,
-            bot_plot,
-            xmin=0.0,
-            xmax=1.0,
-            facecolor=col,
-            edgecolor="k",
-            linewidth=0.3,
-            alpha=0.9,
-            zorder=0.8,
+        entry = dictionary.get(str(last_val), dictionary.get(last_val, {}))
+        col = entry.get("color") or color_map.get(last_val) or color_map.get(str(last_val), default_color)
+        hatch = entry.get("hatch", "")
+        base_ax.add_patch(
+            Rectangle(
+                (0.0, min(top_plot, bot_plot)),
+                1.0,
+                abs(bot_plot - top_plot),
+                facecolor=col,
+                edgecolor="k",
+                linewidth=0.3,
+                alpha=0.9,
+                hatch=hatch,
+                zorder=0.8,
+            )
         )
 
 def _draw_lithofacies_track(base_ax,well, track, offset = 0.0):

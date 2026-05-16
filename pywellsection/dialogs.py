@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
     QDoubleSpinBox, QCheckBox, QColorDialog, QSpinBox, QCheckBox,
     QFileDialog, QTextBrowser, QTableWidget, QTableWidgetItem,
-    QPushButton, QWidget, QListWidget, QGroupBox,QAbstractItemView
+    QPushButton, QWidget, QListWidget, QGroupBox,QAbstractItemView, QTabWidget
 )
 
 from PySide6.QtCore import Qt, Signal
@@ -2082,6 +2082,174 @@ class NewDiscreteTrackDialog(QDialog):
     def result_track(self):
         """Return the new track dict or None."""
         return self._result
+
+
+class DiscreteLogDictionaryDialog(QDialog):
+    COL_NUMBER = 0
+    COL_NAME = 1
+    COL_COLOR = 2
+    COL_HATCH = 3
+
+    def __init__(self, parent, log_name, dictionary=None, used_values=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Discrete dictionary: {log_name}")
+        self.resize(560, 420)
+        self._result = None
+        self._used_values = set()
+        for value in used_values or []:
+            try:
+                ivalue = int(value)
+            except (TypeError, ValueError):
+                continue
+            if ivalue > 0:
+                self._used_values.add(ivalue)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Edit discrete values. Numbers must be positive integers and unique.", self))
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Number", "Name", "Color", "Hatch"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table, 1)
+
+        row_buttons = QHBoxLayout()
+        btn_add = QPushButton("Add row", self)
+        btn_delete = QPushButton("Delete selected row(s)", self)
+        btn_color = QPushButton("Pick color", self)
+        btn_add.clicked.connect(self._add_row)
+        btn_delete.clicked.connect(self._delete_selected_rows)
+        btn_color.clicked.connect(self._pick_color)
+        row_buttons.addWidget(btn_add)
+        row_buttons.addWidget(btn_delete)
+        row_buttons.addWidget(btn_color)
+        row_buttons.addStretch(1)
+        layout.addLayout(row_buttons)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._populate(dictionary or {})
+
+    def _populate(self, dictionary):
+        rows = []
+        for raw_code, entry in (dictionary or {}).items():
+            try:
+                code = int(raw_code)
+            except (TypeError, ValueError):
+                continue
+            if code <= 0:
+                continue
+            if not isinstance(entry, dict):
+                entry = {"name": str(entry)}
+            rows.append((
+                code,
+                str(entry.get("name", code)),
+                str(entry.get("color", "")),
+                str(entry.get("hatch", "")),
+            ))
+
+        present = {row[0] for row in rows}
+        for code in sorted(self._used_values - present):
+            rows.append((code, str(code), "#cccccc", ""))
+
+        for code, name, color, hatch in sorted(rows, key=lambda r: r[0]):
+            self._append_row(code, name, color, hatch)
+
+    def _append_row(self, number="", name="", color="", hatch=""):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self.table.setItem(row, self.COL_NUMBER, QTableWidgetItem(str(number)))
+        self.table.setItem(row, self.COL_NAME, QTableWidgetItem(str(name)))
+        self.table.setItem(row, self.COL_COLOR, QTableWidgetItem(str(color)))
+        self.table.setItem(row, self.COL_HATCH, QTableWidgetItem(str(hatch)))
+
+    def _add_row(self):
+        number = 1
+        used = set()
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, self.COL_NUMBER)
+            try:
+                used.add(int(item.text()))
+            except (AttributeError, TypeError, ValueError):
+                pass
+        while number in used:
+            number += 1
+        self._append_row(number, f"Value {number}", "#cccccc", "")
+
+    def _delete_selected_rows(self):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
+        for row in rows:
+            self.table.removeRow(row)
+
+    def _pick_color(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        item = self.table.item(row, self.COL_COLOR)
+        initial = QColor(item.text()) if item and QColor(item.text()).isValid() else QColor("#cccccc")
+        color = QColorDialog.getColor(initial, self, "Pick discrete color")
+        if color.isValid():
+            if item is None:
+                item = QTableWidgetItem()
+                self.table.setItem(row, self.COL_COLOR, item)
+            item.setText(color.name())
+
+    def accept(self):
+        dictionary = {}
+        seen = set()
+        for row in range(self.table.rowCount()):
+            num_item = self.table.item(row, self.COL_NUMBER)
+            name_item = self.table.item(row, self.COL_NAME)
+            color_item = self.table.item(row, self.COL_COLOR)
+            hatch_item = self.table.item(row, self.COL_HATCH)
+
+            raw_number = (num_item.text() if num_item else "").strip()
+            try:
+                number = int(raw_number)
+            except ValueError:
+                QMessageBox.warning(self, "Discrete dictionary", f"Row {row + 1}: number must be an integer.")
+                return
+            if number <= 0:
+                QMessageBox.warning(self, "Discrete dictionary", f"Row {row + 1}: number must be positive.")
+                return
+            if number in seen:
+                QMessageBox.warning(self, "Discrete dictionary", f"Number {number} is used more than once.")
+                return
+            seen.add(number)
+
+            name = (name_item.text() if name_item else "").strip() or str(number)
+            color = (color_item.text() if color_item else "").strip() or "#cccccc"
+            if not QColor(color).isValid():
+                QMessageBox.warning(self, "Discrete dictionary", f"Row {row + 1}: color is not valid.")
+                return
+            hatch = (hatch_item.text() if hatch_item else "").strip()
+            dictionary[str(number)] = {
+                "name": name,
+                "color": QColor(color).name(),
+                "hatch": hatch,
+            }
+
+        missing_used = sorted(self._used_values - {int(k) for k in dictionary})
+        if missing_used:
+            QMessageBox.warning(
+                self,
+                "Discrete dictionary",
+                "The dictionary must contain entries for existing values: "
+                + ", ".join(str(v) for v in missing_used),
+            )
+            return
+
+        self._result = dictionary
+        super().accept()
+
+    def result_dictionary(self):
+        return self._result
+
 
 class DiscreteColorEditorDialog(QDialog):
     """
@@ -4254,11 +4422,11 @@ class EditStratigraphyDialog(QDialog):
         self.setWindowTitle("Edit Stratigraphy")
         self.resize(820, 460)
 
-        self._input = OrderedDict(stratigraphy or {})
+        self._input = self._sort_input(stratigraphy or {})
         self._result = None
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Edit unit name, level, role, color and hatch.", self))
+        layout.addWidget(QLabel("Edit stratigraphic tops. Use Up/Down to set shallow-to-deep order.", self))
 
         filter_row = QHBoxLayout()
         filter_row.addWidget(QLabel("Filter", self))
@@ -4269,22 +4437,31 @@ class EditStratigraphyDialog(QDialog):
 
         self.table = QTableWidget(self)
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Name", "Level", "Role", "Color", "Hatch"])
+        self.table.setHorizontalHeaderLabels(["Index", "Name", "Level", "Color", "Hatch"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSortingEnabled(True)
+        self.table.setSortingEnabled(False)
         layout.addWidget(self.table)
 
         row_btn = QHBoxLayout()
         btn_add = QPushButton("Add row", self)
         btn_del = QPushButton("Delete selected", self)
+        btn_up = QPushButton("Up", self)
+        btn_down = QPushButton("Down", self)
+        btn_from_tree = QPushButton("Initialize from input tree", self)
         row_btn.addWidget(btn_add)
         row_btn.addWidget(btn_del)
+        row_btn.addWidget(btn_up)
+        row_btn.addWidget(btn_down)
+        row_btn.addWidget(btn_from_tree)
         row_btn.addStretch(1)
         layout.addLayout(row_btn)
 
         btn_add.clicked.connect(self._add_row)
         btn_del.clicked.connect(self._delete_selected)
+        btn_up.clicked.connect(lambda: self._move_selected(-1))
+        btn_down.clicked.connect(lambda: self._move_selected(1))
+        btn_from_tree.clicked.connect(self._initialize_from_input_tree)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply, self)
         btns.accepted.connect(self._on_accept)
@@ -4298,50 +4475,104 @@ class EditStratigraphyDialog(QDialog):
     def _populate(self):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(0)
-        for name, meta in sorted(self._input.items(), key=lambda item: str(item[0]).lower()):
+        for row_index, (name, meta) in enumerate(self._input.items(), start=1):
             row = self.table.rowCount()
             self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(str(name)))
-            self.table.setItem(row, 1, QTableWidgetItem(str(meta.get("level", "formation"))))
-            self.table.setItem(row, 2, QTableWidgetItem(str(meta.get("role", "stratigraphy"))))
+            self._set_index_item(row, row_index)
+            self.table.setItem(row, 1, QTableWidgetItem(str(name)))
+            self.table.setItem(row, 2, QTableWidgetItem(str(meta.get("level", "formation"))))
             self.table.setItem(row, 3, QTableWidgetItem(str(meta.get("color", "#cccccc"))))
             self.table.setItem(row, 4, QTableWidgetItem(str(meta.get("hatch", "-"))))
-        self.table.setSortingEnabled(True)
-        self._sort_by_name()
         self._apply_filter()
 
-    def _sort_by_name(self):
-        self.table.sortItems(0, Qt.AscendingOrder)
+    def _sort_input(self, stratigraphy):
+        def _sort_key(item):
+            meta = item[1] if isinstance(item[1], dict) else {}
+            try:
+                idx = float(meta.get("strat_index", 10**9))
+            except (TypeError, ValueError):
+                idx = 10**9
+            return idx, str(item[0]).lower()
+
+        return OrderedDict(sorted((stratigraphy or {}).items(), key=_sort_key))
+
+    def _initialize_from_input_tree(self):
+        parent = self.parent()
+        sync = getattr(parent, "_sync_top_roles_and_order_from_input_tree", None)
+        if not callable(sync):
+            QMessageBox.information(
+                self,
+                "Stratigraphy",
+                "The parent window cannot initialize the order from the input tree.",
+            )
+            return
+
+        stratigraphy = sync()
+        stratigraphy_only = OrderedDict(
+            (name, dict(meta or {}))
+            for name, meta in (stratigraphy or {}).items()
+            if str((meta or {}).get("role", "stratigraphy") or "stratigraphy").strip().lower() == "stratigraphy"
+        )
+        self._input = self._sort_input(stratigraphy_only)
+        self._populate()
+
+    def _set_index_item(self, row, index):
+        item = QTableWidgetItem(str(index))
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        item.setTextAlignment(Qt.AlignCenter)
+        self.table.setItem(row, 0, item)
+
+    def _renumber_indices(self):
+        for row in range(self.table.rowCount()):
+            self._set_index_item(row, row + 1)
 
     def _apply_filter(self):
         needle = self.filter_edit.text().strip().lower() if hasattr(self, "filter_edit") else ""
         for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
+            item = self.table.item(row, 1)
             name = item.text().lower() if item else ""
             self.table.setRowHidden(row, bool(needle and needle not in name))
 
     def _add_row(self):
-        self.table.setSortingEnabled(False)
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self.table.setItem(row, 0, QTableWidgetItem("NewUnit"))
-        self.table.setItem(row, 1, QTableWidgetItem("formation"))
-        self.table.setItem(row, 2, QTableWidgetItem("stratigraphy"))
+        self._set_index_item(row, row + 1)
+        self.table.setItem(row, 1, QTableWidgetItem("NewUnit"))
+        self.table.setItem(row, 2, QTableWidgetItem("formation"))
         self.table.setItem(row, 3, QTableWidgetItem("#cccccc"))
         self.table.setItem(row, 4, QTableWidgetItem("-"))
-        self.table.setSortingEnabled(True)
-        self._sort_by_name()
         self._apply_filter()
 
     def _delete_selected(self):
         rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
         for r in rows:
             self.table.removeRow(r)
+        self._renumber_indices()
+
+    def _move_selected(self, direction):
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()})
+        if len(rows) != 1:
+            return
+        row = rows[0]
+        target = row + int(direction)
+        if target < 0 or target >= self.table.rowCount():
+            return
+        self._swap_rows(row, target)
+        self._renumber_indices()
+        self.table.selectRow(target)
+        self._apply_filter()
+
+    def _swap_rows(self, row_a, row_b):
+        for col in range(self.table.columnCount()):
+            item_a = self.table.takeItem(row_a, col)
+            item_b = self.table.takeItem(row_b, col)
+            self.table.setItem(row_a, col, item_b)
+            self.table.setItem(row_b, col, item_a)
 
     def _collect_result(self):
         out = OrderedDict()
         for row in range(self.table.rowCount()):
-            name_item = self.table.item(row, 0)
+            name_item = self.table.item(row, 1)
             if name_item is None:
                 continue
             name = name_item.text().strip()
@@ -4351,8 +4582,9 @@ class EditStratigraphyDialog(QDialog):
                 QMessageBox.warning(self, "Stratigraphy", f"Duplicate unit name '{name}'.")
                 return
             out[name] = {
-                "level": (self.table.item(row, 1).text().strip() if self.table.item(row, 1) else "formation"),
-                "role": (self.table.item(row, 2).text().strip() if self.table.item(row, 2) else "stratigraphy"),
+                "strat_index": row + 1,
+                "level": (self.table.item(row, 2).text().strip() if self.table.item(row, 2) else "formation"),
+                "role": "stratigraphy",
                 "color": (self.table.item(row, 3).text().strip() if self.table.item(row, 3) else "#cccccc"),
                 "hatch": (self.table.item(row, 4).text().strip() if self.table.item(row, 4) else "-"),
             }
@@ -4365,7 +4597,7 @@ class EditStratigraphyDialog(QDialog):
         self._result = out
         self.applied.emit(out)
         self._input = OrderedDict(out)
-        self._sort_by_name()
+        self._renumber_indices()
         self._apply_filter()
 
     def _on_accept(self):
@@ -4382,6 +4614,102 @@ class EditStratigraphyDialog(QDialog):
 
 class StratigraphyEditorDialog(EditStratigraphyDialog):
     """Backward-compatible alias for older call sites."""
+
+
+class ObjectSettingsDialog(QDialog):
+    """Generic settings dialog for tree objects."""
+
+    def __init__(self, parent=None, title="Object settings", info_rows=None,
+                 stats_rows=None, display_fields=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(620, 520)
+        self._display_fields = list(display_fields or [])
+        self._widgets = {}
+        self._result = None
+
+        layout = QVBoxLayout(self)
+        tabs = QTabWidget(self)
+        layout.addWidget(tabs, 1)
+
+        info_tab = QWidget(self)
+        info_layout = QVBoxLayout(info_tab)
+        header_group = QGroupBox("Name and header", info_tab)
+        header_layout = QFormLayout(header_group)
+        for key, value in (info_rows or []):
+            label = QLabel(str(value), header_group)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            header_layout.addRow(str(key) + ":", label)
+        info_layout.addWidget(header_group)
+
+        stats_group = QGroupBox("Statistics", info_tab)
+        stats_layout = QFormLayout(stats_group)
+        for key, value in (stats_rows or []):
+            label = QLabel(str(value), stats_group)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            stats_layout.addRow(str(key) + ":", label)
+        info_layout.addWidget(stats_group)
+        info_layout.addStretch(1)
+        tabs.addTab(info_tab, "Info")
+
+        display_tab = QWidget(self)
+        display_layout = QFormLayout(display_tab)
+        if not self._display_fields:
+            display_layout.addRow(QLabel("No editable display settings are available for this object.", display_tab))
+        for field in self._display_fields:
+            key = field.get("key")
+            label = field.get("label", key)
+            kind = field.get("type", "text")
+            value = field.get("value", "")
+
+            if kind == "combo":
+                widget = QComboBox(display_tab)
+                widget.addItems([str(v) for v in field.get("choices", [])])
+                if value is not None:
+                    widget.setCurrentText(str(value))
+            elif kind == "float":
+                widget = QDoubleSpinBox(display_tab)
+                widget.setRange(float(field.get("min", -1e12)), float(field.get("max", 1e12)))
+                widget.setDecimals(int(field.get("decimals", 6)))
+                widget.setValue(float(value or 0.0))
+            elif kind == "int":
+                widget = QSpinBox(display_tab)
+                widget.setRange(int(field.get("min", -1000000)), int(field.get("max", 1000000)))
+                widget.setValue(int(value or 0))
+            elif kind == "bool":
+                widget = QCheckBox(display_tab)
+                widget.setChecked(bool(value))
+            else:
+                widget = QLineEdit(display_tab)
+                widget.setText("" if value is None else str(value))
+
+            self._widgets[key] = (kind, widget)
+            display_layout.addRow(str(label) + ":", widget)
+        tabs.addTab(display_tab, "Display")
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns.accepted.connect(self._on_accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _on_accept(self):
+        out = {}
+        for key, (kind, widget) in self._widgets.items():
+            if kind == "combo":
+                out[key] = widget.currentText()
+            elif kind == "float":
+                out[key] = float(widget.value())
+            elif kind == "int":
+                out[key] = int(widget.value())
+            elif kind == "bool":
+                out[key] = bool(widget.isChecked())
+            else:
+                out[key] = widget.text().strip()
+        self._result = out
+        self.accept()
+
+    def result_display(self):
+        return self._result
 
 
 class EditWellLogTableDialog(QDialog):

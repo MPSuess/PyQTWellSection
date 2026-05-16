@@ -15,8 +15,9 @@ class QTextEditLogger(QPlainTextEdit, logging.Handler):
     write_text_signal = pyqtSignal(str)
 
     def __init__(self, parent):
-        QPlainTextEdit.__init__(self, parent)
+        QPlainTextEdit.__init__(self)
         logging.Handler.__init__(self)
+        self.hide()
         self.widget = QPlainTextEdit(parent)
         self.widget.setReadOnly(True)
         self.write_text_signal.connect(self.widget.appendPlainText)

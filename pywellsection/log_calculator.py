@@ -1,3 +1,4 @@
+import json
 import re
 import numpy as np
 
@@ -6,7 +7,13 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QListWidget, QListWidgetItem, QPlainTextEdit, QLineEdit,
     QPushButton, QComboBox, QDialogButtonBox, QLabel, QMessageBox,
-    QInputDialog, QGridLayout
+    QInputDialog, QGridLayout, QFileDialog
+)
+
+from pywellsection.discrete_logs import (
+    discrete_step_to_depth,
+    normalize_discrete_log_definition,
+    numeric_result_to_positive_codes,
 )
 
 import re
@@ -240,6 +247,7 @@ class LogCalculatorDialog(QDialog):
       - function buttons (sin, log, where, etc.)
       - output settings: name + continuous/discrete
     """
+    _history = []
 
     def __init__(self, parent, panel, all_wells):
         """
@@ -261,7 +269,7 @@ class LogCalculatorDialog(QDialog):
 
         # ---- Left: Log list ----
         left = QVBoxLayout()
-        left.addWidget(QLabel("Available continuous logs (pick to insert):", self))
+        left.addWidget(QLabel("Available logs (continuous and discrete):", self))
 
         self.lst_logs = QListWidget(self)
         #self.lst_logs.setSelectionMode(self.lst_logs.SingleSelection)
@@ -270,6 +278,23 @@ class LogCalculatorDialog(QDialog):
         btn_insert = QPushButton("Insert selected log", self)
         btn_insert.clicked.connect(self._insert_selected_log)
         left.addWidget(btn_insert)
+
+        left.addWidget(QLabel("History:", self))
+        self.lst_history = QListWidget(self)
+        self.lst_history.itemDoubleClicked.connect(self._load_history_item)
+        left.addWidget(self.lst_history, 1)
+
+        history_buttons = QHBoxLayout()
+        btn_load_history = QPushButton("Use", self)
+        btn_save_formula = QPushButton("Save...", self)
+        btn_load_formula = QPushButton("Load...", self)
+        btn_load_history.clicked.connect(self._load_selected_history)
+        btn_save_formula.clicked.connect(self._save_formula_file)
+        btn_load_formula.clicked.connect(self._load_formula_file)
+        history_buttons.addWidget(btn_load_history)
+        history_buttons.addWidget(btn_save_formula)
+        history_buttons.addWidget(btn_load_formula)
+        left.addLayout(history_buttons)
 
         layout.addLayout(left, 1)
 
@@ -395,6 +420,7 @@ class LogCalculatorDialog(QDialog):
         # populate log list
         self._log_symbol_map = {}  # display -> symbol
         self._populate_logs()
+        self._populate_history()
 
     def eventFilter(self, obj, event):
         # Only handle key presses from the expression editor
@@ -452,6 +478,117 @@ class LogCalculatorDialog(QDialog):
         ln, sym = it.data(Qt.UserRole)
         self._insert_text(sym)
 
+    def _current_formula_entry(self):
+        return {
+            "formula": self.txt_expr.toPlainText().strip(),
+            "output_name": self.ed_out_name.text().strip(),
+            "output_type": self.cmb_kind.currentText().strip().lower() or "continuous",
+        }
+
+    def _set_formula_entry(self, entry):
+        if not isinstance(entry, dict):
+            return
+        self.txt_expr.setPlainText(str(entry.get("formula", "")))
+        self.ed_out_name.setText(str(entry.get("output_name", "")))
+        kind = str(entry.get("output_type", "continuous")).strip().lower()
+        idx = self.cmb_kind.findText(kind)
+        self.cmb_kind.setCurrentIndex(idx if idx >= 0 else 0)
+
+    def _formula_title(self, entry):
+        out_name = str(entry.get("output_name", "")).strip()
+        kind = str(entry.get("output_type", "continuous")).strip()
+        formula = str(entry.get("formula", "")).strip().replace("\n", " ")
+        prefix = f"{out_name} ({kind})" if out_name else f"({kind})"
+        return f"{prefix}: {formula[:80]}"
+
+    def _populate_history(self):
+        self.lst_history.clear()
+        for entry in type(self)._history:
+            it = QListWidgetItem(self._formula_title(entry))
+            it.setData(Qt.UserRole, entry)
+            self.lst_history.addItem(it)
+
+    def _add_history_entry(self, entry):
+        formula = str(entry.get("formula", "")).strip()
+        if not formula:
+            return
+        normalized = {
+            "formula": formula,
+            "output_name": str(entry.get("output_name", "")).strip(),
+            "output_type": str(entry.get("output_type", "continuous")).strip().lower() or "continuous",
+        }
+        type(self)._history = [
+            old for old in type(self)._history
+            if not (
+                old.get("formula") == normalized["formula"]
+                and old.get("output_name") == normalized["output_name"]
+                and old.get("output_type") == normalized["output_type"]
+            )
+        ]
+        type(self)._history.insert(0, normalized)
+        type(self)._history = type(self)._history[:50]
+        self._populate_history()
+
+    def _load_history_item(self, item):
+        if item is None:
+            return
+        self._set_formula_entry(item.data(Qt.UserRole))
+
+    def _load_selected_history(self):
+        self._load_history_item(self.lst_history.currentItem())
+
+    def _save_formula_file(self):
+        entry = self._current_formula_entry()
+        if not entry["formula"]:
+            QMessageBox.warning(self, "Log Calculator", "Please enter a formula before saving.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save calculator formula",
+            "",
+            "Calculator Formulas (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(entry, f, indent=2)
+        except Exception as e:
+            QMessageBox.critical(self, "Log Calculator", f"Failed to save formula:\n{e}")
+            return
+        self._add_history_entry(entry)
+
+    def _load_formula_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load calculator formula",
+            "",
+            "Calculator Formulas (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            QMessageBox.critical(self, "Log Calculator", f"Failed to load formula:\n{e}")
+            return
+        if isinstance(data, list):
+            if not data:
+                QMessageBox.information(self, "Log Calculator", "The formula file is empty.")
+                return
+            type(self)._history = [entry for entry in data if isinstance(entry, dict)] + type(self)._history
+            type(self)._history = type(self)._history[:50]
+            self._populate_history()
+            self._set_formula_entry(data[0])
+        elif isinstance(data, dict):
+            self._set_formula_entry(data)
+            self._add_history_entry(data)
+        else:
+            QMessageBox.warning(self, "Log Calculator", "Formula file has an unsupported format.")
+
     # ============================================================
     # 3) Execution: compute log per well and add to wells
     # ============================================================
@@ -502,15 +639,15 @@ class LogCalculatorDialog(QDialog):
 
 
         for w in wells:
-            # skip wells without any logs
             w_logs = w.get("logs") or {}
-            if not w_logs:
+            w_discrete_logs = w.get("discrete_logs") or {}
+            if not w_logs and not w_discrete_logs:
                 n_skipped += 1
                 continue
 
             # Build per-well symbol env from available logs
-            # Choose a common depth grid: depth of the first available log in this well
-            first_log = next(iter(w_logs.values()))
+            # Choose a common depth grid: prefer continuous logs, then discrete logs.
+            first_log = next(iter(w_logs.values())) if w_logs else next(iter(w_discrete_logs.values()))
             depth0 = np.asarray(first_log.get("depth", []), dtype=float)
             if depth0.size < 2:
                 n_skipped += 1
@@ -528,6 +665,19 @@ class LogCalculatorDialog(QDialog):
                 if d.size < 2 or x.size < 2:
                     continue
                 env[sym] = _interp_to_depth(d, x, depth0)
+
+            # Add discrete logs as numeric positive integer category arrays.
+            for ln, sym in self._log_symbol_map.items():
+                dlog = w_discrete_logs.get(ln)
+                if dlog is None:
+                    continue
+                dlog = normalize_discrete_log_definition(dlog)
+                w_discrete_logs[ln] = dlog
+                d = np.asarray(dlog.get("depth", []), dtype=float)
+                x = np.asarray(dlog.get("values", []), dtype=float)
+                if d.size < 1 or x.size < 1:
+                    continue
+                env[sym] = discrete_step_to_depth(d, x, depth0)
 
             # Provide depth as a variable too
             env["DEPTH"] = depth0
@@ -550,17 +700,13 @@ class LogCalculatorDialog(QDialog):
                 w["logs"][out_name] = {"depth": depth0.tolist(), "data": y.tolist()}
                 n_done += 1
             else:
-                # DISCRETE: store (depth, values) with -999 meaning "no value below"
-                # Here we convert numeric result to categories by keeping values as strings of rounded number.
-                # If you want true categorical mapping later, you can replace this.
-                vals = []
-                for v in y:
-                    if not np.isfinite(v):
-                        vals.append("-999")
-                    else:
-                        vals.append(f"{float(v):.4g}")
+                vals, dictionary = numeric_result_to_positive_codes(y)
                 w.setdefault("discrete_logs", {})
-                w["discrete_logs"][out_name] = {"depth": depth0.tolist(), "values": vals}
+                w["discrete_logs"][out_name] = {
+                    "depth": depth0.tolist(),
+                    "values": vals,
+                    "dictionary": dictionary,
+                }
                 n_done += 1
 
         if errors:
@@ -595,6 +741,11 @@ class LogCalculatorDialog(QDialog):
 
         self.out_name = out_name
         self.out_kind = kind
+        self._add_history_entry({
+            "formula": expr_raw,
+            "output_name": out_name,
+            "output_type": kind,
+        })
         self.accept()
 
     def result(self):

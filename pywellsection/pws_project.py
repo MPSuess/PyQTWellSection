@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import datetime
 import copy
 
+from pywellsection.discrete_logs import normalize_discrete_log_definition
+
 
 # ============================================================
 # 1) Window spec schema (for project.all_windows)
@@ -201,21 +203,11 @@ def _normalize_continuous_logs(well: Dict[str, Any]):
 
 def _normalize_discrete_logs(well: Dict[str, Any]):
     """
-    Your discrete format is depth[] + values[] with -999 indicating no value below depth.
-    Ensure lengths match (clamp).
+    Normalize discrete logs to the positive-int code format with a value dictionary.
     """
     dlogs = well.get("discrete_logs") or {}
     for ln, ld in list(dlogs.items()):
-        if not isinstance(ld, dict):
-            continue
-        d = ld.get("depth") or []
-        v = ld.get("values") or []
-        if isinstance(d, list) and isinstance(v, list):
-            n = min(len(d), len(v))
-            if n < len(d) or n < len(v):
-                ld["depth"] = d[:n]
-                ld["values"] = v[:n]
-        dlogs[ln] = ld
+        dlogs[ln] = normalize_discrete_log_definition(ld)
     well["discrete_logs"] = dlogs
 
 

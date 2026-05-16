@@ -5051,13 +5051,35 @@
             250.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#ffff7f",
+              "hatch": "."
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#aa5500",
+              "hatch": "-"
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#55ffff",
+              "hatch": "//"
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#ff55ff",
+              "hatch": "/./"
+            }
+          }
         },
         "FACIES3": {
           "depth": [
@@ -5069,13 +5091,35 @@
             250.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#4e79a7",
+              "hatch": ""
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#f28e2b",
+              "hatch": ""
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#e15759",
+              "hatch": ""
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#76b7b2",
+              "hatch": ""
+            }
+          }
         }
       },
       "tops": {
@@ -5219,14 +5263,14 @@
       "bitmaps": {
         "cp001": {
           "name": "bitmap",
-          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
+          "path": "C:\\Users\\MPSuess\\pyqtwell\\PyQTWellSection\\P5.pdj\\Well A_cp001.png",
           "top_depth": 0.0,
           "base_depth": 100.0,
           "track": "core"
         },
         "cp002": {
           "name": "bitmap2",
-          "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
+          "path": "C:\\Users\\MPSuess\\pyqtwell\\PyQTWellSection\\P5.pdj\\Well A_cp002.png",
           "top_depth": 100.0,
           "base_depth": 300.0,
           "track": "core"
@@ -5234,14 +5278,14 @@
       },
       "cp001": {
         "name": "bitmap",
-        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp001.png",
+        "path": "C:\\Users\\MPSuess\\pyqtwell\\PyQTWellSection\\P5.pdj\\Well A_cp001.png",
         "top_depth": 0.0,
         "base_depth": 100.0,
         "track": "core"
       },
       "cp002": {
         "name": "bitmap2",
-        "path": "/Users/suess/PycharmProjects/PyWellSection/P5.pdj/Well A_cp002.png",
+        "path": "C:\\Users\\MPSuess\\pyqtwell\\PyQTWellSection\\P5.pdj\\Well A_cp002.png",
         "top_depth": 100.0,
         "base_depth": 300.0,
         "track": "core"
@@ -8286,13 +8330,35 @@
             750.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#ffff7f",
+              "hatch": "."
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#aa5500",
+              "hatch": "-"
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#55ffff",
+              "hatch": "//"
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#ff55ff",
+              "hatch": "/./"
+            }
+          }
         },
         "FACIES3": {
           "depth": [
@@ -8304,13 +8370,35 @@
             750.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#4e79a7",
+              "hatch": ""
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#f28e2b",
+              "hatch": ""
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#e15759",
+              "hatch": ""
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#76b7b2",
+              "hatch": ""
+            }
+          }
         }
       },
       "tops": {
@@ -11369,13 +11457,35 @@
             1250.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#ffff7f",
+              "hatch": "."
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#aa5500",
+              "hatch": "-"
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#55ffff",
+              "hatch": "//"
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#ff55ff",
+              "hatch": "/./"
+            }
+          }
         },
         "FACIES3": {
           "depth": [
@@ -11387,13 +11497,35 @@
             1250.0
           ],
           "values": [
-            "Sandstone",
-            "Shale",
-            "Limestone",
-            "Shale",
-            "Dolomite",
-            "Shale"
-          ]
+            1,
+            2,
+            3,
+            2,
+            4,
+            2
+          ],
+          "dictionary": {
+            "1": {
+              "name": "Sandstone",
+              "color": "#4e79a7",
+              "hatch": ""
+            },
+            "2": {
+              "name": "Shale",
+              "color": "#f28e2b",
+              "hatch": ""
+            },
+            "3": {
+              "name": "Limestone",
+              "color": "#e15759",
+              "hatch": ""
+            },
+            "4": {
+              "name": "Dolomite",
+              "color": "#76b7b2",
+              "hatch": ""
+            }
+          }
         }
       },
       "tops": {
@@ -11619,59 +11751,26 @@
       "visible": true,
       "floating": false,
       "window_title": "Well Section NNW-SSE",
-      "visible_tops": {
-        "Upper Formation A": {
-          "level": "sequence",
-          "color": "#ff0000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Formation A": {
-          "level": "formation",
-          "color": "#ffcc00",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Sequence 1": {
-          "level": "sequence",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Member A1": {
-          "level": "member",
-          "color": "#000fff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Carboniferous": {
-          "level": "formation",
-          "color": "#000000",
-          "hatch": "-",
-          "role": "stratigraphy"
-        },
-        "Lower Formation A": {
-          "level": "sequence",
-          "color": "#0000ff",
-          "hatch": "-",
-          "role": "stratigraphy"
-        }
-      },
+      "visible_tops": [
+        "Upper Formation A",
+        "Formation A",
+        "Sequence 1",
+        "Member A1",
+        "Carboniferous",
+        "Lower Formation A"
+      ],
       "visible_logs": [
         "CAL",
         "GR",
-        "RHOB",
         "PHI",
+        "RHOB",
         "RT"
       ],
       "visible_tracks": [
-        "core",
-        "GR-CAL",
-        "RT-RHOB",
         "LithoFacies",
         "Facies",
-        "f3",
-        "RHOB-PHI"
+        "core",
+        "f3"
       ],
       "visible_wells": [
         "Well A",
@@ -11683,7 +11782,12 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "panel_title": "Well_Section_1"
+        "vertical_scale": 1.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     },
     {
@@ -11705,7 +11809,12 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "panel_title": "Well_Section_1"
+        "vertical_scale": 1.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     },
     {
@@ -11728,13 +11837,18 @@
         "track_gap_factor": 1.0,
         "track_width": 1.0,
         "redraw_requested": true,
-        "panel_title": "Well_Section_1"
+        "vertical_scale": 1.0,
+        "gap_proportional_to_distance": false,
+        "gap_distance_mode": "auto",
+        "gap_distance_ref_m": 1000.0,
+        "gap_min_factor": 0.8,
+        "gap_max_factor": 8.0
       }
     }
   ],
   "ui_layout": {
-    "geometry_b64": "AdnQywADAAAAAAAHAAAAGQAAByQAAAVXAAAABwAAADUAAAckAAAFVwAAAAAAAAAACgAAAAAHAAAANQAAByQAAAVX",
-    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAFC/wCAAAAAfwAAAAYAAAFCwAAASQA/////AEAAAAC/AAAAAAAAAH1AAAAYQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAASgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAASgD////8AAAB9gAABSgAAACXAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAABgAAAReAAAArgD////8AAAEdwAAAKwAAAB1AQAAFPoAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABKAP////sAAAAGAEwAbwBnAQAAAAD/////AAAASgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAASgD///8AAAABAAADJgAABQv8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABfAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAF8A////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAAFCwAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
+    "geometry_b64": "AdnQywADAAAAAAAHAAAAFgAAByQAAAVXAAAABwAAADUAAAckAAAFVwAAAAAAAAAACgAAAAAHAAAANQAAByQAAAVX",
+    "state_b64": "AAAA/wAAAAH9AAAAAgAAAAAAAAceAAAE7fwCAAAAAfwAAAAhAAAE7QAAAPoA/////AEAAAAC/AAAAAAAAAH0AAAAhQD////6AAAAAAEAAAAC+wAAAAoASQBuAHAAdQB0AQAAAAD/////AAAAUgD////7AAAADgBXAGkAbgBkAG8AdwBzAQAAAAD/////AAAAUgD////8AAAB+AAABSYAAACFAP////wCAAAAA/sAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMQEAAAAYAAACvAAAAAAAAAAA+wAAACgAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABOAE4AVwAtAFMAUwBFAQAAACEAAAReAAAAjAD////8AAAEgwAAAIsAAABqAQAAF/oAAAAAAQAAAAP7AAAAEABDAG8AbQBtAGEAbgBkAHMBAAAAAP////8AAABSAP////sAAAAGAEwAbwBnAQAAAAD/////AAAAUgD////7AAAADgBDAG8AbgBzAG8AbABlAQAAAeQAAAITAAAAUgD///8AAAABAAADJgAABQv8AgAAAAb7AAAAHABXAGUAbABsAF8AUwBlAGMAdABpAG8AbgBfADIBAAAAGAAAAVYAAAAAAAAAAPsAAAAcAFcAZQBsAGwAXwBTAGUAYwB0AGkAbwBuAF8AMwEAAAFvAAAAvQAAAAAAAAAA/AAAABgAAAKIAAAAAAD////6AAAAAAEAAAAC+wAAABwAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABCAQAAAAD/////AAAAAAAAAAD7AAAAFgBTAGUAYwB0AGkAbwBuACAATgAtAFMAAAAD+AAAAswAAABbAP////wAAAAYAAAFCwAAAAAA////+gAAAAABAAAAAvsAAAAcAFcAZQBsAGwAIABTAGUAYwB0AGkAbwBuACAAQQEAAAQNAAAA1QAAAAAAAAAA+wAAACAAVwBlAGwAbAAgAFMAZQBjAHQAaQBvAG4AIABFAC0AVwAAAAAA/////wAAAFsA////+wAAABYAUwBlAGMAdABpAG8AbgAgAE4ALQBTAQAAABgAAAG3AAAAAAAAAAD7AAAAIABXAGUAbABsACAAUwBlAGMAdABpAG8AbgAgAEUALQBXAQAAAdAAAAG0AAAAAAAAAAAAAAAAAAAE7QAAAAQAAAAEAAAACAAAAAj8AAAAAA==",
     "tab_groups": [
       [
         "Console",
@@ -11745,6 +11859,1099 @@
         "Windows",
         "Input"
       ]
+    ]
+  },
+  "tree_dict": {
+    "roots": [
+      {
+        "text": "Wells",
+        "type": "folder",
+        "policy": null,
+        "check_state": "CheckState.PartiallyChecked",
+        "movable": true,
+        "drop_flags": 1,
+        "expanded": true,
+        "children": [
+          {
+            "text": "Well A",
+            "type": "folder",
+            "policy": null,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 0,
+            "expanded": true,
+            "children": [
+              {
+                "text": "Logs",
+                "type": "folder",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": true,
+                "children": [
+                  {
+                    "text": "continuous",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "CAL",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well A",
+                          "CAL"
+                        ]
+                      },
+                      {
+                        "text": "GR",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well A",
+                          "GR"
+                        ]
+                      },
+                      {
+                        "text": "PHI",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well A",
+                          "PHI"
+                        ]
+                      },
+                      {
+                        "text": "RHOB",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well A",
+                          "RHOB"
+                        ]
+                      },
+                      {
+                        "text": "RT",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well A",
+                          "RT"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "discrete",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "FACIES",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well A",
+                          "FACIES"
+                        ]
+                      },
+                      {
+                        "text": "FACIES3",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well A",
+                          "FACIES3"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "bitmap",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "cp001",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Bitmap",
+                          "Well A",
+                          "cp001"
+                        ]
+                      },
+                      {
+                        "text": "cp002",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Bitmap",
+                          "Well A",
+                          "cp002"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  }
+                ],
+                "data": null
+              },
+              {
+                "text": "Completions",
+                "type": "leaf",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": false,
+                "children": [],
+                "data": null
+              }
+            ],
+            "data": [
+              "Well A",
+              "Well",
+              "None"
+            ]
+          },
+          {
+            "text": "Well B",
+            "type": "folder",
+            "policy": null,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 0,
+            "expanded": true,
+            "children": [
+              {
+                "text": "Logs",
+                "type": "folder",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": true,
+                "children": [
+                  {
+                    "text": "continuous",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "GR",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well B",
+                          "GR"
+                        ]
+                      },
+                      {
+                        "text": "RHOB",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well B",
+                          "RHOB"
+                        ]
+                      },
+                      {
+                        "text": "RT",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well B",
+                          "RT"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "discrete",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "FACIES",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well B",
+                          "FACIES"
+                        ]
+                      },
+                      {
+                        "text": "FACIES3",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well B",
+                          "FACIES3"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "bitmap",
+                    "type": "leaf",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": false,
+                    "children": [],
+                    "data": null
+                  }
+                ],
+                "data": null
+              },
+              {
+                "text": "Completions",
+                "type": "leaf",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": false,
+                "children": [],
+                "data": null
+              }
+            ],
+            "data": [
+              "Well B",
+              "Well",
+              "None"
+            ]
+          },
+          {
+            "text": "Well C",
+            "type": "folder",
+            "policy": null,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 0,
+            "expanded": true,
+            "children": [
+              {
+                "text": "Logs",
+                "type": "folder",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": true,
+                "children": [
+                  {
+                    "text": "continuous",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "GR",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well C",
+                          "GR"
+                        ]
+                      },
+                      {
+                        "text": "RHOB",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well C",
+                          "RHOB"
+                        ]
+                      },
+                      {
+                        "text": "RT",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "Continuous_Log",
+                          "Well C",
+                          "RT"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "discrete",
+                    "type": "folder",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": true,
+                    "children": [
+                      {
+                        "text": "FACIES",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well C",
+                          "FACIES"
+                        ]
+                      },
+                      {
+                        "text": "FACIES3",
+                        "type": "leaf",
+                        "policy": 2,
+                        "check_state": null,
+                        "movable": false,
+                        "drop_flags": 0,
+                        "expanded": false,
+                        "children": [],
+                        "data": [
+                          "DiscreteLog",
+                          "Well C",
+                          "FACIES3"
+                        ]
+                      }
+                    ],
+                    "data": null
+                  },
+                  {
+                    "text": "bitmap",
+                    "type": "leaf",
+                    "policy": 3,
+                    "check_state": null,
+                    "movable": false,
+                    "drop_flags": 0,
+                    "expanded": false,
+                    "children": [],
+                    "data": null
+                  }
+                ],
+                "data": null
+              },
+              {
+                "text": "Completions",
+                "type": "leaf",
+                "policy": 3,
+                "check_state": null,
+                "movable": false,
+                "drop_flags": 0,
+                "expanded": false,
+                "children": [],
+                "data": null
+              }
+            ],
+            "data": [
+              "Well C",
+              "Well",
+              "None"
+            ]
+          }
+        ],
+        "data": [
+          "Wells",
+          "Root",
+          "Folder"
+        ]
+      },
+      {
+        "text": "Wells Tops",
+        "type": "folder",
+        "policy": null,
+        "check_state": "CheckState.PartiallyChecked",
+        "movable": true,
+        "drop_flags": 1,
+        "expanded": true,
+        "children": [
+          {
+            "text": "Stratigraphy",
+            "type": "folder",
+            "policy": null,
+            "check_state": "CheckState.PartiallyChecked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "Upper Formation A",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Upper Formation A"
+                ]
+              },
+              {
+                "text": "Formation A",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Formation A"
+                ]
+              },
+              {
+                "text": "Sequence 1",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Sequence 1"
+                ]
+              },
+              {
+                "text": "Member A1",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Member A1"
+                ]
+              },
+              {
+                "text": "Carboniferous",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Carboniferous"
+                ]
+              },
+              {
+                "text": "Lower Formation A",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Tops",
+                  "stratigraphy",
+                  "Lower Formation A"
+                ]
+              }
+            ],
+            "data": [
+              "Well Tops",
+              "Stratigraphy",
+              "Subfolder"
+            ]
+          },
+          {
+            "text": "Faults",
+            "type": "leaf",
+            "policy": null,
+            "check_state": null,
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Well Tops",
+              "Faults",
+              "Subfolder"
+            ]
+          },
+          {
+            "text": "Other",
+            "type": "leaf",
+            "policy": null,
+            "check_state": null,
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Well Tops",
+              "Other",
+              "Subfolder"
+            ]
+          }
+        ],
+        "data": [
+          "Tops",
+          "Root",
+          "Folder"
+        ]
+      },
+      {
+        "text": "Logs",
+        "type": "folder",
+        "policy": null,
+        "check_state": "CheckState.PartiallyChecked",
+        "movable": true,
+        "drop_flags": 1,
+        "expanded": true,
+        "children": [
+          {
+            "text": "continuous",
+            "type": "folder",
+            "policy": 3,
+            "check_state": null,
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "CAL",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Continuous_Log",
+                  "CAL"
+                ]
+              },
+              {
+                "text": "GR",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Continuous_Log",
+                  "GR"
+                ]
+              },
+              {
+                "text": "PHI",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Continuous_Log",
+                  "PHI"
+                ]
+              },
+              {
+                "text": "RHOB",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Continuous_Log",
+                  "RHOB"
+                ]
+              },
+              {
+                "text": "RT",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Continuous_Log",
+                  "RT"
+                ]
+              }
+            ],
+            "data": [
+              "Well Logs",
+              "continuous",
+              "Subfolder"
+            ]
+          },
+          {
+            "text": "discrete",
+            "type": "folder",
+            "policy": 3,
+            "check_state": null,
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "FACIES",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "DiscreteLog",
+                  "FACIES"
+                ]
+              },
+              {
+                "text": "FACIES3",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "DiscreteLog",
+                  "FACIES3"
+                ]
+              }
+            ],
+            "data": [
+              "Well Logs",
+              "discrete",
+              "Subfolder"
+            ]
+          },
+          {
+            "text": "bitmap",
+            "type": "folder",
+            "policy": 3,
+            "check_state": null,
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "cp001",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Bitmap",
+                  "cp001"
+                ]
+              },
+              {
+                "text": "cp002",
+                "type": "leaf",
+                "policy": 1,
+                "check_state": "CheckState.Checked",
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Logs",
+                  "Bitmap",
+                  "cp002"
+                ]
+              }
+            ],
+            "data": [
+              "Well Logs",
+              "bitmap",
+              "Subfolder"
+            ]
+          }
+        ],
+        "data": [
+          "Logs",
+          "Root",
+          "Folder"
+        ]
+      },
+      {
+        "text": "Tracks",
+        "type": "folder",
+        "policy": null,
+        "check_state": "CheckState.PartiallyChecked",
+        "movable": true,
+        "drop_flags": 1,
+        "expanded": true,
+        "children": [
+          {
+            "text": "LithoFacies",
+            "type": "leaf",
+            "policy": 1,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Track",
+              "LithoFacies",
+              "None"
+            ]
+          },
+          {
+            "text": "GR-CAL",
+            "type": "folder",
+            "policy": 1,
+            "check_state": "CheckState.Unchecked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "GR",
+                "type": "leaf",
+                "policy": 2,
+                "check_state": null,
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Track",
+                  "GR-CAL",
+                  "GR"
+                ]
+              },
+              {
+                "text": "CAL",
+                "type": "leaf",
+                "policy": 2,
+                "check_state": null,
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Track",
+                  "GR-CAL",
+                  "CAL"
+                ]
+              }
+            ],
+            "data": [
+              "Track",
+              "GR-CAL",
+              "None"
+            ]
+          },
+          {
+            "text": "RT-RHOB",
+            "type": "folder",
+            "policy": 1,
+            "check_state": "CheckState.Unchecked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "RT",
+                "type": "leaf",
+                "policy": 2,
+                "check_state": null,
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Track",
+                  "RT-RHOB",
+                  "RT"
+                ]
+              }
+            ],
+            "data": [
+              "Track",
+              "RT-RHOB",
+              "None"
+            ]
+          },
+          {
+            "text": "RHOB-PHI",
+            "type": "folder",
+            "policy": 1,
+            "check_state": "CheckState.Unchecked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": true,
+            "children": [
+              {
+                "text": "RHOB",
+                "type": "leaf",
+                "policy": 2,
+                "check_state": null,
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Track",
+                  "RHOB-PHI",
+                  "RHOB"
+                ]
+              },
+              {
+                "text": "PHI",
+                "type": "leaf",
+                "policy": 2,
+                "check_state": null,
+                "movable": true,
+                "drop_flags": 1,
+                "expanded": false,
+                "children": [],
+                "data": [
+                  "Track",
+                  "RHOB-PHI",
+                  "PHI"
+                ]
+              }
+            ],
+            "data": [
+              "Track",
+              "RHOB-PHI",
+              "None"
+            ]
+          },
+          {
+            "text": "Facies",
+            "type": "leaf",
+            "policy": 1,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Track",
+              "Facies",
+              "None"
+            ]
+          },
+          {
+            "text": "core",
+            "type": "leaf",
+            "policy": 1,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Track",
+              "core",
+              "None"
+            ]
+          },
+          {
+            "text": "f3",
+            "type": "leaf",
+            "policy": 1,
+            "check_state": "CheckState.Checked",
+            "movable": true,
+            "drop_flags": 1,
+            "expanded": false,
+            "children": [],
+            "data": [
+              "Track",
+              "f3",
+              "None"
+            ]
+          }
+        ],
+        "data": [
+          "Tracks",
+          "Root",
+          "Folder"
+        ]
+      },
+      {
+        "text": "Filters",
+        "type": "leaf",
+        "policy": null,
+        "check_state": null,
+        "movable": true,
+        "drop_flags": 0,
+        "expanded": false,
+        "children": [],
+        "data": [
+          "Filters",
+          "Root",
+          "Folder"
+        ]
+      }
     ]
   }
 }

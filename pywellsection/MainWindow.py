@@ -71,6 +71,8 @@ from pywellsection.dialogs import LithofaciesDisplaySettingsDialog
 from pywellsection.dialogs import LithofaciesTableDialog
 from pywellsection.dialogs import LoadCoreBitmapDialog
 from pywellsection.dialogs import HelpDialog
+from pywellsection.dialogs import ObjectSettingsDialog
+from pywellsection.dialogs import DiscreteLogDictionaryDialog
 from pywellsection.dialogs import LoadBitmapForTrackDialog
 from pywellsection.dialogs import BitmapPlacementDialog
 from pywellsection.dialogs import TrackSettingsDialog
@@ -83,6 +85,7 @@ from pathlib import Path
 from collections import OrderedDict
 
 from pywellsection.log_calculator import LogCalculatorDialog
+from pywellsection.discrete_logs import normalize_discrete_log_definition
 
 from pywellsection.Import_LBEG_xlsx import load_LBEG_SV
 from pywellsection.BEEE_load_stratigraphy import _load_BEEE_stratigraphy
@@ -205,6 +208,7 @@ class MainWindow(QMainWindow):
         self._recent_projects_max = 8
         self._recent_projects_settings_key = "recent_projects"
         self.recent_projects_menu = None
+        self._open_settings_dialogs = []
 
         self.tops_tree_populated = False
         self.well_tree_populated = False
@@ -222,6 +226,10 @@ class MainWindow(QMainWindow):
         #wells.test_class()
 
         self.all_wells = wells
+        for well in self.all_wells:
+            disc_logs = well.get("discrete_logs", {}) or {}
+            for log_name, dlog in list(disc_logs.items()):
+                disc_logs[log_name] = normalize_discrete_log_definition(dlog)
         self.all_stratigraphy = stratigraphy
         self.all_tracks = tracks
 
@@ -739,17 +747,10 @@ class MainWindow(QMainWindow):
 
             for well in wells:
                 disc_logs = well.get("discrete_logs", {})
-                self.all_discrete_logs=disc_logs
-
                 for log_name, d in list(disc_logs.items()):
-                    if "top_depths" in d and "bottom_depths" in d:
-                        tops = np.array(d["top_depths"], dtype=float)
-                        values = np.array(d["values"], dtype=object)
-                        # convert to depth/value representation (top sample)
-                        disc_logs[log_name] = {
-                            "depth": tops.tolist(),
-                            "values": values.tolist(),
-                        }
+                    disc_logs[log_name] = normalize_discrete_log_definition(d)
+                    if log_name not in self.all_discrete_logs:
+                        self.all_discrete_logs.append(log_name)
                 self.project.all_discrete_logs = self.all_discrete_logs
 
             for well in wells:
@@ -1642,9 +1643,9 @@ class MainWindow(QMainWindow):
         self.input_tree.set_accept_children_drop(self.c_logs_folder, False)
         self.input_tree.set_accept_children_drop(self.c_tracks_folder, False)
         self.input_tree.set_accept_children_drop(self.c_filter_folder, False)
-        self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, False)
-        self.input_tree.set_accept_children_drop(self.c_faults_root, False)
-        self.input_tree.set_accept_children_drop(self.c_other_root, False)
+        self.input_tree.set_accept_children_drop(self.c_stratigraphy_root, True)
+        self.input_tree.set_accept_children_drop(self.c_faults_root, True)
+        self.input_tree.set_accept_children_drop(self.c_other_root, True)
 
     def _update_input_tree(self):
         
@@ -1775,10 +1776,23 @@ class MainWindow(QMainWindow):
 
         if log_type == "continuous":
             it = self.input_tree.add_checkable_leaf(self.cont_folder, log_name)
+            if self.all_logs is None:
+                self.all_logs = []
+            elif not hasattr(self.all_logs, "append"):
+                self.all_logs = list(self.all_logs)
+            if log_name not in self.all_logs:
+                self.all_logs.append(log_name)
         elif log_type == "discrete":
             it = self.input_tree.add_checkable_leaf(self.disc_folder, log_name)
+            if self.all_discrete_logs is None:
+                self.all_discrete_logs = []
+            elif not hasattr(self.all_discrete_logs, "append"):
+                self.all_discrete_logs = list(self.all_discrete_logs)
+            if log_name not in self.all_discrete_logs:
+                self.all_discrete_logs.append(log_name)
 
-        it.setData(0, Qt.UserRole, ("Logs", log_type, log_name))
+        role = "Continuous_Log" if log_type == "continuous" else "DiscreteLog"
+        it.setData(0, Qt.UserRole, ("Logs", role, log_name))
         state = Qt.Unchecked
         it.setCheckState(0, state)
         return True
@@ -2075,6 +2089,11 @@ class MainWindow(QMainWindow):
         self.c_stratigraphy_root = strat_root
         self.c_faults_root = faults_root
         self.c_other_root = other_root
+        for root in (strat_root, faults_root, other_root):
+            try:
+                self.input_tree.set_accept_children_drop(root, True)
+            except Exception:
+                pass
         return tops_root, strat_root, faults_root, other_root
 
     def _ensure_input_filter_root(self):
@@ -2212,6 +2231,83 @@ class MainWindow(QMainWindow):
                 top_item.setCheckState(0, Qt.Checked)
         finally:
             self.input_tree.blockSignals(False)
+
+    def _sync_top_roles_and_order_from_input_tree(self):
+        """Use the input-tree Well Tops sections as source for top role and stratigraphic order."""
+        was_blocked = self.input_tree.signalsBlocked()
+        self.input_tree.blockSignals(True)
+        try:
+            roots = self._ensure_input_tops_roots()
+            if not roots or not getattr(self, "all_stratigraphy", None):
+                return OrderedDict(getattr(self, "all_stratigraphy", {}) or {})
+            _, strat_root, faults_root, other_root = roots
+            role_roots = [
+                ("stratigraphy", strat_root),
+                ("fault", faults_root),
+                ("other", other_root),
+            ]
+
+            def _top_name(item):
+                data = item.data(0, Qt.UserRole)
+                if isinstance(data, (tuple, list)) and len(data) >= 3 and data[0] == "Tops":
+                    return str(data[2])
+                text = item.text(0).strip()
+                if text in self.all_stratigraphy:
+                    return text
+                return None
+
+            def _walk(item):
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    yield child
+                    yield from _walk(child)
+
+            seen = set()
+            strat_index = 1
+            for role, root in role_roots:
+                if root is None:
+                    continue
+                for item in _walk(root):
+                    name = _top_name(item)
+                    if not name or name not in self.all_stratigraphy or name in seen:
+                        continue
+                    seen.add(name)
+                    meta = dict(self.all_stratigraphy.get(name) or {})
+                    meta["role"] = role
+                    if role == "stratigraphy":
+                        meta["strat_index"] = strat_index
+                        strat_index += 1
+                    self.all_stratigraphy[name] = meta
+                    new_data = ("Tops", role, name)
+                    if item.data(0, Qt.UserRole) != new_data:
+                        item.setData(0, Qt.UserRole, new_data)
+
+            ordered = OrderedDict()
+            strat_items = []
+            rest_items = []
+            for name, meta in self.all_stratigraphy.items():
+                role = str((meta or {}).get("role", "stratigraphy") or "stratigraphy").lower()
+                if role == "stratigraphy":
+                    try:
+                        idx = int(meta.get("strat_index", 10**9))
+                    except (TypeError, ValueError):
+                        idx = 10**9
+                    strat_items.append((idx, name, meta))
+                else:
+                    rest_items.append((name, meta))
+            for _, name, meta in sorted(strat_items, key=lambda item: (item[0], item[1].lower())):
+                ordered[name] = meta
+            for name, meta in rest_items:
+                ordered[name] = meta
+
+            self.all_stratigraphy = ordered
+            if hasattr(self, "project"):
+                self.project.all_stratigraphy = self.all_stratigraphy
+            if hasattr(self, "panel"):
+                self.panel.stratigraphy = self.all_stratigraphy
+            return self.all_stratigraphy
+        finally:
+            self.input_tree.blockSignals(was_blocked)
 
     def _populate_log_tree(self):
         """Rebuild the tree from self.all_wells, preserving selections if possible."""
@@ -3745,10 +3841,121 @@ class MainWindow(QMainWindow):
         self._populate_well_tree()
         return log_name
 
+    def _action_open_log_calculator_for_well(self, well_name):
+        well_name = str(well_name or "").strip()
+        if not well_name:
+            return None
+
+        well = None
+        for candidate in getattr(self, "all_wells", []) or []:
+            if candidate.get("name") == well_name:
+                well = candidate
+                break
+
+        if well is None:
+            QMessageBox.warning(self, "Log Calculator", f"Well '{well_name}' was not found.")
+            return None
+
+        if not (well.get("logs") or {}) and not (well.get("discrete_logs") or {}):
+            QMessageBox.information(self, "Log Calculator", f"Well '{well_name}' has no logs.")
+            return None
+
+        self._cleanup_and_repopulate_log_tree()
+        dlg = LogCalculatorDialog(self, self.panel, [well])
+        dlg.setWindowTitle(f"Log Calculator - {well_name}")
+        if dlg.exec_() != QDialog.Accepted:
+            self._cleanup_and_repopulate_log_tree()
+            return None
+
+        result = dlg.result()
+        if not result or len(result) < 2:
+            self._cleanup_and_repopulate_log_tree()
+            return None
+
+        log_name = str(result[0] or "").strip()
+        log_type = str(result[1] or "").strip().lower()
+        if not log_name or log_type not in ("continuous", "discrete"):
+            self._cleanup_and_repopulate_log_tree()
+            return None
+
+        self._add_log_to_logs(log_name, log_type)
+        self._populate_input_tree()
+        self._cleanup_and_repopulate_log_tree()
+        self._populate_well_log_tree()
+        self._populate_well_tree()
+        self.panel.set_wells(self.all_wells)
+        self.panel.set_draw_well_panel(True)
+        self._rebuild_well_panel_from_tree()
+        return log_name
+
+    def _ensure_stratigraphic_indices(self, stratigraphy):
+        stratigraphy = OrderedDict(stratigraphy or {})
+        if not stratigraphy:
+            return stratigraphy
+
+        stratigraphy_only = OrderedDict(
+            (name, meta)
+            for name, meta in stratigraphy.items()
+            if str((meta or {}).get("role", "stratigraphy") or "stratigraphy").strip().lower() == "stratigraphy"
+        )
+        stratigraphy = stratigraphy_only
+        if not stratigraphy:
+            return stratigraphy
+
+        def _valid_index(meta):
+            try:
+                return int((meta or {}).get("strat_index")) > 0
+            except (TypeError, ValueError):
+                return False
+
+        all_have_indices = all(_valid_index(meta) for meta in stratigraphy.values())
+        if all_have_indices:
+            ordered_items = sorted(
+                stratigraphy.items(),
+                key=lambda item: (int((item[1] or {}).get("strat_index", 10**9)), str(item[0]).lower()),
+            )
+        else:
+            depth_by_name = {}
+            for name in stratigraphy:
+                values = []
+                for well in getattr(self, "all_wells", []) or []:
+                    tops = well.get("tops") or {}
+                    if name not in tops:
+                        continue
+                    raw = tops[name]
+                    try:
+                        depth = float(raw.get("depth") if isinstance(raw, dict) else raw)
+                    except (TypeError, ValueError):
+                        continue
+                    if np.isfinite(depth):
+                        values.append(depth)
+                if values:
+                    depth_by_name[name] = float(np.nanmedian(values))
+
+            original_pos = {name: i for i, name in enumerate(stratigraphy.keys())}
+            ordered_items = sorted(
+                stratigraphy.items(),
+                key=lambda item: (
+                    0 if item[0] in depth_by_name else 1,
+                    depth_by_name.get(item[0], float("inf")),
+                    original_pos.get(item[0], 10**9),
+                    str(item[0]).lower(),
+                ),
+            )
+
+        out = OrderedDict()
+        for idx, (name, meta) in enumerate(ordered_items, start=1):
+            meta = dict(meta or {})
+            meta["strat_index"] = idx
+            out[name] = meta
+        return out
+
     def _action_edit_stratigraphy(self):
         """Open table dialog to edit/add stratigraphy for the project."""
         # Make sure we have a stratigraphy dict
-        strat = OrderedDict(getattr(self, "all_stratigraphy", None) or {})
+        strat = self._ensure_stratigraphic_indices(
+            OrderedDict(getattr(self, "all_stratigraphy", None) or {})
+        )
 
         #dlg = StratigraphyEditorDialog(self, strat)
         dlg = EditStratigraphyDialog(self, strat)
@@ -3772,6 +3979,7 @@ class MainWindow(QMainWindow):
         if result_strat is None:
             return
 
+        existing = OrderedDict(getattr(self, "all_stratigraphy", None) or {})
         new_strat = OrderedDict()
         for name, meta in result_strat.items():
             clean_name = str(name or "").strip()
@@ -3785,7 +3993,19 @@ class MainWindow(QMainWindow):
             meta["level"] = str(meta.get("level", "formation") or "formation").strip()
             meta["color"] = str(meta.get("color", "#cccccc") or "#cccccc").strip()
             meta["hatch"] = str(meta.get("hatch", "-") or "-").strip()
+            try:
+                meta["strat_index"] = int(meta.get("strat_index", len(new_strat) + 1))
+            except (TypeError, ValueError):
+                meta["strat_index"] = len(new_strat) + 1
             new_strat[clean_name] = meta
+
+        new_strat = OrderedDict(
+            sorted(new_strat.items(), key=lambda item: (int(item[1].get("strat_index", 10**9)), str(item[0]).lower()))
+        )
+        for old_name, old_meta in existing.items():
+            role = str((old_meta or {}).get("role", "stratigraphy") or "stratigraphy").strip().lower()
+            if role in ("fault", "other") and old_name not in new_strat:
+                new_strat[old_name] = dict(old_meta or {})
 
         # 1) update project-level stratigraphy
         old_strat = OrderedDict(getattr(self, "all_stratigraphy", None) or {})
@@ -4090,6 +4310,60 @@ class MainWindow(QMainWindow):
         # refresh track tree
         if hasattr(self, "_populate_track_tree"):
             self._populate_track_tree()
+
+    def _action_edit_discrete_log_dictionary(self, log_name: str, well_name: str | None = None):
+        targets = []
+        for well in getattr(self, "all_wells", []) or []:
+            if well_name is not None and well.get("name") != well_name:
+                continue
+            disc_logs = well.get("discrete_logs", {}) or {}
+            if log_name in disc_logs:
+                disc_logs[log_name] = normalize_discrete_log_definition(disc_logs[log_name])
+                targets.append(disc_logs[log_name])
+
+        if not targets:
+            QMessageBox.information(
+                self,
+                "Discrete log dictionary",
+                f"No discrete log '{log_name}' found.",
+            )
+            return
+
+        current = targets[0].get("dictionary", {})
+        used_values = set()
+        for dlog in targets:
+            for value in dlog.get("values", []) or []:
+                try:
+                    ivalue = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if ivalue > 0:
+                    used_values.add(ivalue)
+
+        dlg = DiscreteLogDictionaryDialog(
+            self,
+            log_name=log_name,
+            dictionary=current,
+            used_values=used_values,
+        )
+        if dlg.exec_() != QDialog.Accepted:
+            return
+
+        dictionary = dlg.result_dictionary()
+        if dictionary is None:
+            return
+
+        for dlog in targets:
+            dlog["dictionary"] = dict(dictionary)
+
+        if hasattr(self, "panel"):
+            self.panel.wells = self.all_wells
+            self.panel.draw_well_panel()
+
+        if hasattr(self, "_populate_log_tree"):
+            self._populate_log_tree()
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
 
     def _action_edit_discrete_colors_for_track(self, track_name: str):
         """
@@ -5239,6 +5513,15 @@ class MainWindow(QMainWindow):
             if chosen == act_edit:
                 self._edit_log_display_settings(log_name)
             return
+        if parent is self.discrete_logs_folder:
+            log_name = item.data(0, Qt.UserRole) or item.text(0)
+            if not log_name:
+                return
+            act_edit_dictionary = menu.addAction(f"Edit dictionary for '{log_name}'...")
+            chosen = menu.exec_(global_pos)
+            if chosen == act_edit_dictionary:
+                self._action_edit_discrete_log_dictionary(log_name)
+            return
         if parent is self.bitmaps_folder:
             bitmap_name = item.data(0, Qt.UserRole) or item.text(0)
             if not bitmap_name:
@@ -5299,10 +5582,15 @@ class MainWindow(QMainWindow):
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             if track.get("type") == "discrete":
                 #menu = QMenu(self)
-                act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+                act_edit_disc_colors = menu.addAction(f"Edit discrete dictionary for '{track_name}'...")
                 chosen = menu.exec_(global_pos)
                 if chosen == act_edit_disc_colors:
-                    self._action_edit_discrete_colors_for_track(track_name)
+                    disc_cfg = track.get("discrete", {}) if track else {}
+                    disc_log_name = disc_cfg.get("log")
+                    if disc_log_name:
+                        self._action_edit_discrete_log_dictionary(disc_log_name)
+                    else:
+                        self._action_edit_discrete_colors_for_track(track_name)
             elif track.get("type") == "bitmap":
                 #menu = QMenu(self)
                 act_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
@@ -5862,6 +6150,274 @@ class MainWindow(QMainWindow):
         well["logs"] = logs
 
         self._sync_tree_and_redraw_after_model_change(repopulate_tracks=False)
+
+    def _numeric_stats_rows(self, values):
+        try:
+            arr = np.asarray(values, dtype=float)
+            arr = arr[np.isfinite(arr)]
+        except Exception:
+            arr = np.asarray([], dtype=float)
+        if arr.size == 0:
+            return [("Count", 0)]
+        return [
+            ("Count", int(arr.size)),
+            ("Min", f"{float(np.nanmin(arr)):.6g}"),
+            ("Max", f"{float(np.nanmax(arr)):.6g}"),
+            ("Mean", f"{float(np.nanmean(arr)):.6g}"),
+            ("Std dev", f"{float(np.nanstd(arr)):.6g}"),
+        ]
+
+    def _find_well_by_name(self, well_name):
+        return next((w for w in getattr(self, "all_wells", []) or [] if w.get("name") == well_name), None)
+
+    def _find_track_by_name(self, track_name):
+        return next((t for t in getattr(self, "all_tracks", []) or [] if t.get("name") == track_name), None)
+
+    def _first_track_log_cfg(self, log_name):
+        for track in getattr(self, "all_tracks", []) or []:
+            for log_cfg in track.get("logs", []) or []:
+                if isinstance(log_cfg, dict) and log_cfg.get("log") == log_name:
+                    return log_cfg
+        return {}
+
+    def _object_settings_payload(self, data, item):
+        info = []
+        stats = []
+        display = []
+        title = "Object settings"
+        apply_kind = None
+        apply_id = None
+
+        if not isinstance(data, (tuple, list)) or not data:
+            return title, info, stats, display, apply_kind, apply_id
+
+        if len(data) >= 2 and data[1] == "Well":
+            well_name = data[0]
+            well = self._find_well_by_name(well_name) or {}
+            title = f"Settings: well {well_name}"
+            info = [
+                ("Name", well.get("name", well_name)),
+                ("UWI", well.get("uwi", "")),
+                ("Reference type", well.get("reference_type", "")),
+                ("Reference depth", well.get("reference_depth", "")),
+                ("Total depth", well.get("total_depth", "")),
+                ("X", well.get("x", "")),
+                ("Y", well.get("y", "")),
+            ]
+            stats = [
+                ("Continuous logs", len(well.get("logs", {}) or {})),
+                ("Discrete logs", len(well.get("discrete_logs", {}) or {})),
+                ("Tops", len(well.get("tops", {}) or {})),
+                ("Bitmaps", len(well.get("bitmaps", {}) or {})),
+            ]
+
+        elif data[0] == "Continuous_Log" and len(data) >= 3:
+            well_name, log_name = data[1], data[2]
+            well = self._find_well_by_name(well_name) or {}
+            log_def = (well.get("logs") or {}).get(log_name, {})
+            cfg = self._first_track_log_cfg(log_name)
+            title = f"Settings: {well_name} / {log_name}"
+            depth = log_def.get("depth", [])
+            values = log_def.get("data", [])
+            info = [("Well", well_name), ("Log", log_name), ("Type", "continuous")]
+            if depth:
+                info.extend([("Top depth", f"{min(depth):.6g}"), ("Base depth", f"{max(depth):.6g}")])
+            stats = self._numeric_stats_rows(values)
+            display = [
+                {"key": "color", "label": "Color", "value": cfg.get("color", "black")},
+                {"key": "render", "label": "Render", "type": "combo", "choices": ["line", "points", "color"], "value": cfg.get("render", "line")},
+                {"key": "linewidth", "label": "Line width", "type": "float", "min": 0.1, "max": 20, "decimals": 2, "value": cfg.get("linewidth", 1.0)},
+                {"key": "xscale", "label": "X scale", "type": "combo", "choices": ["linear", "log"], "value": cfg.get("xscale", "linear")},
+                {"key": "direction", "label": "Direction", "type": "combo", "choices": ["normal", "reverse"], "value": cfg.get("direction", "normal")},
+            ]
+            apply_kind, apply_id = "continuous_log", log_name
+
+        elif data[0] == "Logs" and len(data) >= 3 and data[1] in ("Continuous_Log", "continuous"):
+            log_name = data[2]
+            cfg = self._first_track_log_cfg(log_name)
+            title = f"Settings: {log_name}"
+            info = [("Log", log_name), ("Type", "continuous"), ("Scope", "all wells")]
+
+            all_values = []
+            all_depths = []
+            wells_with_log = 0
+            for well in getattr(self, "all_wells", []) or []:
+                log_def = (well.get("logs") or {}).get(log_name)
+                if not isinstance(log_def, dict):
+                    continue
+                wells_with_log += 1
+                all_values.extend(log_def.get("data", []) or [])
+                all_depths.extend(log_def.get("depth", []) or [])
+            if all_depths:
+                info.extend([("Top depth", f"{min(all_depths):.6g}"), ("Base depth", f"{max(all_depths):.6g}")])
+            stats = [("Wells containing log", wells_with_log)] + self._numeric_stats_rows(all_values)
+            display = [
+                {"key": "color", "label": "Color", "value": cfg.get("color", "black")},
+                {"key": "render", "label": "Render", "type": "combo", "choices": ["line", "points", "color"], "value": cfg.get("render", "line")},
+                {"key": "linewidth", "label": "Line width", "type": "float", "min": 0.1, "max": 20, "decimals": 2, "value": cfg.get("linewidth", 1.0)},
+                {"key": "xscale", "label": "X scale", "type": "combo", "choices": ["linear", "log"], "value": cfg.get("xscale", "linear")},
+                {"key": "direction", "label": "Direction", "type": "combo", "choices": ["normal", "reverse"], "value": cfg.get("direction", "normal")},
+                {"key": "alpha", "label": "Alpha", "type": "float", "min": 0.0, "max": 1.0, "decimals": 2, "value": cfg.get("alpha", 1.0)},
+                {"key": "decimate", "label": "Decimate", "type": "int", "min": 1, "max": 1000, "value": cfg.get("decimate", 1)},
+            ]
+            apply_kind, apply_id = "continuous_log", log_name
+
+        elif data[0] == "DiscreteLog" and len(data) >= 3:
+            well_name, log_name = data[1], data[2]
+            well = self._find_well_by_name(well_name) or {}
+            log_def = (well.get("discrete_logs") or {}).get(log_name, {})
+            title = f"Settings: {well_name} / {log_name}"
+            info = [("Well", well_name), ("Log", log_name), ("Type", "discrete")]
+            stats = [("Samples", len(log_def.get("depth", []) or [])), ("Values", len(set(log_def.get("values", []) or [])))]
+
+        elif data[0] == "Tops" and len(data) >= 3:
+            top_name = data[2]
+            meta = dict((getattr(self, "all_stratigraphy", {}) or {}).get(top_name, {}) or {})
+            depths = []
+            for well in getattr(self, "all_wells", []) or []:
+                val = (well.get("tops") or {}).get(top_name)
+                if isinstance(val, dict):
+                    val = val.get("depth")
+                if val is not None:
+                    depths.append(val)
+            title = f"Settings: top {top_name}"
+            info = [("Name", top_name), ("Role", meta.get("role", data[1] if len(data) > 1 else "")), ("Level", meta.get("level", ""))]
+            stats = self._numeric_stats_rows(depths)
+            display = [
+                {"key": "role", "label": "Role", "type": "combo", "choices": ["stratigraphy", "fault", "other"], "value": meta.get("role", "stratigraphy")},
+                {"key": "level", "label": "Level", "value": meta.get("level", "formation")},
+                {"key": "color", "label": "Color", "value": meta.get("color", "#cccccc")},
+                {"key": "hatch", "label": "Hatch", "value": meta.get("hatch", "-")},
+            ]
+            apply_kind, apply_id = "top", top_name
+
+        elif data[0] == "Track" and len(data) >= 2:
+            track_name = data[1]
+            track = self._find_track_by_name(track_name) or {}
+            title = f"Settings: track {track_name}"
+            info = [("Name", track.get("name", track_name)), ("Type", track.get("type", "continuous"))]
+            stats = [("Logs", len(track.get("logs", []) or [])), ("Fills", len(track.get("fills", []) or []))]
+            display = [
+                {"key": "name", "label": "Name", "value": track.get("name", track_name)},
+                {"key": "type", "label": "Type", "value": track.get("type", "continuous")},
+            ]
+            apply_kind, apply_id = "track", track_name
+
+        elif data[0] == "Bitmap" and len(data) >= 3:
+            well_name, bmp_key = data[1], data[2]
+            well = self._find_well_by_name(well_name) or {}
+            bmp = (well.get("bitmaps") or {}).get(bmp_key, {})
+            title = f"Settings: bitmap {bmp.get('name', bmp_key)}"
+            info = [("Well", well_name), ("Bitmap", bmp.get("name", bmp_key)), ("Path", bmp.get("path", "")), ("Track", bmp.get("track", ""))]
+            stats = [("Top depth", bmp.get("top_depth", "")), ("Base depth", bmp.get("base_depth", ""))]
+            display = [
+                {"key": "name", "label": "Name", "value": bmp.get("name", bmp_key)},
+                {"key": "top_depth", "label": "Top depth", "type": "float", "value": bmp.get("top_depth", 0.0)},
+                {"key": "base_depth", "label": "Base depth", "type": "float", "value": bmp.get("base_depth", 0.0)},
+                {"key": "flip_vertical", "label": "Flip vertical", "type": "bool", "value": bmp.get("flip_vertical", False)},
+            ]
+            apply_kind, apply_id = "bitmap", (well_name, bmp_key)
+
+        elif data[0] == "Filter" and len(data) >= 4:
+            name = data[1]
+            cfg = dict(data[3] or {})
+            title = f"Settings: filter {name}"
+            info = [("Name", name), ("Type", cfg.get("type", data[2])), ("Active", cfg.get("active", False))]
+            stats = [("Upper top", cfg.get("top", "")), ("Lower top", cfg.get("bottom", ""))]
+            display = [
+                {"key": "top", "label": "Upper top", "value": cfg.get("top", "")},
+                {"key": "bottom", "label": "Lower top", "value": cfg.get("bottom", "")},
+                {"key": "active", "label": "Active", "type": "bool", "value": cfg.get("active", False)},
+            ]
+            apply_kind, apply_id = "filter", name
+
+        else:
+            title = f"Settings: {item.text(0) if item is not None else 'object'}"
+            info = [("Tree item", item.text(0) if item is not None else ""), ("Data", data)]
+
+        return title, info, stats, display, apply_kind, apply_id
+
+    def _apply_object_display_settings(self, apply_kind, apply_id, values, item=None):
+        if not values:
+            return
+        if apply_kind == "top":
+            meta = dict((self.all_stratigraphy or {}).get(apply_id, {}) or {})
+            meta.update(values)
+            role = str(meta.get("role", "stratigraphy") or "stratigraphy").strip().lower()
+            if role not in ("stratigraphy", "fault", "other"):
+                role = "stratigraphy"
+            meta["role"] = role
+            if role == "stratigraphy" and not meta.get("strat_index"):
+                strat_indices = []
+                for m in (self.all_stratigraphy or {}).values():
+                    try:
+                        strat_indices.append(int((m or {}).get("strat_index")))
+                    except (TypeError, ValueError):
+                        pass
+                meta["strat_index"] = (max(strat_indices) + 1) if strat_indices else 1
+            self.all_stratigraphy[apply_id] = meta
+            if hasattr(self, "project"):
+                self.project.all_stratigraphy = self.all_stratigraphy
+            if hasattr(self, "panel"):
+                self.panel.stratigraphy = self.all_stratigraphy
+            if item is not None:
+                item.setData(0, Qt.UserRole, ("Tops", role, apply_id))
+            self._populate_tops_tree()
+        elif apply_kind == "continuous_log":
+            for track in self.all_tracks or []:
+                for log_cfg in track.get("logs", []) or []:
+                    if isinstance(log_cfg, dict) and log_cfg.get("log") == apply_id:
+                        log_cfg.update(values)
+        elif apply_kind == "track":
+            track = self._find_track_by_name(apply_id)
+            if track is not None:
+                old_name = track.get("name")
+                track.update(values)
+                if item is not None and values.get("name"):
+                    item.setText(0, values["name"])
+                    item.setData(0, Qt.UserRole, ("Track", values["name"], "None"))
+                if old_name != track.get("name"):
+                    self._populate_track_tree()
+        elif apply_kind == "bitmap":
+            well_name, bmp_key = apply_id
+            well = self._find_well_by_name(well_name)
+            bmp = ((well or {}).get("bitmaps") or {}).get(bmp_key)
+            if bmp is not None:
+                bmp.update(values)
+                if item is not None and values.get("name"):
+                    item.setText(0, values["name"])
+        elif apply_kind == "filter":
+            root = self._ensure_input_filter_root()
+            for filter_item in self.input_tree.get_items_in_folder(root, recursive=True, include_folders=False):
+                data = filter_item.data(0, Qt.UserRole)
+                if isinstance(data, (tuple, list)) and len(data) >= 4 and data[0] == "Filter" and data[1] == apply_id:
+                    cfg = dict(data[3] or {})
+                    cfg.update(values)
+                    filter_item.setData(0, Qt.UserRole, ("Filter", apply_id, cfg.get("type", "top_interval"), cfg))
+                    filter_item.setCheckState(0, Qt.Checked if cfg.get("active") else Qt.Unchecked)
+            self._sync_panel_filters_from_tree(redraw=False)
+        self.panel.set_draw_well_panel(True)
+        self.panel.draw_well_panel()
+
+    def _action_object_settings(self, data, item):
+        title, info, stats, display, apply_kind, apply_id = self._object_settings_payload(data, item)
+        dlg = ObjectSettingsDialog(self, title=title, info_rows=info, stats_rows=stats, display_fields=display)
+        dlg.setModal(False)
+        dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+
+        def _apply_settings():
+            self._apply_object_display_settings(apply_kind, apply_id, dlg.result_display(), item=item)
+
+        def _forget_dialog(*_):
+            if dlg in self._open_settings_dialogs:
+                self._open_settings_dialogs.remove(dlg)
+
+        dlg.accepted.connect(_apply_settings)
+        dlg.finished.connect(_forget_dialog)
+        self._open_settings_dialogs.append(dlg)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     def _delete_log_from_well(self, well_name: str, log_name: str, confirm: bool = True):
         wells = getattr(self, "all_wells", []) or []
@@ -6595,7 +7151,21 @@ class MainWindow(QMainWindow):
         well_name = item.text(0) #if we need a well name, this is where to find it.
 
         menu = QMenu(self)
-        #
+        act_object_settings = menu.addAction("Settings...")
+        menu.addSeparator()
+        act_continuous_log_edit = None
+        act_continuous_log_splice = None
+        act_continuous_log_delete = None
+        act_discrete_dictionary = None
+        act_well_log_calculator = None
+        act_Logs_edit = None
+        act_open_log_calculator = None
+        act_edit_disc_colors = None
+        act_track_edit_continuous_log = None
+        act_track_add_continuous_log = None
+        discrete_dictionary_log_name = None
+        discrete_dictionary_well_name = None
+        parent_item = item.parent()
 
         if data[0] == "Wells":
             act_add_new_well = menu.addAction("Add new well...")
@@ -6603,6 +7173,7 @@ class MainWindow(QMainWindow):
         if data[1] == "Well":
             well_name = item.text(0)
             act_edit_single_well = menu.addAction(f"Edit well '{well_name}'...")
+            act_well_log_calculator = menu.addAction(f"Run log calculator for '{well_name}'...")
             act_move_left = menu.addAction(f"Move well left '{well_name}'...")
             act_move_right = menu.addAction(f"Move well right '{well_name}'...")
             act_load_bitmap = menu.addAction(f"Load bitmap '{well_name}'...")
@@ -6617,12 +7188,35 @@ class MainWindow(QMainWindow):
             act_continuous_log_edit = menu.addAction("Edit log data (table)…")
             act_continuous_log_splice = menu.addAction("Splice from LAS…")
             act_continuous_log_delete = menu.addAction("Delete log…")
+            act_well_log_calculator = menu.addAction(f"Run log calculator for '{well_name}'...")
+        if data[0] == "DiscreteLog":
+            _, well_name, log_name = data
+            discrete_dictionary_log_name = log_name
+            discrete_dictionary_well_name = well_name
+            act_discrete_dictionary = menu.addAction("Edit discrete dictionary...")
+            act_well_log_calculator = menu.addAction(f"Run log calculator for '{well_name}'...")
         if data[0] == "Logs":
             #act_open_log_calculator = menu.addAction("Open log calculator...")
             if data[1] == "Continuous_Log":
                 log_name = data[2]
                 act_Logs_edit = menu.addAction(f"Edit display settings for '{log_name}'...")
                 act_open_log_calculator = menu.addAction("Open log calculator...")
+            elif str(data[1]).lower() in ("discretelog", "discrete"):
+                log_name = data[2]
+                discrete_dictionary_log_name = log_name
+                discrete_dictionary_well_name = None
+                act_discrete_dictionary = menu.addAction(f"Edit dictionary for '{log_name}'...")
+                act_open_log_calculator = menu.addAction("Open log calculator...")
+        if (
+            act_discrete_dictionary is None
+            and parent_item is not None
+            and parent_item.text(0).strip().lower() == "discrete"
+        ):
+            log_name = item.text(0).strip()
+            if log_name:
+                discrete_dictionary_log_name = log_name
+                discrete_dictionary_well_name = None
+                act_discrete_dictionary = menu.addAction(f"Edit dictionary for '{log_name}'...")
         if data[0] == "Tracks":
             act_add_new_track = menu.addAction("Add new track...")
             act_add_disc_track = menu.addAction("Add new discrete track...")
@@ -6634,7 +7228,7 @@ class MainWindow(QMainWindow):
 
             act_delete_track = menu.addAction(f"Delete Track '{track_name}'...")
             if track.get("type") == "discrete":
-                act_edit_disc_colors = menu.addAction(f"Edit discrete track colors '{track_name}'...")
+                act_edit_disc_colors = menu.addAction(f"Edit discrete dictionary for '{track_name}'...")
             elif track.get("type") == "bitmap":
                 act_track_add_core_bitmap = menu.addAction(f"Load core bitmap into '{track_name}'...")
                 act_edit_bitmap_track = menu.addAction(f"Edit bitmap position'{track_name}'...")
@@ -6651,36 +7245,68 @@ class MainWindow(QMainWindow):
         act_collapse_all = menu.addAction("Collapse all")
         act_print_path = menu.addAction("Print path")
         chosen = menu.exec_(global_pos)
+        if chosen is None:
+            return
         # Now the actions
+        if chosen == act_object_settings:
+            self._action_object_settings(data, item)
+            return
         try:
+            handled = False
             if chosen == act_continuous_log_edit:
                 self._edit_well_log_table(well_name, log_name)
+                handled = True
             elif chosen == act_continuous_log_splice:
                 self._splice_well_log_from_las(well_name, log_name)
+                handled = True
             elif chosen == act_continuous_log_delete:
                 self._delete_log_from_well(well_name, log_name, confirm=True)
-            return
+                handled = True
+            elif chosen == act_discrete_dictionary:
+                self._action_edit_discrete_log_dictionary(
+                    discrete_dictionary_log_name,
+                    discrete_dictionary_well_name,
+                )
+                handled = True
+            elif chosen == act_well_log_calculator:
+                self._action_open_log_calculator_for_well(well_name)
+                handled = True
+            if handled:
+                return
         except Exception:
             pass
         try:
+            handled = False
             if chosen == act_Logs_edit:
                 self._edit_log_display_settings(log_name)
+                handled = True
             if chosen == act_open_log_calculator:
                 self._action_open_log_calculator()
+                handled = True
+            if handled:
                 return
-            return
         except:
             pass
         try: # edit_tops_stratigraphy
             if chosen == act_edit_tops_stratigraphy:
                 self._action_edit_stratigraphy()
             elif chosen == act_rebuilt_stratigraphy:
-                self._rebuild_stratigraphic_table_from_tree()
+                self._sync_top_roles_and_order_from_input_tree()
+                self._populate_tops_tree()
+                if hasattr(self, "panel"):
+                    self.panel.stratigraphy = self.all_stratigraphy
+                    self.panel.set_draw_well_panel(True)
+                    self.panel.draw_well_panel()
         except:
             pass
         try: #
             if chosen == act_edit_disc_colors:
-                self._action_edit_discrete_colors_for_track(track_name)
+                disc_cfg = track.get("discrete", {}) if track else {}
+                disc_log_name = disc_cfg.get("log")
+                if disc_log_name:
+                    self._action_edit_discrete_log_dictionary(disc_log_name)
+                else:
+                    self._action_edit_discrete_colors_for_track(track_name)
         except:
             pass
         try:
@@ -6722,6 +7348,8 @@ class MainWindow(QMainWindow):
         try:
             if chosen == act_edit_single_well:
                 self._action_edit_single_well_by_name(well_name)
+            elif chosen == act_well_log_calculator:
+                self._action_open_log_calculator_for_well(well_name)
             elif chosen == act_move_left:
                 self._move_well(well_name, -1)
             elif chosen == act_move_right:

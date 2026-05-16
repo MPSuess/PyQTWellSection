@@ -23,6 +23,7 @@ import openpyxl
 from pywellsection.dialogs import ImportTopsAssignWellDialog, ImportCoreExcelDialog
 #from pywellsection.testrange.Bee_SV_load import bgr_sv_load_tree
 from pywellsection.Bee_SV_load import bgr_sv_load_tree
+from pywellsection.discrete_logs import normalize_discrete_log_definition
 
 
 def _file_load_tops_from_csv(self, path: str):
@@ -802,10 +803,17 @@ def import_discrete_logs_from_csv(self, path: str):
         values = [v for (d, v) in samples]
 
         disc_logs = well.setdefault("discrete_logs", {})
-        disc_logs[log_name] = {
+        disc_logs[log_name] = normalize_discrete_log_definition({
             "depth": depths,
             "values": values,
-        }
+        })
+        if hasattr(self, "all_discrete_logs"):
+            if self.all_discrete_logs is None:
+                self.all_discrete_logs = []
+            elif not hasattr(self.all_discrete_logs, "append"):
+                self.all_discrete_logs = list(self.all_discrete_logs)
+            if log_name not in self.all_discrete_logs:
+                self.all_discrete_logs.append(log_name)
         imported_pairs += 1
 
     # ---- update panel ----

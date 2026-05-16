@@ -155,6 +155,9 @@ class  WellPanelWidget(QWidget):
 
         self._flatten_top_name = None
         self._flatten_depths = []
+        self._pre_flatten_depth_window = None
+        self._preserve_depth_window_on_next_draw = False
+        self._center_depth_on_next_draw = None
         self.current_depth_window = None  # (top_true, bottom_true) or None
 
         #self.draw_well_panel()
@@ -219,8 +222,9 @@ class  WellPanelWidget(QWidget):
             # Keep current_depth_window deterministic during import/rebuild redraws.
             # Explicit layout settings can still override via set_current_depth_window().
             visible_depth_range = self.get_visible_depth_range()
-            if visible_depth_range is not None:
+            if visible_depth_range is not None and not self._preserve_depth_window_on_next_draw:
                 self.current_depth_window = visible_depth_range
+            self._preserve_depth_window_on_next_draw = False
 
             # 2) Redraw everything (this will clear fig and rebuild axe
             self.fig.clear()
@@ -258,6 +262,11 @@ class  WellPanelWidget(QWidget):
                 self._draw_visible_wells_override = None
 
             depth_window = filter_depth_window if filter_depth_window is not None else self.get_current_depth_window()
+            visible_name_set = set(visible_wells_for_draw or [])
+            self._display_wells_for_axes = [
+                w for w in (wells_for_draw or [])
+                if w.get("name") in visible_name_set
+            ]
 
 
             try:
@@ -297,8 +306,13 @@ class  WellPanelWidget(QWidget):
                 return
             self._connect_ylim_sync()
             self._build_axis_index()
+            if self.current_depth_window is not None:
+                self._apply_depth_window_to_axes(self.current_depth_window)
 
             self.canvas.draw()
+            if self._center_depth_on_next_draw is not None:
+                self._center_scroll_on_depth(self._center_depth_on_next_draw)
+                self._center_depth_on_next_draw = None
 
     def set_top_interval_filter(self, top_name, bottom_name):
         top_name = str(top_name or "").strip()
@@ -474,29 +488,43 @@ class  WellPanelWidget(QWidget):
         if self._active_top_dialog is None:
             LOG.debug ("no more top dialog?")
             return
+        if self._active_pick_context is None:
+            return
 
         wi = self._active_pick_context["wi"]
-        well = self.wells[wi]
-        tops = well["tops"]
+        top_name = self._active_pick_context.get("formation_name")
+        well = self._well_for_display_index(wi)
+        if well is None or not top_name:
+            return
+        tops = well.setdefault("tops", {})
+        if top_name not in tops:
+            return
 
         new_depth = self._active_top_dialog.value()
         self.top_depth = new_depth
-        nearest_name=self._picked_formation
 
-        old_val = tops[nearest_name]
+        old_val = tops[top_name]
         if isinstance(old_val, dict):
             updated_val = dict(old_val)
             updated_val["depth"] = new_depth
-            self._active_top_dialog = None
         else:
             updated_val = new_depth
 
-        tops[nearest_name] = updated_val
+        tops[top_name] = updated_val
+
+        well_name = well.get("name")
+        for candidate in self.wells or []:
+            if candidate is well:
+                continue
+            if well_name and candidate.get("name") == well_name:
+                candidate.setdefault("tops", {})[top_name] = updated_val
+                break
 
         self.top_depth = new_depth
         self._active_top_dialog = None
         self._active_pick_context = None
         self._clear_pick_line()
+        self.set_draw_well_panel(True)
         self.draw_well_panel()
 
     def edit_top_dialog_rejected(self):
@@ -551,14 +579,7 @@ class  WellPanelWidget(QWidget):
             return
 
         wi = self._active_pick_context["wi"]
-
-        if self._flatten_depths is not None:
-            if len(self._flatten_depths) > 0:
-                flatten_depth = self._flatten_depths[wi]
-            else:
-                flatten_depth = 0
-        else:
-            flatten_depth = 0
+        flatten_depth = self._get_flatten_offset_for_well(wi)
 
         print("dialog pick event received")
 
@@ -574,7 +595,11 @@ class  WellPanelWidget(QWidget):
 
         formation_name = self._active_pick_context["formation_name"]
 
-        min, max = self._get_stratigraphic_bounds(formation_name)
+        bounds = self._get_stratigraphic_bounds(formation_name)
+        if bounds is None:
+            min, max = -math.inf, math.inf
+        else:
+            min, max = bounds
 
         LOG.debug(f"min={min} max={max} depth={depth} flatten_depth={flatten_depth}")
 
@@ -625,7 +650,9 @@ class  WellPanelWidget(QWidget):
 
         #if ti-wi <= 0: return 0
 
-        well = self.wells[wi]
+        well = self._well_for_display_index(wi)
+        if well is None:
+            return
         if "tops" not in well or not well["tops"]:
             tops = None
 
@@ -816,10 +843,49 @@ class  WellPanelWidget(QWidget):
             bottom_plot = max(float(y0), float(y1))
             offsets = getattr(self, "_flatten_depths", None)
             if offsets:
-                offset = offsets[0] if len(offsets) > 0 else 0.0
+                offset = 0.0
             else:
                 offset = 0.0
             self.current_depth_window = (top_plot + offset, bottom_plot + offset)
+        except Exception:
+            return
+
+    def _apply_depth_window_to_axes(self, depth_window):
+        try:
+            top, bottom = depth_window
+            if top is None or bottom is None:
+                return
+            top = float(top)
+            bottom = float(bottom)
+            if not (math.isfinite(top) and math.isfinite(bottom)):
+                return
+            if abs(bottom - top) <= 1e-9:
+                return
+            self._syncing_ylim = True
+            for ax in getattr(self, "axes", []) or []:
+                ax.set_ylim(bottom, top)
+            for ax in getattr(self, "well_main_axes", []) or []:
+                ax.set_ylim(bottom, top)
+        except Exception:
+            return
+        finally:
+            self._syncing_ylim = False
+
+    def _center_scroll_on_depth(self, depth):
+        try:
+            axes = getattr(self, "well_main_axes", None) or getattr(self, "axes", None) or []
+            if not axes:
+                return
+            ax = axes[0]
+            self.canvas.draw()
+            _, display_y = ax.transData.transform((0.0, float(depth)))
+            canvas_h = max(1, int(self.canvas.height()))
+            widget_y = canvas_h - float(display_y)
+            viewport_h = max(1, int(self.scroll_area.viewport().height()))
+            bar = self.scroll_area.verticalScrollBar()
+            target = int(round(widget_y - viewport_h / 2.0))
+            target = max(bar.minimum(), min(bar.maximum(), target))
+            bar.setValue(target)
         except Exception:
             return
 
@@ -841,11 +907,7 @@ class  WellPanelWidget(QWidget):
         wi_target = self._active_pick_context["wi"]
         print ("currently_picked:" ,wi_target)
         depth = float(event.ydata)
-        if len(self._flatten_depths)>0:
-        #if len(self._flatten_depths) > 0:
-            flatten_depth = self._flatten_depths[wi_target]
-        else:
-            flatten_depth = 0
+        flatten_depth = self._get_flatten_offset_for_well(wi_target)
 
         LOG.debug(f"depth={depth} flatten_depth={flatten_depth}")
 
@@ -856,7 +918,11 @@ class  WellPanelWidget(QWidget):
         formation_name = self._active_pick_context["formation_name"]
 
         if formation_name is not None:
-            min,max = self._get_stratigraphic_bounds(formation_name)
+            bounds = self._get_stratigraphic_bounds(formation_name)
+            if bounds is None:
+                min, max = -math.inf, math.inf
+            else:
+                min, max = bounds
 
             # if depth < min-flatten_depth:
             #     depth = min-flatten_depth
@@ -905,17 +971,14 @@ class  WellPanelWidget(QWidget):
 
     def _draw_temp_highlight(self, wi: int, top_name: str):
         """Highlight a top in a given well (used when top is first clicked)."""
-        well = self.wells[wi]
+        well = self._well_for_display_index(wi)
+        if well is None:
+            return
         tops = well.get("tops", {})
         if top_name not in tops:
             return
 
-        if self._flatten_depths is not None:
-            if len(self._flatten_depths) > 0:
-                flatten_depth = self._flatten_depths[wi]
-            else: flatten_depth = 0
-        else:
-            flatten_depth = 0
+        flatten_depth = self._get_flatten_offset_for_well(wi)
 
         val = tops[top_name]
         if isinstance(val, dict):
@@ -981,7 +1044,9 @@ class  WellPanelWidget(QWidget):
         """
         from PySide6.QtWidgets import QDialog
 
-        well = self.wells[well_index]
+        well = self._well_for_display_index(well_index)
+        if well is None:
+            return
         tops = well["tops"]
 
         if top_name not in tops:
@@ -1001,7 +1066,9 @@ class  WellPanelWidget(QWidget):
         }
 
         if top_name is not None:
-            min_bound,max_bound= self._get_stratigraphic_bounds(top_name)
+            bounds = self._get_stratigraphic_bounds(top_name)
+            if bounds is not None:
+                min_bound, max_bound = bounds
 
         dlg = EditFormationTopDialog(
             self,
@@ -1026,7 +1093,9 @@ class  WellPanelWidget(QWidget):
         Delete a formation top from a given well, after user confirmation.
         Redraws the well_panel and clears any highlight.
         """
-        well = self.wells[well_index]
+        well = self._well_for_display_index(well_index)
+        if well is None:
+            return
         tops = well.get("tops", {})
 
         if top_name not in tops:
@@ -1061,45 +1130,60 @@ class  WellPanelWidget(QWidget):
         - depths increase with depth (e.g. 1000 m -> 2000 m)
         - self.stratigraphy is ordered shallow -> deep
         """
+        if not self._active_pick_context:
+            return None
+
         wi = self._active_pick_context["wi"]
-        well = self.wells[wi]
-        #well = self.well
-        tops = well["tops"]
+        well = self._well_for_display_index(wi)
+        if well is None:
+            return None
+        tops = well.get("tops", {}) or {}
 
         if top_name not in tops:
-            return
+            return None
 
-        ref_depth = well["reference_depth"]
-        well_td = ref_depth + well["total_depth"]
+        ref_depth = float(well.get("reference_depth", 0.0))
+        well_td = ref_depth + float(well.get("total_depth", 0.0))
 
         # Default: whole well interval
         min_bound = ref_depth
         max_bound = well_td
 
         strat = getattr(self, "stratigraphy", None)
-        if not strat or top_name not in strat:
+        if isinstance(strat, dict):
+            role = str(((strat.get(top_name) or {}).get("role", "stratigraphy")) or "stratigraphy").lower()
+            if role != "stratigraphy":
+                return min_bound, max_bound
+        strat_names = self._stratigraphy_names_in_order()
+        if not strat_names or top_name not in strat_names:
             return min_bound, max_bound
 
-        tops = well.get("tops", {})
-        idx_map = {key: i for i, key in enumerate(tops)}
-        idx = idx_map.get(top_name)
+        idx = strat_names.index(top_name)
+        shallower_depth = None
+        deeper_depth = None
 
-        idx_l=list(idx_map)
+        for j in range(idx - 1, -1, -1):
+            name = strat_names[j]
+            if name in tops:
+                shallower_depth = self._top_depth_value(tops[name])
+                if shallower_depth is not None:
+                    break
 
-        if idx is None:
-            return min_bound, max_bound
-        elif len(idx_l)==1:
-            return min_bound, max_bound
-        else:
-            if idx==0:
-                return min_bound, self._top_depth_value(tops[idx_l[idx+1]], max_bound)
-            elif idx==len(idx_l)-1:
-                return self._top_depth_value(tops[idx_l[idx-1]], min_bound), max_bound
-            else:
-                return (
-                    self._top_depth_value(tops[idx_l[idx-1]], min_bound),
-                    self._top_depth_value(tops[idx_l[idx+1]], max_bound),
-                )
+        for j in range(idx + 1, len(strat_names)):
+            name = strat_names[j]
+            if name in tops:
+                deeper_depth = self._top_depth_value(tops[name])
+                if deeper_depth is not None:
+                    break
+
+        eps = 1e-3
+        if shallower_depth is not None:
+            min_bound = max(min_bound, float(shallower_depth) + eps)
+        if deeper_depth is not None:
+            max_bound = min(max_bound, float(deeper_depth) - eps)
+
+        if not (math.isfinite(min_bound) and math.isfinite(max_bound)) or min_bound >= max_bound:
+            return ref_depth, well_td
 
         return min_bound, max_bound
 
@@ -1110,6 +1194,31 @@ class  WellPanelWidget(QWidget):
             return float(value)
         except (TypeError, ValueError):
             return default
+
+    def _stratigraphy_names_in_order(self):
+        strat = getattr(self, "stratigraphy", None)
+        if isinstance(strat, dict):
+            def _key(item):
+                meta = item[1] if isinstance(item[1], dict) else {}
+                try:
+                    idx = float(meta.get("strat_index", 10**9))
+                except (TypeError, ValueError):
+                    idx = 10**9
+                return idx, str(item[0]).lower()
+            return [
+                name for name, meta in sorted(strat.items(), key=_key)
+                if str((meta or {}).get("role", "stratigraphy") or "stratigraphy").lower() == "stratigraphy"
+            ]
+        return list(strat or [])
+
+    def _well_for_display_index(self, well_index):
+        display_wells = getattr(self, "_display_wells_for_axes", None) or []
+        if 0 <= well_index < len(display_wells):
+            return display_wells[well_index]
+        wells = self.wells or []
+        if 0 <= well_index < len(wells):
+            return wells[well_index]
+        return None
 
     def get_visible_depth_range(self):
         """
@@ -1148,19 +1257,13 @@ class  WellPanelWidget(QWidget):
         if (not math.isfinite(y0)) or (not math.isfinite(y1)) or abs(y1 - y0) < 1e-9:
             return None
 
-        # convert to TRUE depth using offset (flattening shifts depth by offset)
+        # In flattened mode the y-axis is already relative to the datum.
+        # Keep that relative plot window so redraws preserve the current zoom.
         offsets = getattr(self, "_flatten_depths", None)
-
         if offsets:
-            # use first well offset as reference (all axes aligned)
-            offset = offsets[0] if len(offsets) > 0 else 0.0
-        else:
-            offset = 0.0
+            return float(top_plot), float(bottom_plot)
 
-        top_true = top_plot + offset
-        bottom_true = bottom_plot + offset
-
-        return float(top_true), float(bottom_true)
+        return float(top_plot), float(bottom_plot)
 
     def _add_formation_top_at_depth(self, well_index: int, depth: float):
         """
@@ -1303,13 +1406,20 @@ class  WellPanelWidget(QWidget):
         # Unknown in strat column -> do nothing
             return
 
+        current_window = self.get_visible_depth_range() or self.get_current_depth_window()
+        if current_window is not None:
+            top, bottom = current_window
+            current_span = abs(float(bottom) - float(top))
+            self._pre_flatten_depth_window = (float(top), float(bottom))
+        else:
+            current_span = None
+            self._pre_flatten_depth_window = None
+
         flatten_depths = []
 
-        if type(self.stratigraphy) is list:
-            idx_map = self.stratigraphy
-        else:
-            strat_keys = self.stratigraphy.keys()
-            idx_map = list(strat_keys)
+        idx_map = self._stratigraphy_names_in_order()
+        if top_name not in idx_map:
+            return
 
         idx_target = idx_map.index(top_name)
 
@@ -1336,7 +1446,7 @@ class  WellPanelWidget(QWidget):
                     break
 
             # search deeper
-            for j in range(idx_target + 1, len(self.stratigraphy)):
+            for j in range(idx_target + 1, len(idx_map)):
                 nm = idx_map[j]
                 if nm in tops:
                     v = tops[nm]
@@ -1360,7 +1470,12 @@ class  WellPanelWidget(QWidget):
         # Store state and redraw
         self._flatten_top_name = top_name
         self._flatten_depths = flatten_depths
-        #self.current_depth_window = None
+        if current_span is not None and current_span > 1e-9:
+            half_span = current_span / 2.0
+            self.current_depth_window = (-half_span, half_span)
+            self._preserve_depth_window_on_next_draw = True
+            self._center_depth_on_next_draw = 0.0
+        self.set_draw_well_panel(True)
         self.draw_well_panel()
 
     def _set_offset_for_well(self, wi: int, depth: float):
@@ -1474,9 +1589,21 @@ class  WellPanelWidget(QWidget):
         """
         Turn off flattening and redraw in true depth.
         """
+        current_window = self.get_visible_depth_range() or self.get_current_depth_window()
+        current_span = None
+        if current_window is not None:
+            top, bottom = current_window
+            current_span = abs(float(bottom) - float(top))
+        previous_window = getattr(self, "_pre_flatten_depth_window", None)
         self._flatten_top_name = None
         self._flatten_depths = None
-        #self.current_depth_window = None  # optional: reset zoom as well
+        if previous_window is not None and current_span is not None and current_span > 1e-9:
+            prev_top, prev_bottom = previous_window
+            center = (float(prev_top) + float(prev_bottom)) / 2.0
+            half_span = current_span / 2.0
+            self.current_depth_window = (center - half_span, center + half_span)
+            self._preserve_depth_window_on_next_draw = True
+        self.set_draw_well_panel(True)
         self.draw_well_panel()
         
     def set_panel_settings(self, settings):
