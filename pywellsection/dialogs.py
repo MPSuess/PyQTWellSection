@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QPushButton, QWidget, QListWidget, QGroupBox,QAbstractItemView
 )
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 
 import numpy as np
@@ -1214,17 +1214,16 @@ class AllTopsTableDialog(QDialog):
     """
     Edit/add/delete formation tops of all wells in a single table.
 
-    Columns: Well, Top, Level, Depth
-    - Existing rows: Well, Top via comboboxes (disabled), Depth editable.
-    - New rows: Well, Top via comboboxes (enabled), Depth editable.
-      Top choices come from stratigraphy + any extra tops found in wells.
-    Filter box: filters by substring in Well/Top/Level columns.
+    Columns: Well, Top, Depth
+    - Existing rows: Well via disabled combobox, Top via combobox, Depth editable.
+    - New rows: Well and Top via comboboxes, Depth editable.
+      Top choices come from existing stratigraphy names.
+    Filter box: filters by substring in Well/Top columns.
     """
 
     COL_WELL = 0
     COL_TOP = 1
-    COL_LEVEL = 2
-    COL_DEPTH = 3
+    COL_DEPTH = 2
 
     def __init__(self, parent, wells, stratigraphy=None):
         super().__init__(parent)
@@ -1247,14 +1246,11 @@ class AllTopsTableDialog(QDialog):
             w.get("name", f"Well {i+1}") for i, w in enumerate(self._wells)
         })
 
-        # all top names: first strat order, then any extra from wells
+        # top names: existing stratigraphy names only.
+        # Existing well tops outside stratigraphy are inserted per-row only so
+        # the current value remains visible, but new selections come from stratigraphy.
         strat_names = list(self._strat.keys())
-        extra_names = set()
-        for well in self._wells:
-            for tname in (well.get("tops", {}) or {}).keys():
-                if tname not in strat_names:
-                    extra_names.add(tname)
-        self._top_names = strat_names + sorted(extra_names)
+        self._top_names = strat_names
 
         # records deletions of existing tops
         self._deleted_pairs = set()
@@ -1266,25 +1262,29 @@ class AllTopsTableDialog(QDialog):
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel(
-            "Edit depths of formation tops for all wells.\n"
+            "Edit formation tops for all wells.\n"
             "Use the filter to search by well name or top name.\n"
-            "You can also add new tops (choose Well + Top + Depth) or delete rows.",
+            "You can rename tops, add new tops, or delete rows.",
             self
         ))
 
         # filter box
         flayout = QFormLayout()
         self.ed_filter = QLineEdit(self)
-        self.ed_filter.setPlaceholderText("Filter by well / top / level...")
+        self.ed_filter.setPlaceholderText("Filter by well / top...")
         self.ed_filter.textChanged.connect(self._apply_filter)
         flayout.addRow("Filter:", self.ed_filter)
         layout.addLayout(flayout)
 
         # table
         self.table = QTableWidget(self)
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Well", "Top", "Level", "Depth"])
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Well", "Top", "Depth"])
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        self.table.setColumnWidth(self.COL_WELL, 180)
+        self.table.setColumnWidth(self.COL_TOP, 260)
+        self.table.setColumnWidth(self.COL_DEPTH, 90)
         layout.addWidget(self.table)
 
         # add/delete row buttons
@@ -1321,48 +1321,22 @@ class AllTopsTableDialog(QDialog):
 
     def _create_top_combo(self, selected_name: str = "", enabled: bool = True) -> QComboBox:
         cb = QComboBox(self.table)
-        cb.addItems(self._top_names)
-        if selected_name and selected_name in self._top_names:
+        names = list(self._top_names)
+        if selected_name and selected_name not in names:
+            names.insert(0, selected_name)
+        cb.addItems(names)
+        if selected_name:
             cb.setCurrentText(selected_name)
         if not enabled:
             cb.setEnabled(False)
-        # when top changes, update Level column if we have stratigraphy
-        cb.currentTextChanged.connect(self._update_level_for_row_from_top)
         return cb
-
-    def _update_level_for_row_from_top(self, top_name: str):
-        """
-        When top combo changes on any row, update the Level column using stratigraphy.
-        """
-        if not self._strat:
-            return
-
-        # find which combobox emitted the signal
-        cb = self.sender()
-        if cb is None:
-            return
-
-        # locate row of this combobox
-        for row in range(self.table.rowCount()):
-            if self.table.cellWidget(row, self.COL_TOP) is cb:
-                level = ""
-                meta = self._strat.get(top_name, {}) or {}
-                level = meta.get("level", "")
-                it_level = self.table.item(row, self.COL_LEVEL)
-                if it_level is None:
-                    it_level = QTableWidgetItem(level)
-                    it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
-                    self.table.setItem(row, self.COL_LEVEL, it_level)
-                else:
-                    it_level.setText(level)
-                break
 
     # ---------------- populate / helpers ----------------
 
     def _populate_table(self):
         """
         Fill table with rows for every (well, top).
-        Order: by stratigraphy (if provided), then any remaining tops.
+        Order: by well name, then depth.
         """
         rows = []
 
@@ -1372,52 +1346,29 @@ class AllTopsTableDialog(QDialog):
             if not tops:
                 continue
 
-            ordered_names = list(self._strat.keys()) if self._strat else []
-            used = set()
-
-            # first by strat column order
-            for name in ordered_names:
-                if name in tops:
-                    rows.append((well_name, name))
-                    used.add(name)
-
-            # add any remaining tops not in stratigraphy
-            for name in tops.keys():
-                if name not in used:
-                    rows.append((well_name, name))
-
-        self.table.setRowCount(len(rows))
-
-        for row, (well_name, top_name) in enumerate(rows):
-            # find depth
-            depth = 0.0
-            for well in self._wells:
-                if well.get("name", "") == well_name:
-                    tops = well.get("tops", {}) or {}
-                    val = tops.get(top_name)
+            for top_name, val in tops.items():
+                try:
                     if isinstance(val, dict):
                         depth = float(val.get("depth", 0.0))
                     else:
                         depth = float(val)
-                    break
+                except (TypeError, ValueError):
+                    depth = 0.0
+                rows.append((well_name, top_name, depth))
 
-            level = ""
-            if self._strat:
-                meta = self._strat.get(top_name, {}) or {}
-                level = meta.get("level", "")
+        rows.sort(key=lambda row: (str(row[0]).casefold(), row[2], str(row[1]).casefold()))
 
+        self.table.setRowCount(len(rows))
+
+        for row, (well_name, top_name, depth) in enumerate(rows):
             # Well combobox (existing row, disabled)
             cb_well = self._create_well_combo(well_name, enabled=False)
             self.table.setCellWidget(row, self.COL_WELL, cb_well)
 
-            # Top combobox (existing row, disabled)
-            cb_top = self._create_top_combo(top_name, enabled=False)
+            # Top combobox
+            cb_top = self._create_top_combo(top_name, enabled=True)
+            cb_top.setProperty("original_pair", (well_name, top_name))
             self.table.setCellWidget(row, self.COL_TOP, cb_top)
-
-            # Level (read-only)
-            it_level = QTableWidgetItem(level)
-            it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
-            self.table.setItem(row, self.COL_LEVEL, it_level)
 
             # Depth (editable)
             it_depth = QTableWidgetItem(f"{depth:.3f}")
@@ -1437,11 +1388,6 @@ class AllTopsTableDialog(QDialog):
         cb_top = self._create_top_combo("", enabled=True)
         self.table.setCellWidget(row, self.COL_TOP, cb_top)
 
-        # Level auto-filled when top changes (handled by signal)
-        it_level = QTableWidgetItem("")
-        it_level.setFlags(it_level.flags() & ~Qt.ItemIsEditable)
-        self.table.setItem(row, self.COL_LEVEL, it_level)
-
         it_depth = QTableWidgetItem("")
         it_depth.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.table.setItem(row, self.COL_DEPTH, it_depth)
@@ -1460,7 +1406,10 @@ class AllTopsTableDialog(QDialog):
             cb_top = self.table.cellWidget(row, self.COL_TOP)
 
             well_name = cb_well.currentText().strip() if cb_well else ""
-            top_name = cb_top.currentText().strip() if cb_top else ""
+            old_pair = cb_top.property("original_pair") if cb_top else None
+            top_name = old_pair[1] if isinstance(old_pair, (tuple, list)) and len(old_pair) >= 2 else (
+                cb_top.currentText().strip() if cb_top else ""
+            )
 
             pair = (well_name, top_name)
             if pair in self._existing_pairs:
@@ -1488,11 +1437,6 @@ class AllTopsTableDialog(QDialog):
 
             if txt in well_txt or txt in top_txt:
                 show = True
-            else:
-                # Level from item
-                item = self.table.item(row, self.COL_LEVEL)
-                if item and txt in item.text().lower():
-                    show = True
 
             self.table.setRowHidden(row, not show)
 
@@ -1501,10 +1445,12 @@ class AllTopsTableDialog(QDialog):
         Validate depths and build:
           - updates:   (well_name, top_name) -> depth
           - additions: (well_name, top_name) -> depth
+          - renames:   (old_well_name, old_top_name) -> (well_name, top_name, depth)
           - deletions: set of (well_name, top_name)
         """
         updates = {}
         additions = {}
+        renames = {}
         seen_pairs = set()
 
         n_rows = self.table.rowCount()
@@ -1552,7 +1498,15 @@ class AllTopsTableDialog(QDialog):
                 return
             seen_pairs.add(pair)
 
-            if pair in self._existing_pairs:
+            old_pair = cb_top.property("original_pair") if cb_top else None
+            if isinstance(old_pair, (tuple, list)) and len(old_pair) >= 2:
+                old_pair = (str(old_pair[0]), str(old_pair[1]))
+            else:
+                old_pair = None
+
+            if old_pair in self._existing_pairs and old_pair != pair:
+                renames[old_pair] = (well_name, top_name, depth)
+            elif pair in self._existing_pairs:
                 updates[pair] = depth
             else:
                 additions[pair] = depth
@@ -1560,6 +1514,7 @@ class AllTopsTableDialog(QDialog):
         self._result = {
             "updates": updates,
             "additions": additions,
+            "renames": renames,
             "deletions": set(self._deleted_pairs),
         }
         self.accept()
@@ -1570,6 +1525,7 @@ class AllTopsTableDialog(QDialog):
           {
             "updates":   { (well_name, top_name): depth, ... },
             "additions": { (well_name, top_name): depth, ... },
+            "renames":   { (old_well_name, old_top_name): (well_name, top_name, depth), ... },
             "deletions": set( (well_name, top_name), ... ),
           }
         or None if dialog was cancelled.
@@ -4291,6 +4247,7 @@ class LoadWellHeadsDialog(QDialog):
 
 class EditStratigraphyDialog(QDialog):
     """Simple table editor for project stratigraphy metadata."""
+    applied = Signal(object)
 
     def __init__(self, parent=None, stratigraphy=None):
         super().__init__(parent)
@@ -4303,11 +4260,19 @@ class EditStratigraphyDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Edit unit name, level, role, color and hatch.", self))
 
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filter", self))
+        self.filter_edit = QLineEdit(self)
+        self.filter_edit.setPlaceholderText("Name contains...")
+        filter_row.addWidget(self.filter_edit, 1)
+        layout.addLayout(filter_row)
+
         self.table = QTableWidget(self)
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Name", "Level", "Role", "Color", "Hatch"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSortingEnabled(True)
         layout.addWidget(self.table)
 
         row_btn = QHBoxLayout()
@@ -4321,16 +4286,19 @@ class EditStratigraphyDialog(QDialog):
         btn_add.clicked.connect(self._add_row)
         btn_del.clicked.connect(self._delete_selected)
 
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply, self)
         btns.accepted.connect(self._on_accept)
+        btns.button(QDialogButtonBox.Apply).clicked.connect(self._on_apply)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+        self.filter_edit.textChanged.connect(self._apply_filter)
         self._populate()
 
     def _populate(self):
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(0)
-        for name, meta in self._input.items():
+        for name, meta in sorted(self._input.items(), key=lambda item: str(item[0]).lower()):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(str(name)))
@@ -4338,8 +4306,22 @@ class EditStratigraphyDialog(QDialog):
             self.table.setItem(row, 2, QTableWidgetItem(str(meta.get("role", "stratigraphy"))))
             self.table.setItem(row, 3, QTableWidgetItem(str(meta.get("color", "#cccccc"))))
             self.table.setItem(row, 4, QTableWidgetItem(str(meta.get("hatch", "-"))))
+        self.table.setSortingEnabled(True)
+        self._sort_by_name()
+        self._apply_filter()
+
+    def _sort_by_name(self):
+        self.table.sortItems(0, Qt.AscendingOrder)
+
+    def _apply_filter(self):
+        needle = self.filter_edit.text().strip().lower() if hasattr(self, "filter_edit") else ""
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            name = item.text().lower() if item else ""
+            self.table.setRowHidden(row, bool(needle and needle not in name))
 
     def _add_row(self):
+        self.table.setSortingEnabled(False)
         row = self.table.rowCount()
         self.table.insertRow(row)
         self.table.setItem(row, 0, QTableWidgetItem("NewUnit"))
@@ -4347,13 +4329,16 @@ class EditStratigraphyDialog(QDialog):
         self.table.setItem(row, 2, QTableWidgetItem("stratigraphy"))
         self.table.setItem(row, 3, QTableWidgetItem("#cccccc"))
         self.table.setItem(row, 4, QTableWidgetItem("-"))
+        self.table.setSortingEnabled(True)
+        self._sort_by_name()
+        self._apply_filter()
 
     def _delete_selected(self):
         rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
         for r in rows:
             self.table.removeRow(r)
 
-    def _on_accept(self):
+    def _collect_result(self):
         out = OrderedDict()
         for row in range(self.table.rowCount()):
             name_item = self.table.item(row, 0)
@@ -4371,7 +4356,24 @@ class EditStratigraphyDialog(QDialog):
                 "color": (self.table.item(row, 3).text().strip() if self.table.item(row, 3) else "#cccccc"),
                 "hatch": (self.table.item(row, 4).text().strip() if self.table.item(row, 4) else "-"),
             }
+        return out
+
+    def _on_apply(self):
+        out = self._collect_result()
+        if out is None:
+            return
         self._result = out
+        self.applied.emit(out)
+        self._input = OrderedDict(out)
+        self._sort_by_name()
+        self._apply_filter()
+
+    def _on_accept(self):
+        out = self._collect_result()
+        if out is None:
+            return
+        self._result = out
+        self.applied.emit(out)
         self.accept()
 
     def result_stratigraphy(self):

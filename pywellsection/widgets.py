@@ -4,6 +4,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtCore import (Qt, QAbstractTableModel, QModelIndex)
 from PySide6.QtCore import Signal as pyqtSignal
 from PySide6.QtWidgets import QPlainTextEdit, QDockWidget
+from shiboken6 import isValid
 
 from pandas import DataFrame
 
@@ -14,7 +15,8 @@ class QTextEditLogger(QPlainTextEdit, logging.Handler):
     write_text_signal = pyqtSignal(str)
 
     def __init__(self, parent):
-        super().__init__()
+        QPlainTextEdit.__init__(self, parent)
+        logging.Handler.__init__(self)
         self.widget = QPlainTextEdit(parent)
         self.widget.setReadOnly(True)
         self.write_text_signal.connect(self.widget.appendPlainText)
@@ -22,8 +24,17 @@ class QTextEditLogger(QPlainTextEdit, logging.Handler):
         self.widget.setFont(QFont("Courier", 12))
 
     def emit(self, record):
-        msg = self.format(record)
-        self.write_text_signal.emit(msg)
+        widget = getattr(self, "widget", None)
+        if widget is None or not isValid(widget):
+            return
+        try:
+            msg = self.format(record)
+            self.write_text_signal.emit(msg)
+        except RuntimeError:
+            return
+
+    def close(self):
+        logging.Handler.close(self)
 
 
 class QTextEditCommands(QPlainTextEdit):

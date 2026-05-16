@@ -175,6 +175,8 @@ def draw_multi_wells_panel_on_figure(fig,wells,tracks,suptitle=None,well_gap_fac
     for w in selected_wells:
         for log_name, log_def in w.get("logs", {}).items():
             depth = log_def["depth"]
+            if depth is None or len(depth) == 0:
+                continue
             min_data_depth = np.nanmin(depth)
             max_data_depth = np.nanmax(depth)
             if max_data_depth < top_phys: top_phys = max_data_depth
@@ -445,6 +447,8 @@ def Add_logs_to_track(base_ax, offset, track, visible_logs, well):
 
         depth = log_def["depth"]
         data = log_def["data"]
+        if depth is None or data is None or len(depth) == 0 or len(data) == 0:
+            continue
         mask = [x > 0 for x in depth]
         # plotting depth: flattened if offset != 0
         depth_plot = [x - offset for x in depth]

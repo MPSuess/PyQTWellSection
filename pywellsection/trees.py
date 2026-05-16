@@ -337,6 +337,8 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
         # guard to suppress itemChanged logic during programmatic updates
         self._updating = False
+        self._context_menu_busy = False
+        self._context_menu_suppressed = False
 
         # checkbox toggles
         self.itemChanged.connect(self._on_item_changed)
@@ -912,12 +914,21 @@ class CheckableTree(QtWidgets.QTreeWidget):
 
 
     def _show_context_menu(self, pos: QtCore.QPoint):
+        if self._context_menu_busy or self._context_menu_suppressed:
+            return
 
-        item = self.itemAt(pos)
-        global_pos = (self.viewport().mapToGlobal(pos))
+        self._context_menu_busy = True
+        try:
+            item = self.itemAt(pos)
+            global_pos = (self.viewport().mapToGlobal(pos))
+            self.contextMenuEvent.emit(global_pos, item)
+        finally:
+            self._context_menu_busy = False
+            self._context_menu_suppressed = True
+            QtCore.QTimer.singleShot(1000, self._clear_context_menu_suppression)
 
-        self.contextMenuEvent.emit(global_pos, item)
-        return
+    def _clear_context_menu_suppression(self):
+        self._context_menu_suppressed = False
 
     def _show_context_menuo(self, pos: QtCore.QPoint):
         item = self.itemAt(pos)
@@ -1419,7 +1430,6 @@ class CheckableTree(QtWidgets.QTreeWidget):
             return []
 
         if not isValid(folder_item):
-            QtMessageBox.critical(self, "Error", "Invalid folder item")
             return []
 
         results = []
@@ -1454,6 +1464,7 @@ def connect_input_tree(self):
     self.input_tree.parentToggled.connect(self.on_parent_toggled)
     #self.input_tree.itemToggled.connect(self.on_item_toggled)
     self.input_tree.itemToggled.connect(self.on_leaf_toggled)
+    self.input_tree.itemChanged.connect(self.on_input_tree_item_changed)
     self.input_tree.contextAction.connect(self.on_context_action)
     # self.input_tree.structureChanged.connect(self.on_structure_changed)
     self.input_tree.contextMenuEvent.connect(self.on_input_tree_context_menu)
@@ -1465,10 +1476,24 @@ def connect_input_tree(self):
     on_tree_loaded(self)
 
 def on_tree_loaded(self):
+    def _valid_item(item):
+        try:
+            return item is not None and isValid(item)
+        except RuntimeError:
+            return False
+
+    def _data(item):
+        if not _valid_item(item):
+            return None
+        try:
+            return item.data(0, Qt.UserRole)
+        except RuntimeError:
+            return None
+
     descendents = self.input_tree.get_items_in_folder(self.input_tree.invisibleRootItem(), recursive=True)
     for d in descendents:
-        data = d.data(0, Qt.UserRole)
-        if data and len(data) > 2:
+        data = _data(d)
+        if isinstance(data, (tuple, list)) and len(data) > 2:
             if data[2] == "Folder":
                 if data[0]=="Wells":
                     self.c_well_folder = d
@@ -1478,13 +1503,16 @@ def on_tree_loaded(self):
                     self.c_well_logs_folder = d
                 if data[0]=="Tracks":
                     self.c_well_track_folder = d
+                if data[0]=="Filters":
+                    self.c_filter_folder = d
 
 
-    descendents = self.input_tree.get_items_in_folder(self.c_well_tops_folder, recursive=False)
+    tops_folder = getattr(self, "c_well_tops_folder", None)
+    descendents = self.input_tree.get_items_in_folder(tops_folder, recursive=False)
     if len(descendents) > 0:
         for d in descendents:
-            data = d.data(0, Qt.UserRole)
-            if len(data) > 2:
+            data = _data(d)
+            if isinstance(data, (tuple, list)) and len(data) > 2:
                 if data[2] == "Subfolder":
                     if data[1]=="Faults":
                         self.c_faults_root = d
@@ -1493,11 +1521,12 @@ def on_tree_loaded(self):
                     if data[1]=="Other":
                         self.c_other_root = d
 
-    descendents = self.input_tree.get_items_in_folder(self.c_well_logs_folder, recursive=False)
+    logs_folder = getattr(self, "c_well_logs_folder", None)
+    descendents = self.input_tree.get_items_in_folder(logs_folder, recursive=False)
     if len(descendents) > 0:
         for d in descendents:
-            data = d.data(0, Qt.UserRole)
-            if len(data) > 2:
+            data = _data(d)
+            if isinstance(data, (tuple, list)) and len(data) > 2:
                 if data[2] == "Subfolder":
                     if data[1]=="continuous":
                         self.cont_folder = d
@@ -1557,6 +1586,7 @@ def setup_well_tree(self):
     self.c_well_tops_folder = self.input_tree.add_root("Wells Tops")
     self.c_well_logs_folder = self.input_tree.add_root("Logs")
     self.c_well_track_folder = self.input_tree.add_root("Tracks")
+    self.c_filter_folder = self.input_tree.add_root("Filters")
 
     # Subfolders
     # The Well Tops entries
@@ -1573,6 +1603,7 @@ def setup_well_tree(self):
     self.c_well_tops_folder.setData(0,Qt.UserRole, ("Tops", "Root", "Folder"))
     self.c_well_logs_folder.setData(0,Qt.UserRole, ("Logs", "Root", "Folder"))
     self.c_well_track_folder.setData(0,Qt.UserRole, ("Tracks", "Root", "Folder"))
+    self.c_filter_folder.setData(0, Qt.UserRole, ("Filters", "Root", "Folder"))
     # --- subfolders ---
     self.c_faults_root.setData(0, Qt.UserRole, ("Well Tops", "Faults", "Subfolder"))
     self.c_stratigraphy_root.setData(0, Qt.UserRole, ("Well Tops", "Stratigraphy", "Subfolder"))
@@ -1581,6 +1612,7 @@ def setup_well_tree(self):
     self.cont_folder.setData(0, Qt.UserRole, ("Well Logs", "continuous", "Subfolder"))
     self.disc_folder.setData(0, Qt.UserRole, ("Well Logs", "discrete", "Subfolder"))
     self.bmp_folder.setData(0, Qt.UserRole, ("Well Logs", "bitmap", "Subfolder"))
+    self.input_tree.set_accept_children_drop(self.c_filter_folder, False)
 
     # self.input_tree.set_accept_children_drop(self.cont_folder, False)
     # self.input_tree.set_accept_children_drop(self.disc_folder, False)

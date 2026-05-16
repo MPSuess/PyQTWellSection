@@ -73,7 +73,7 @@ def _file_load_tops_from_csv(self, path: str):
             wells_by_name[nm] = w
 
     # ---- ensure we have a stratigraphy dict ----
-    strat = getattr(self, "stratigraphy", None)
+    strat = getattr(self, "all_stratigraphy", None)
     if strat is None or not isinstance(strat, dict):
         strat = OrderedDict()
     else:
@@ -157,22 +157,30 @@ def _file_load_tops_from_csv(self, path: str):
             added_tops += 1
 
     # store stratigraphy back
-    self.stratigraphy = strat
+    self.all_stratigraphy = strat
+    if hasattr(self, "project"):
+        self.project.all_stratigraphy = self.all_stratigraphy
+        self.project.all_wells = self.all_wells
 
     # ---- update panel ----
     if hasattr(self, "panel"):
         self.panel.wells = self.all_wells
-        self.panel.stratigraphy = self.stratigraphy
-        # keep zoom/flatten; if you want to reset, uncomment:
-        # self.panel.current_depth_window = None
-        # self.panel._flatten_depths = None
-        self.panel.draw_panel()
+        self.panel.stratigraphy = self.all_stratigraphy
 
     # ---- refresh trees ----
-    if hasattr(self, "_populate_well_tree"):
-        self._populate_well_tree()
-    if hasattr(self, "_populate_top_tree"):
-        self._populate_top_tree()
+    tree = getattr(self, "input_tree", None)
+    if tree is not None:
+        tree.blockSignals(True)
+    try:
+        if hasattr(self, "_populate_well_tree"):
+            self._populate_well_tree()
+        if hasattr(self, "_populate_tops_tree"):
+            self._populate_tops_tree()
+    finally:
+        if tree is not None:
+            tree.blockSignals(False)
+    if hasattr(self, "_rebuild_well_panel_from_tree"):
+        self._rebuild_well_panel_from_tree()
 
     # ---- summary message ----
     msg = [
@@ -1187,20 +1195,37 @@ def import_schichtenverzeichnis(parent, project, xlsx_path, bee_path="./BEE_Chro
     strat = project.all_stratigraphy
     for key, meta in strat_updates.items():
         strat.setdefault(key, {}).update(meta)
+    if hasattr(parent, "all_stratigraphy"):
+        parent.all_stratigraphy = strat
 
     tops_dict = target_well.setdefault("tops", {})
 
-    parent.panel.set_draw_well_panel(False)
+    tree = getattr(parent, "input_tree", None)
+    if tree is not None:
+        tree.blockSignals(True)
+    try:
+        if hasattr(parent, "panel"):
+            parent.panel.set_draw_well_panel(False)
 
-    for t in tops:
-        tops_dict[t["key"]] = {
-            "depth": t["depth"],
-            "role": t["role"],
-            "level": strat.get(t["key"], {}).get("level", "formation"),
-        }
-        parent.add_top_to_tree(t["key"], t["role"])
+        for t in tops:
+            tops_dict[t["key"]] = {
+                "depth": t["depth"],
+                "role": t["role"],
+                "level": strat.get(t["key"], {}).get("level", "formation"),
+            }
+            parent.add_top_to_tree(t["key"], t["role"])
+    finally:
+        if hasattr(parent, "panel"):
+            parent.panel.set_draw_well_panel(True)
+        if tree is not None:
+            tree.blockSignals(False)
 
-    parent.panel.set_draw_well_panel(True)
+    if hasattr(parent, "_populate_well_tree"):
+        parent._populate_well_tree()
+    if hasattr(parent, "_populate_tops_tree"):
+        parent._populate_tops_tree()
+    if hasattr(parent, "_rebuild_well_panel_from_tree"):
+        parent._rebuild_well_panel_from_tree()
 
     QMessageBox.information(
         parent,
@@ -1675,6 +1700,10 @@ def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
         
         # Update project stratigraphy
         project.all_stratigraphy = strat
+        if hasattr(parent, "all_stratigraphy"):
+            parent.all_stratigraphy = strat
+        if hasattr(parent, "all_wells"):
+            parent.all_wells = project.all_wells
         
         # Update total depth if needed
         try:
@@ -1692,20 +1721,27 @@ def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
         # Snapshot currently checked wells/tops to preserve user-visible state.
         prev_checked_wells = set()
         prev_checked_tops = set()
+        tops_root = None
         if hasattr(parent, "input_tree"):
             try:
+                if hasattr(parent, "_ensure_input_tops_roots"):
+                    tops_root, _, _, _ = parent._ensure_input_tops_roots()
                 if hasattr(parent, "c_well_folder"):
                     for it in parent.input_tree.get_items_in_folder(parent.c_well_folder, recursive=True):
                         info = it.data(0, Qt.UserRole)
                         if isinstance(info, (tuple, list)) and len(info) > 1 and info[1] == "Well":
                             if it.checkState(0) == Qt.Checked and info[0]:
                                 prev_checked_wells.add(str(info[0]).strip())
-                if hasattr(parent, "c_well_tops_folder"):
-                    for it in parent.input_tree.get_items_in_folder(parent.c_well_tops_folder, recursive=True):
+                if tops_root is not None:
+                    for it in parent.input_tree.get_items_in_folder(tops_root, recursive=True):
                         info = it.data(0, Qt.UserRole)
+                        nm = None
                         if isinstance(info, (tuple, list)) and len(info) > 2 and info[0] == "Tops":
-                            if it.checkState(0) == Qt.Checked and info[2]:
-                                prev_checked_tops.add(str(info[2]).strip())
+                            nm = info[2]
+                        if not nm and hasattr(parent, "all_stratigraphy") and it.text(0).strip() in parent.all_stratigraphy:
+                            nm = it.text(0).strip()
+                        if nm and it.checkState(0) == Qt.Checked:
+                            prev_checked_tops.add(str(nm).strip())
             except Exception:
                 pass
 
@@ -1716,6 +1752,8 @@ def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
             parent.all_stratigraphy = strat
         if hasattr(parent, "_populate_tops_tree"):
             parent._populate_tops_tree()
+        if hasattr(parent, "_ensure_input_tops_roots"):
+            tops_root, _, _, _ = parent._ensure_input_tops_roots()
 
         # Ensure imported well/tops are visible while preserving previously checked state.
         if hasattr(parent, "input_tree"):
@@ -1734,18 +1772,22 @@ def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
                             nm = str(info[0]).strip()
                             it.setCheckState(0, Qt.Checked if nm in desired_wells else Qt.Unchecked)
 
-                if hasattr(parent, "c_well_tops_folder"):
-                    for it in parent.input_tree.get_items_in_folder(parent.c_well_tops_folder, recursive=True):
+                if tops_root is not None:
+                    for it in parent.input_tree.get_items_in_folder(tops_root, recursive=True):
                         info = it.data(0, Qt.UserRole)
+                        nm = None
                         if isinstance(info, (tuple, list)) and len(info) > 2 and info[0] == "Tops":
                             nm = str(info[2]).strip()
+                        elif hasattr(parent, "all_stratigraphy") and it.text(0).strip() in parent.all_stratigraphy:
+                            nm = it.text(0).strip()
+                        if nm:
                             it.setCheckState(0, Qt.Checked if nm in desired_tops else Qt.Unchecked)
 
                 # Keep roots visibly checked if anything is selected.
                 if hasattr(parent, "c_well_folder") and desired_wells:
                     parent.c_well_folder.setCheckState(0, Qt.Checked)
-                if hasattr(parent, "c_well_tops_folder") and desired_tops:
-                    parent.c_well_tops_folder.setCheckState(0, Qt.Checked)
+                if tops_root is not None and desired_tops:
+                    tops_root.setCheckState(0, Qt.Checked)
             except Exception:
                 pass
             finally:
@@ -1753,15 +1795,13 @@ def load_well_tops_from_excel(parent, xlsx_path: str) -> bool:
 
         if hasattr(parent, "_rebuild_well_panel_from_tree"):
             parent._rebuild_well_panel_from_tree()
-        
-        # Redraw active panel if it exists
+
+        # Keep active panel data aligned; _rebuild_well_panel_from_tree already
+        # performs the single redraw from the final input-tree checkbox state.
         active_panel = getattr(parent, "active_window", None)
         if active_panel is not None and hasattr(active_panel, "well_panel"):
             active_panel.well_panel.stratigraphy = strat
             active_panel.well_panel.wells = project.all_wells
-            # Recompute depth limits after data import to avoid stale 0..1 ranges.
-            active_panel.well_panel.current_depth_window = None
-            active_panel.well_panel.draw_well_panel()
         
         # Show summary
         msg = [
